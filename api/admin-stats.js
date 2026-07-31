@@ -1,4 +1,4 @@
-import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
+import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
 
 const num=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
 const isoDay=v=>new Date(v).toISOString().slice(0,10);
@@ -36,13 +36,15 @@ export default async function handler(req,res){
       await requireAdmin(adminUser);
       if(req.method==='GET'){
         const models=(await getAvailableModels()).sort((a,b)=>(a.pricing.prompt+a.pricing.completion)-(b.pricing.prompt+b.pricing.completion));
+        const liveModels=GEMINI_LIVE_MODELS.map(x=>({...x}));
         const imageModels=GEMINI_IMAGE_MODELS.map(x=>({...x})).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
-        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,pricingSource:'Google Gemini Developer API pricing',pricingSourceUrl:'https://ai.google.dev/gemini-api/docs/pricing',refreshedAt:'2026-07-31',catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
+        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,liveModels,pricingSource:'Google Gemini Developer API pricing',pricingSourceUrl:'https://ai.google.dev/gemini-api/docs/pricing',refreshedAt:'2026-07-31',catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
       }
       const b=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const action=String(b.action||'bulk-models');
       const validText=new Set((await getAvailableModels()).map(x=>x.id));
       const validImages=new Set(GEMINI_IMAGE_MODELS.map(x=>x.id));
+      const validLive=new Set(GEMINI_LIVE_MODELS.map(x=>x.id));
       const clean=v=>String(v??'').trim();
       const safeId=v=>clean(v).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48);
       if(action==='delete'){
@@ -52,15 +54,15 @@ export default async function handler(req,res){
         return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }
       if(action==='save-tool'){
-        const t=b.tool||{};const id=safeId(t.id);const type=t.tool_type==='image'?'image':'text';const model=clean(t.model_id);
+        const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image','live_audio','live_translate']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
         if(!id||!clean(t.name_ar)||!clean(t.name_en))return json(res,400,{error:localize(locale,'أدخل معرّفًا واسمًا عربيًا وإنجليزيًا.','Enter an id plus Arabic and English names.')});
-        if(!(type==='image'?validImages:validText).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
+        if(!(type==='image'?validImages:(type==='live_audio'||type==='live_translate'?validLive:validText)).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
         const row={id,name_ar:clean(t.name_ar).slice(0,120),name_en:clean(t.name_en).slice(0,120),description_ar:clean(t.description_ar).slice(0,1000),description_en:clean(t.description_en).slice(0,1000),tool_type:type,model_id:model,is_active:t.is_active!==false,sort_order:Math.max(0,Math.min(9999,Number(t.sort_order)||0)),updated_at:new Date().toISOString()};
         const {error}=await db().from('ai_tools').upsert(row,{onConflict:'id'});if(error)throw error;
         return json(res,200,{ok:true,tool:row,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }
       const tools=await getAiTools({includeInactive:true});const updates=[];
-      for(const tool of tools){const value=b.settings?.[tool.id];const valid=(tool.tool_type==='image'?validImages:validText).has(value);if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()})}
+      for(const tool of tools){const value=b.settings?.[tool.id];const valid=(tool.tool_type==='image'?validImages:(tool.tool_type==='live_audio'||tool.tool_type==='live_translate'?validLive:validText)).has(value);if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()})}
       if(!updates.length)return json(res,400,{error:localize(locale,'لم يتم إرسال إعدادات صالحة.','No valid settings were submitted.')});
       const {error}=await db().from('ai_tools').upsert(updates,{onConflict:'id'});if(error)throw error;
       return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});

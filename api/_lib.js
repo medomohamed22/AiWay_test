@@ -557,6 +557,12 @@ export const GEMINI_IMAGE_MODELS = [
   { id:'gemini-3-pro-image', name:'Nano Banana Pro', description:'إنتاج صور احترافية وتعليمات مركبة حتى 4K.', pricing:{prompt:2.70/1e6,completion:13.50/1e6,imageOutputPerMillion:120,request:0.134}, inputModalities:['text','image'], outputModalities:['text','image'], supportedResolutions:['1K','2K','4K'], tier:'stable' }
 ];
 
+
+export const GEMINI_LIVE_MODELS = [
+  { id:'gemini-3.1-flash-live-preview', name:'Gemini 3 Flash Live', description:'محادثة صوتية فورية منخفضة التأخير مع إدخال نص وصور وصوت وفيديو وإخراج صوت ونص.', pricing:{prompt:0.75/1e6,completion:4.50/1e6,textInput:0.75/1e6,audioInput:3.00/1e6,imageVideoInput:1.00/1e6,textOutput:4.50/1e6,audioOutput:12.00/1e6,audioInputPerMinute:0.005,audioOutputPerMinute:0.018}, inputModalities:['text','image','audio','video'], outputModalities:['text','audio'], tier:'preview', liveKind:'dialog' },
+  { id:'gemini-3.5-live-translate-preview', name:'Gemini 3.5 Live Translate', description:'ترجمة صوتية فورية ثنائية الاتجاه بين أكثر من 70 لغة مع إخراج صوت ونص مترجم.', pricing:{prompt:3.50/1e6,completion:21.00/1e6,audioInput:3.50/1e6,audioOutput:21.00/1e6,audioInputPerMinute:0.0053,audioOutputPerMinute:0.0315,totalPerMinute:0.0368}, inputModalities:['audio'], outputModalities:['audio','text'], tier:'preview', liveKind:'translate', pricingNote:'تُعرض التكلفة الفعلية من صفحة تسعير Google وحساب الفوترة عند إتاحتها للمشروع.' }
+];
+
 export async function getAvailableModels(){ return GEMINI_MODELS.map(model=>({...model,pricing:{...model.pricing}})); }
 
 export const DEFAULT_AI_TOOLS = [
@@ -567,7 +573,9 @@ export const DEFAULT_AI_TOOLS = [
   {id:'translate',name_ar:'الترجمة',name_en:'Translation',description_ar:'ترجمة النصوص مع الحفاظ على المعنى والسياق.',description_en:'Translate text while preserving meaning and context.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:50},
   {id:'study',name_ar:'الدراسة',name_en:'Study',description_ar:'شرح الدروس، حل الأسئلة وإنشاء خطط ومراجعات دراسية.',description_en:'Explain lessons, solve questions, and create study plans and reviews.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:60},
   {id:'business',name_ar:'الأعمال',name_en:'Business',description_ar:'تحليل الأفكار وخطط الأعمال والمحتوى المهني.',description_en:'Analyze ideas, business plans, and professional content.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:70},
-  {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام نماذج Gemini للصور.',description_en:'Generate and edit images with Gemini image models.',tool_type:'image',model_id:'gemini-3.1-flash-lite-image',is_active:true,sort_order:80}
+  {id:'voice-chat',name_ar:'محادثة صوتية',name_en:'Voice conversation',description_ar:'تحدث مباشرة مع Gemini بصوت طبيعي واستجابة فورية.',description_en:'Talk with Gemini in real time using natural voice and low-latency responses.',tool_type:'live_audio',model_id:'gemini-3.1-flash-live-preview',is_active:true,sort_order:80},
+  {id:'voice-translate',name_ar:'الترجمة الصوتية',name_en:'Live voice translation',description_ar:'ترجمة المحادثات صوتيًا في الوقت الحقيقي بين اللغات.',description_en:'Translate spoken conversations between languages in real time.',tool_type:'live_translate',model_id:'gemini-3.5-live-translate-preview',is_active:true,sort_order:90},
+  {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام نماذج Gemini للصور.',description_en:'Generate and edit images with Gemini image models.',tool_type:'image',model_id:'gemini-3.1-flash-lite-image',is_active:true,sort_order:100}
 ];
 
 export async function getAiTools({includeInactive=false}={}){
