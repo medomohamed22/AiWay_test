@@ -1,7 +1,7 @@
 // AiWay service worker — app-shell caching + Web Push notifications.
 // Intentionally does NOT intercept /api/* requests: all chat, payment,
 // Pi login and download traffic must always reach the network directly.
-const CACHE_VERSION = 'aiway-shell-v1';
+const CACHE_VERSION = 'aiway-shell-v4';
 const SHELL_ASSETS = ['/', '/index.html', '/aiway-logo.png', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -23,23 +23,28 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  // Never cache API, admin, or auth-sensitive routes — always hit the network.
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
+  // Documents are network-first so every Vercel deployment appears immediately.
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' })
         .then((response) => {
-          if (response && response.ok && (request.destination === 'document' || request.destination === 'image')) {
-            const copy = response.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
-          }
+          if (response && response.ok) caches.open(CACHE_VERSION).then(cache => cache.put('/index.html', response.clone())).catch(() => {});
           return response;
         })
-        .catch(() => cached || caches.match('/index.html'));
-      return cached || network;
-    })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.ok && request.destination === 'image') caches.open(CACHE_VERSION).then(cache => cache.put(request, response.clone())).catch(() => {});
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
 
