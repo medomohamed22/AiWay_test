@@ -57,7 +57,11 @@ export default async function handler(req,res){
         const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image','live_audio','live_translate']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
         if(!id||!clean(t.name_ar)||!clean(t.name_en))return json(res,400,{error:localize(locale,'أدخل معرّفًا واسمًا عربيًا وإنجليزيًا.','Enter an id plus Arabic and English names.')});
         if(!(type==='image'?validImages:(type==='live_audio'||type==='live_translate'?validLive:validText)).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
-        const row={id,name_ar:clean(t.name_ar).slice(0,120),name_en:clean(t.name_en).slice(0,120),description_ar:clean(t.description_ar).slice(0,1000),description_en:clean(t.description_en).slice(0,1000),tool_type:type,model_id:model,is_active:t.is_active!==false,sort_order:Math.max(0,Math.min(9999,Number(t.sort_order)||0)),updated_at:new Date().toISOString()};
+        let promptConfig=t.prompt_config;
+        if(typeof promptConfig==='string'){try{promptConfig=JSON.parse(promptConfig)}catch{return json(res,400,{error:localize(locale,'كود JSON الخاص بتعليمات الأداة غير صالح.','The tool instruction JSON is invalid.')})}}
+        if(!promptConfig||typeof promptConfig!=='object'||Array.isArray(promptConfig))promptConfig={};
+        const promptJson=JSON.stringify(promptConfig);if(promptJson.length>12000)return json(res,400,{error:localize(locale,'تعليمات الأداة كبيرة جدًا.','Tool instructions are too large.')});
+        const row={id,name_ar:clean(t.name_ar).slice(0,120),name_en:clean(t.name_en).slice(0,120),description_ar:clean(t.description_ar).slice(0,1000),description_en:clean(t.description_en).slice(0,1000),tool_type:type,model_id:model,prompt_config:promptConfig,is_active:t.is_active!==false,sort_order:Math.max(0,Math.min(9999,Number(t.sort_order)||0)),updated_at:new Date().toISOString()};
         const {error}=await db().from('ai_tools').upsert(row,{onConflict:'id'});if(error)throw error;
         return json(res,200,{ok:true,tool:row,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }

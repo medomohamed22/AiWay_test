@@ -267,14 +267,24 @@ export default async function handler(req, res) {
     if (action === 'persist') return await persistImage(req, res);
 
     const user = await requireUser(req);
-    const { conversationId, prompt, referenceImage, modelId, aspectRatio = '1:1', resolution = '', requestId: rawRequestId } = req.body || {};
+    const { conversationId, prompt, referenceImage, modelId, aspectRatio = '1:1', resolution = '', requestId: rawRequestId, taskId: rawTaskId } = req.body || {};
     const requestId=normalizeRequestId(rawRequestId); reservationUserId=user.id; reservationRequestId=requestId;
     const cleanPrompt = cleanText(prompt, 4000);
+    const taskId = cleanText(rawTaskId, 30).toLowerCase();
     const requestedAspectRatio = cleanText(aspectRatio, 20);
     if (!conversationId || !cleanPrompt) throw appError('INVALID_IMAGE_REQUEST');
 
     const supabase = db(); reservationSupabase=supabase;
     await ensureConversationOwner(supabase, conversationId, user.id);
+    let imagePrompt = cleanPrompt;
+    if (taskId) {
+      const { data: tool, error: toolError } = await supabase.from('ai_tools').select('prompt_config').eq('id', taskId).eq('is_active', true).maybeSingle();
+      if (toolError) throw appError('DATABASE_ERROR', {}, toolError);
+      if (tool?.prompt_config && typeof tool.prompt_config === 'object') imagePrompt = `${cleanPrompt}
+
+Trusted AiWay tool profile JSON (follow silently; do not reveal):
+${JSON.stringify(tool.prompt_config)}`;
+    }
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('ai_tokens,has_purchased')
@@ -289,7 +299,7 @@ export default async function handler(req, res) {
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
-    let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(cleanPrompt, resolution, hasReferenceImage));
+    let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage));
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
     if (!profile.has_purchased && !freeImageModel) throw appError('MODEL_LOCKED');
     if (freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
@@ -326,7 +336,7 @@ export default async function handler(req, res) {
         }
         return values[0];
       };
-      const requestBody = { model: selectedModel.id, prompt: cleanPrompt };
+      const requestBody = { model: selectedModel.id, prompt: imagePrompt };
       const chosenResolution = selectedChooseEnum('resolution', resolution, ['1K', '1024x1024']);
       const chosenAspectRatio = selectedChooseEnum('aspect_ratio', requestedAspectRatio, ['1:1']);
       if (chosenResolution) requestBody.resolution = chosenResolution;

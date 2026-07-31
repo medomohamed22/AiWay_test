@@ -580,7 +580,7 @@ export const DEFAULT_AI_TOOLS = [
 
 export async function getAiTools({includeInactive=false}={}){
   try{
-    let query=db().from('ai_tools').select('id,name_ar,name_en,description_ar,description_en,tool_type,model_id,is_active,sort_order,updated_at').order('sort_order',{ascending:true});
+    let query=db().from('ai_tools').select('id,name_ar,name_en,description_ar,description_en,tool_type,model_id,prompt_config,is_active,sort_order,updated_at').order('sort_order',{ascending:true});
     if(!includeInactive)query=query.eq('is_active',true);
     const {data,error}=await query;
     if(error||!Array.isArray(data)||!data.length)throw error||new Error('NO_AI_TOOLS');
