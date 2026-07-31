@@ -287,6 +287,10 @@ function normalizedErrorCode(error) {
   if (/aborterror|aborted|timed?\s*out|timeout/i.test(`${error?.name || ''} ${raw}`)) return 'REQUEST_TIMEOUT';
   if (/fetch failed|networkerror|econnreset|econnrefused|enotfound|socket hang up/i.test(raw)) return 'NETWORK_ERROR';
   if (/pgrst|postgres|supabase|relation .* does not exist|database/i.test(raw)) return 'DATABASE_ERROR';
+  if (/(?:free[_ -]?tier|trial).*(?:not available|unsupported|limit\s*[:=]\s*0)|(?:not available|unsupported).*free[_ -]?tier/i.test(raw)) return 'MODEL_NOT_AVAILABLE_FREE_TIER';
+  if (/resource_exhausted|quota exceeded|exceeded your current quota|rate limit/i.test(raw)) return 'RATE_LIMITED';
+  if (/permission_denied|does not have access|not authorized|access denied/i.test(raw)) return 'PROVIDER_PERMISSION_DENIED';
+  if (/model.*(?:not found|not available|unsupported)|not found.*model/i.test(raw)) return 'MODEL_UNAVAILABLE';
   return raw;
 }
 
@@ -362,6 +366,10 @@ export function errorDetails(error, locale = 'ar') {
     MODEL_UNAVAILABLE: [503, {
       ar: 'النموذج المختار غير متاح حاليًا. حدّث قائمة النماذج واختر نموذجًا آخر؛ لم يتم خصم رصيدك.',
       en: 'The selected model is currently unavailable. Refresh the model list and choose another model; your balance was not charged.'
+    }],
+    MODEL_NOT_AVAILABLE_FREE_TIER: [402, {
+      ar: 'هذا النموذج غير متاح ضمن التجربة المجانية لهذا المشروع. فعّل الفوترة في Google AI Studio أو اختر نموذجًا مجانيًا آخر؛ لم يتم خصم رصيدك.',
+      en: 'This model is not available on the free tier for this project. Enable billing in Google AI Studio or choose another free-tier model; your balance was not charged.'
     }],
     IMAGE_MODEL_UNAVAILABLE: [503, {
       ar: 'نموذج الصور المختار غير متاح حاليًا. حدّث قائمة النماذج واختر نموذج صور آخر؛ لم يتم خصم رصيدك.',

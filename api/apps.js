@@ -11,6 +11,7 @@ export default async function handler(req, res) {
       await requireUser(req);
       const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const toolId=String(body.toolId||'');
+      const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
       const tools=await getAiTools();
       const tool=tools.find(x=>x.id===toolId&&['live_audio','live_translate'].includes(x.tool_type));
       if(!tool)return json(res,404,{error:localize(locale,'الأداة الصوتية غير متاحة.','The live audio tool is unavailable.')});
@@ -18,11 +19,35 @@ export default async function handler(req, res) {
       if(!model)return json(res,400,{error:localize(locale,'النموذج الصوتي المختار غير صالح.','The selected live model is invalid.')});
       if(!process.env.GEMINI_API_KEY)return json(res,503,{error:localize(locale,'مفتاح Gemini غير مضبوط.','Gemini API key is not configured.')});
       const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
-      const authToken={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:{responseModalities:['AUDIO']}}};
-      if(model.liveKind==='translate')authToken.liveConnectConstraints.config={responseModalities:['AUDIO'],lockAdditionalFields:[]};
-      const response=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({authToken})},12000);
+      const tokenRequest={
+        uses:1,
+        expireTime,
+        newSessionExpireTime,
+        liveConnectConstraints:{
+          model:`models/${model.id}`,
+          config:{responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{}}
+        }
+      };
+      // Translation language is selected by the user in the browser, so this field must remain unlocked.
+      if(model.liveKind==='translate')tokenRequest.liveConnectConstraints.config={responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:false}};
+      const response=await fetchWithTimeout('https://generativelanguage.googleapis.com/v1beta/auth_tokens',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY},
+        body:JSON.stringify(tokenRequest)
+      },12000);
       const data=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(data?.error?.message||`Gemini auth token ${response.status}`);
+      if(!response.ok){
+        const raw=String(data?.error?.message||'');
+        const quota=/quota|resource_exhausted|rate limit|limit: 0/i.test(raw);
+        const billing=/billing|paid tier|free tier|not available.*free|payment/i.test(raw);
+        const denied=response.status===403||/permission_denied|not authorized|access denied/i.test(raw);
+        const unavailable=response.status===404||/not found|not supported|unsupported|not available/i.test(raw);
+        const status=quota?429:(billing?402:(denied?403:(unavailable?400:response.status)));
+        const code=billing||(/free[_ -]?tier/i.test(raw)&&/limit:\s*0/i.test(raw))?'MODEL_NOT_AVAILABLE_FREE_TIER':quota?'GEMINI_QUOTA_EXCEEDED':denied?'GEMINI_ACCESS_DENIED':unavailable?'MODEL_UNAVAILABLE':'GEMINI_LIVE_ERROR';
+        const ar=code==='MODEL_NOT_AVAILABLE_FREE_TIER'?'هذا النموذج غير متاح ضمن التجربة المجانية لهذا المشروع. فعّل الفوترة في Google AI Studio أو اختر نموذجًا متاحًا مجانًا.':code==='GEMINI_QUOTA_EXCEEDED'?'تم الوصول إلى حد استخدام Gemini مؤقتًا. انتظر قليلًا أو راجع حدود المشروع والفوترة.':code==='GEMINI_ACCESS_DENIED'?'المشروع أو مفتاح Gemini لا يملك صلاحية استخدام هذا النموذج. راجع المفتاح والفوترة والمنطقة المدعومة.':code==='MODEL_UNAVAILABLE'?'النموذج المختار غير متاح حاليًا لهذا المشروع أو تم تغيير معرّفه. اختر نموذجًا آخر من لوحة الإدارة.':'تعذر إنشاء جلسة Gemini الصوتية حاليًا. راجع إعدادات المفتاح والفوترة ثم حاول مرة أخرى.';
+        const en=code==='MODEL_NOT_AVAILABLE_FREE_TIER'?'This model is not available on the free tier for this project. Enable billing in Google AI Studio or select a free-tier model.':code==='GEMINI_QUOTA_EXCEEDED'?'The Gemini usage limit has been reached temporarily. Try again later or review the project quota and billing.':code==='GEMINI_ACCESS_DENIED'?'This Gemini project or API key does not have access to the selected model. Check the key, billing, and supported region.':code==='MODEL_UNAVAILABLE'?'The selected model is unavailable for this project or its model ID has changed. Select another model in the admin panel.':'Could not create the Gemini live audio session. Check the API key and billing settings, then try again.';
+        return json(res,status,{error:localize(locale,ar,en),code,providerMessage:process.env.NODE_ENV==='development'?raw:undefined});
+      }
       return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,expiresAt:expireTime});
     }
     if (String(req.query?.mode || '') === 'version') {
