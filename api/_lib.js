@@ -558,13 +558,32 @@ export const GEMINI_IMAGE_MODELS = [
 
 export async function getAvailableModels(){ return GEMINI_MODELS.map(model=>({...model,pricing:{...model.pricing}})); }
 
-export async function getToolModelSettings(){
-  const defaults={coding:'gemini-3.5-flash',summary:'gemini-3.1-flash-lite',ads:'gemini-3.1-flash-lite',writing:'gemini-3.5-flash',translate:'gemini-3.1-flash-lite',study:'gemini-3.5-flash',business:'gemini-3.5-flash',image:'gemini-3.1-flash-lite-image'};
+export const DEFAULT_AI_TOOLS = [
+  {id:'coding',name_ar:'البرمجة',name_en:'Coding',description_ar:'كتابة الكود، إصلاح الأخطاء وشرح الحلول التقنية.',description_en:'Write code, fix bugs, and explain technical solutions.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:10},
+  {id:'summary',name_ar:'التلخيص',name_en:'Summarization',description_ar:'تلخيص النصوص والمقالات والملفات مع الحفاظ على أهم النقاط.',description_en:'Summarize text, articles, and files while preserving key points.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:20},
+  {id:'ads',name_ar:'الإعلانات',name_en:'Advertising',description_ar:'إنشاء نصوص إعلانية وأفكار حملات وتسويق.',description_en:'Create advertising copy, campaign ideas, and marketing content.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:30},
+  {id:'writing',name_ar:'الكتابة',name_en:'Writing',description_ar:'كتابة وإعادة صياغة المحتوى بأساليب مختلفة.',description_en:'Write and rewrite content in different styles.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:40},
+  {id:'translate',name_ar:'الترجمة',name_en:'Translation',description_ar:'ترجمة النصوص مع الحفاظ على المعنى والسياق.',description_en:'Translate text while preserving meaning and context.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:50},
+  {id:'study',name_ar:'الدراسة',name_en:'Study',description_ar:'شرح الدروس، حل الأسئلة وإنشاء خطط ومراجعات دراسية.',description_en:'Explain lessons, solve questions, and create study plans and reviews.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:60},
+  {id:'business',name_ar:'الأعمال',name_en:'Business',description_ar:'تحليل الأفكار وخطط الأعمال والمحتوى المهني.',description_en:'Analyze ideas, business plans, and professional content.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:70},
+  {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام نماذج Gemini للصور.',description_en:'Generate and edit images with Gemini image models.',tool_type:'image',model_id:'gemini-3.1-flash-lite-image',is_active:true,sort_order:80}
+];
+
+export async function getAiTools({includeInactive=false}={}){
   try{
-    const {data,error}=await db().from('ai_settings').select('value').eq('key','tool_models').maybeSingle();
-    if(error||!data?.value)return defaults;
-    return {...defaults,...(typeof data.value==='object'?data.value:{})};
-  }catch{return defaults;}
+    let query=db().from('ai_tools').select('id,name_ar,name_en,description_ar,description_en,tool_type,model_id,is_active,sort_order,updated_at').order('sort_order',{ascending:true});
+    if(!includeInactive)query=query.eq('is_active',true);
+    const {data,error}=await query;
+    if(error||!Array.isArray(data)||!data.length)throw error||new Error('NO_AI_TOOLS');
+    return data;
+  }catch{
+    return DEFAULT_AI_TOOLS.filter(tool=>includeInactive||tool.is_active).map(tool=>({...tool}));
+  }
+}
+
+export async function getToolModelSettings(){
+  const tools=await getAiTools();
+  return Object.fromEntries(tools.map(tool=>[tool.id,tool.model_id]));
 }
 
 export function isFreeModel(model) {
