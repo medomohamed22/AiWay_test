@@ -411,8 +411,8 @@ export function errorDetails(error, locale = 'ar') {
       ar: 'النموذج المختار لا يدعم الصور المرجعية. اختر نموذج صور يدعم إدخال الصور.',
       en: 'The selected model does not support reference images. Choose an image model that accepts image input.'
     }],
-    SEARCH_MODEL_UNSUPPORTED: [400, { ar: 'النموذج المختار لا يدعم بحث Google. اختر نموذجًا من Gemini 3 أو أحدث ثم أعد المحاولة؛ لم يتم خصم رصيدك.', en: 'The selected model does not support Google Search grounding. Choose Gemini 3 or newer and try again; your balance was not charged.' }],
-    SEARCH_BILLING_REQUIRED: [402, { ar: 'بحث Google غير متاح لمستوى الفوترة الحالي أو انتهت حصته. فعّل الفوترة أو راجع حدود البحث في Google AI Studio؛ لم يتم خصم رصيدك.', en: 'Google Search grounding is unavailable for the current billing tier or its allowance was exhausted. Enable billing or review search limits in Google AI Studio; your balance was not charged.' }],
+    SEARCH_MODEL_UNSUPPORTED: [400, { ar: 'ميزة البحث غير متوفرة مع النموذج المختار حاليًا. اختر نموذجًا آخر ثم أعد المحاولة؛ لم يتم خصم رصيدك.', en: 'Search is not currently available with the selected model. Choose another model and try again; your balance was not charged.' }],
+    SEARCH_BILLING_REQUIRED: [402, { ar: 'ميزة البحث غير متوفرة حاليًا. حاول لاحقًا أو أرسل طلبك بدون البحث؛ لم يتم خصم رصيدك.', en: 'Search is currently unavailable. Try again later or send your request without search; your balance was not charged.' }],
     TRIAL_WEB_LOCKED: [403, { ar: 'بحث الويب متاح بعد أول عملية شراء.', en: 'Web search unlocks after your first purchase.' }],
     TRIAL_ENDED: [402, {
       ar: 'انتهت رسائلك التجريبية. اشحن رصيدًا لفتح جميع النماذج ومتابعة الاستخدام.',
@@ -996,6 +996,32 @@ export async function releaseAiTokens(supabase,userId,requestId,meta={}) {
   if(!requestId) return;
   const { error }=await supabase.rpc('release_ai_tokens',{p_user_id:userId,p_request_id:requestId,p_meta:meta});
   if(error) console.error('Token reservation release failed:',error.message);
+}
+
+
+export async function claimFreeTrialToken(supabase, userId, requestId, toolId) {
+  const { data, error } = await supabase.rpc('claim_aiway_free_trial_token', {
+    p_user_id: userId,
+    p_request_id: requestId,
+    p_tool_id: String(toolId || '').slice(0, 40)
+  });
+  if (error) {
+    const message = String(error.message || '').toLowerCase();
+    if (message.includes('trial tool locked')) throw appError('MODEL_LOCKED');
+    if (message.includes('trial ended')) throw appError('TRIAL_ENDED');
+    if (message.includes('already purchased')) throw appError('INVALID_REQUEST');
+    throw appError('DATABASE_ERROR', {}, error);
+  }
+  return data || {};
+}
+
+export async function releaseFreeTrialToken(supabase, userId, requestId) {
+  if (!requestId) return;
+  const { error } = await supabase.rpc('release_aiway_free_trial_token', {
+    p_user_id: userId,
+    p_request_id: requestId
+  });
+  if (error) console.error('Free trial token release failed:', error.message);
 }
 
 

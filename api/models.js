@@ -13,19 +13,27 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       if (body.action !== 'estimate-message') return json(res, 400, { error: localize(locale, 'طلب غير صالح.', 'Invalid request.') });
+      let estimatePurchased = true;
+      try {
+        const estimateUser = await requireUser(req);
+        const { data: estimateProfile } = await db().from('users').select('has_purchased').eq('id', estimateUser.id).single();
+        estimatePurchased = Boolean(estimateProfile?.has_purchased);
+      } catch {}
       const models = await getAvailableModels();
       const image = IMAGE_MODELS.find(model => model.id === body.modelId) || (body.taskId === 'image' ? IMAGE_MODELS[0] : null);
       if (image) {
         const providerUsd = Number(image.pricing.request);
-        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, providerUsd, chargedTokens:Math.max(1, Math.ceil(providerUsd / TOKEN_USD)), approximate:true });
+        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, providerUsd:estimatePurchased?providerUsd:0, chargedTokens:estimatePurchased?Math.max(1, Math.ceil(providerUsd / TOKEN_USD)):1, approximate:true, freeTrial:!estimatePurchased });
       }
       const settings = await getToolModelSettings();
       const id = settings[String(body.taskId || '')] || body.modelId;
       const model = models.find(item => item.id === id) || models[0];
+      const estimate = estimateChatCharge(model.pricing, Array.isArray(body.messages) ? body.messages : [], Boolean(body.webSearch), Number(body.outputReserve || 0));
       return json(res, 200, {
         type:'chat', modelId:model.id, routedModelId:model.id, modelName:model.name,
-        ...estimateChatCharge(model.pricing, Array.isArray(body.messages) ? body.messages : [], Boolean(body.webSearch), Number(body.outputReserve || 0)),
-        approximate:true
+        ...(estimatePurchased ? estimate : { ...estimate, providerUsd:0, chargedTokens:1 }),
+        approximate:true,
+        freeTrial:!estimatePurchased
       });
     }
 
@@ -53,7 +61,7 @@ export default async function handler(req, res) {
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:[] },
       trialModelId:await getTrialModelId(), packages,
       liveModels:GEMINI_LIVE_MODELS.map(model=>({...model,type:model.liveKind==='translate'?'live_translate':'live_audio',provider:'google',providerLabel:'Google'})),
-      imageModels:IMAGE_MODELS.map(model => ({ ...model, locked:!unlocked, isFree:false })),
+      imageModels:IMAGE_MODELS.map(model => ({ ...model, locked:false, isFree:!unlocked })),
       tokenUsd:TOKEN_USD, tools:await getAiTools(), rankingsSource:'Google Gemini API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {

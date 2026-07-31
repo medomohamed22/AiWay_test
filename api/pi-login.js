@@ -75,7 +75,7 @@ async function upsertPiUser(supabase, piUid, username) {
   const { data: user, error } = await supabase
     .from('users')
     .upsert({ pi_uid: piUid, username, last_login_at: new Date().toISOString() }, { onConflict: 'pi_uid' })
-    .select('id, pi_uid, username, role, ai_tokens, trial_messages_remaining, has_purchased, created_at')
+    .select('id, pi_uid, username, role, ai_tokens, trial_messages_remaining, free_trial_tokens, has_purchased, created_at')
     .single();
   if (error || !user) throw appError('DATABASE_ERROR', {}, error);
   return user;
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
       if (!consumed?.user_id) throw appError('PI_LOGIN_BRIDGE_EXPIRED');
       const { data: user, error: userError } = await supabase
         .from('users')
-        .select('id, pi_uid, username, role, ai_tokens, trial_messages_remaining, has_purchased, created_at')
+        .select('id, pi_uid, username, role, ai_tokens, trial_messages_remaining, free_trial_tokens, has_purchased, created_at')
         .eq('id', consumed.user_id)
         .single();
       if (userError || !user) throw appError('DATABASE_ERROR', {}, userError);

@@ -1,4 +1,4 @@
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -149,7 +149,7 @@ async function readProviderFailure(response) {
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
   const uiLocale = requestLocale(req);
-  let reservationUserId = null, reservationRequestId = null, reservationSupabase = null, reservationActive = false;
+  let reservationUserId = null, reservationRequestId = null, reservationSupabase = null, reservationActive = false, freeTrialActive = false;
   try {
     const downloadAction = String(req.query?.action || req.body?.action || '');
     if (req.method === 'GET' && downloadAction === 'native-download') return await nativeDownload(req, res);
@@ -192,17 +192,18 @@ export default async function handler(req, res) {
     }
     const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('ai_tokens,trial_messages_remaining,has_purchased')
+      .select('ai_tokens,trial_messages_remaining,free_trial_tokens,has_purchased')
       .eq('id', user.id)
       .single();
     if (profileError || !profile) throw appError('DATABASE_ERROR', {}, profileError);
 
     const purchased = Boolean(profile.has_purchased);
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
-    if (!purchased && modelId !== trialModelId && modelId !== 'aiway/auto' && !isFreeModel(model)) throw appError('MODEL_LOCKED');
+    if (!purchased && !taskId && modelId !== trialModelId && modelId !== 'aiway/auto' && !isFreeModel(model)) throw appError('MODEL_LOCKED');
     if (!purchased && webSearch) throw appError('TRIAL_WEB_LOCKED');
-    if (!purchased && Number(profile.trial_messages_remaining) <= 0) throw appError('TRIAL_ENDED');
-    if (availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
+    if (!purchased && ['coding','voice-chat','voice-translate'].includes(taskId)) throw appError('MODEL_LOCKED');
+    if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
+    if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
 
     const cleaned = messages.slice(-40)
       .map(message => ({
@@ -283,7 +284,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     const safeMessages = [{ role: 'system', content: formatSystemPrompt(model, language) + taskPrompt }, ...cleaned.filter(message => message.role !== 'system')];
 
     const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, 512);
-    if (availableTokens < initialEstimate.chargedTokens) {
+    if (purchased && availableTokens < initialEstimate.chargedTokens) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
         requiredTokens: initialEstimate.chargedTokens,
@@ -291,8 +292,8 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       });
     }
 
-    const initialMaxTokens = affordableOutputLimit(model.pricing, availableTokens, initialEstimate);
-    if (initialMaxTokens < 128) {
+    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, availableTokens, initialEstimate) : 2048;
+    if (purchased && initialMaxTokens < 128) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
         requiredTokens: initialEstimate.chargedTokens,
@@ -302,8 +303,14 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
 
     if (!process.env.GEMINI_API_KEY) throw appError('MISSING_CONFIGURATION');
 
-    await reserveAiTokens(supabase, user.id, requestId, 'chat', availableTokens);
-    reservationActive = true;
+    if (purchased) {
+      await reserveAiTokens(supabase, user.id, requestId, 'chat', availableTokens);
+      reservationActive=true;
+    } else {
+      await claimFreeTrialToken(supabase, user.id, requestId, taskId || 'chat');
+      freeTrialActive=true;
+    }
+    
 
     const lastUserMessage = continuationTarget ? null : [...cleaned].reverse().find(message => message.role === 'user');
     if (lastUserMessage) {
@@ -352,7 +359,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
 
 `);
     const charge=chargeTokens(activeModel.pricing,usage,webSearch);
-    if(charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
+    if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
 
     const previousUsage = continuationTarget?.token_usage && typeof continuationTarget.token_usage === 'object' ? continuationTarget.token_usage : {};
     const previousChargedTokens = Math.max(0, Number(previousUsage.chargedTokens || 0));
@@ -361,8 +368,8 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       ...previousUsage,
       ...usage,
       ...charge,
-      chargedTokens: previousChargedTokens + charge.chargedTokens,
-      lastContinuationChargedTokens: continuationTarget ? charge.chargedTokens : undefined,
+      chargedTokens: previousChargedTokens + (purchased ? charge.chargedTokens : 1),
+      lastContinuationChargedTokens: continuationTarget ? (purchased ? charge.chargedTokens : 1) : undefined,
       continuations: continuationCount,
       requestedModelId: modelId,
       autoSelected,
@@ -399,10 +406,13 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     }
     if (saveAssistantError || !savedAssistant) throw appError('DATABASE_ERROR', {}, saveAssistantError);
 
-    const remainingTokens = await finalizeAiTokens(supabase, user.id, requestId, charge.chargedTokens, {
-      messageId: savedAssistant.id, modelId: activeModelId, generationId: generationId || null
-    });
+    const remainingTokens = purchased
+      ? await finalizeAiTokens(supabase, user.id, requestId, charge.chargedTokens, {
+          messageId: savedAssistant.id, modelId: activeModelId, generationId: generationId || null
+        })
+      : Math.max(0, Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) - 1);
     reservationActive = false;
+    freeTrialActive = false;
     const conversationUpdate = await supabase.from('conversations')
       .update({ model_id: activeModelId, updated_at: new Date().toISOString() })
       .eq('id', conversationId)
@@ -412,7 +422,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     res.write(`data: ${JSON.stringify({
       type: 'done',
       usage,
-      chargedTokens: charge.chargedTokens,
+      chargedTokens: purchased ? charge.chargedTokens : 1,
       remainingTokens,
       lowBalance: isLowBalance(remainingTokens, charge.chargedTokens),
       requestedModelId: modelId,
@@ -424,13 +434,17 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       messageId: savedAssistant.id,
       continuation: Boolean(continuationTarget),
       continuations: continuationCount,
-      totalChargedTokens: previousChargedTokens + charge.chargedTokens
+      totalChargedTokens: previousChargedTokens + (purchased ? charge.chargedTokens : 1)
     })}\n\n`);
     return res.end();
   } catch (error) {
     if (reservationActive && reservationSupabase && reservationUserId && reservationRequestId) {
       await releaseAiTokens(reservationSupabase, reservationUserId, reservationRequestId, { code: String(error?.code || 'SERVER_ERROR') });
       reservationActive = false;
+    }
+    if (freeTrialActive && reservationSupabase && reservationUserId && reservationRequestId) {
+      await releaseFreeTrialToken(reservationSupabase, reservationUserId, reservationRequestId);
+      freeTrialActive = false;
     }
     if (res.headersSent) {
       const details = errorDetails(error, uiLocale);

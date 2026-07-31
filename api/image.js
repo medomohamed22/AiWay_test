@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -255,7 +255,7 @@ async function getImageModel(requestedId = '', preferQuality = false) {
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
   const uiLocale = requestLocale(req);
-  let reservationUserId=null,reservationRequestId=null,reservationSupabase=null,reservationActive=false;
+  let reservationUserId=null,reservationRequestId=null,reservationSupabase=null,reservationActive=false,freeTrialActive=false;
   try {
     const action = String(req.body?.action || req.query?.action || '');
     if (action === 'cleanup-expired' && req.method === 'GET') return await cleanupExpiredImages(req, res);
@@ -287,22 +287,23 @@ ${JSON.stringify(tool.prompt_config)}`;
     }
     const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('ai_tokens,has_purchased')
+      .select('ai_tokens,free_trial_tokens,trial_messages_remaining,has_purchased')
       .eq('id', user.id)
       .single();
     if (profileError || !profile) throw appError('DATABASE_ERROR', {}, profileError);
     // Free image endpoints remain available before purchase, subject to a strict daily limit.
 
+    const purchased = Boolean(profile.has_purchased);
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
-    if (availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
+    if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
+    if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
     if (!process.env.GEMINI_API_KEY) throw appError('MISSING_CONFIGURATION');
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
     let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage));
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
-    if (!profile.has_purchased && !freeImageModel) throw appError('MODEL_LOCKED');
-    if (freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
+    if (purchased && freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
     const supported = model.supported_parameters || {};
     const enumValues = descriptor => Array.isArray(descriptor)
       ? descriptor.map(String)
@@ -351,7 +352,7 @@ ${JSON.stringify(tool.prompt_config)}`;
 
     let { requestBody: body, chosenResolution: selectedResolution, chosenAspectRatio: selectedAspectRatio } = buildImageRequest(model);
     let estimatedCharge = estimateImageCharge(model, selectedResolution, hasReferenceImage);
-    if (availableTokens < estimatedCharge.chargedTokens) {
+    if (purchased && availableTokens < estimatedCharge.chargedTokens) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
         requiredTokens: estimatedCharge.chargedTokens,
@@ -359,8 +360,13 @@ ${JSON.stringify(tool.prompt_config)}`;
       });
     }
 
-    await reserveAiTokens(supabase,user.id,requestId,'image',availableTokens);
-    reservationActive=true;
+    if (purchased) {
+      await reserveAiTokens(supabase,user.id,requestId,'image',availableTokens);
+      reservationActive=true;
+    } else {
+      await claimFreeTrialToken(supabase,user.id,requestId,taskId || 'image');
+      freeTrialActive=true;
+    }
 
     const parts=[{text:cleanPrompt}];
     if(hasReferenceImage){const match=referenceImage.match(/^data:([^;]+);base64,(.+)$/);if(match)parts.push({inlineData:{mimeType:match[1],data:match[2]}});}
@@ -373,7 +379,7 @@ ${JSON.stringify(tool.prompt_config)}`;
     const thumbnailData=`data:${mediaType};base64,${imagePart.inlineData.data}`; const sourceUrl=null;
     const imageUsage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),cost:estimatedCharge.providerUsd};
     const charge=chargeTokens({},imageUsage,false);
-    if(charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
+    if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
     const item={width:null,height:null};
 
     let savedUser = null;
@@ -429,8 +435,11 @@ ${JSON.stringify(tool.prompt_config)}`;
       throw saveError;
     }
 
-    const remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,charge.chargedTokens,{imageId:savedImage.id,modelId:model.id});
+    const remainingTokens=purchased
+      ? await finalizeAiTokens(supabase,user.id,requestId,charge.chargedTokens,{imageId:savedImage.id,modelId:model.id})
+      : Math.max(0,Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0)-1);
     reservationActive=false;
+    freeTrialActive=false;
     const conversationUpdate = await supabase.from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversationId)
@@ -439,7 +448,7 @@ ${JSON.stringify(tool.prompt_config)}`;
 
     return json(res, 200, {
       image: savedImage,
-      chargedTokens: charge.chargedTokens,
+      chargedTokens: purchased ? charge.chargedTokens : 1,
       providerUsd: charge.providerUsd,
       selectedModelName: model.name || model.id,
       remainingTokens,
@@ -447,6 +456,7 @@ ${JSON.stringify(tool.prompt_config)}`;
     });
   } catch (error) {
     if(reservationActive&&reservationSupabase&&reservationUserId&&reservationRequestId){await releaseAiTokens(reservationSupabase,reservationUserId,reservationRequestId,{code:String(error?.code||'SERVER_ERROR')});reservationActive=false;}
+    if(freeTrialActive&&reservationSupabase&&reservationUserId&&reservationRequestId){await releaseFreeTrialToken(reservationSupabase,reservationUserId,reservationRequestId);freeTrialActive=false;}
     const action = String(req.body?.action || req.query?.action || '');
     if (action === 'download' && error?.message === 'IMAGE_NOT_FOUND') {
       const details = errorDetails(error, uiLocale);
