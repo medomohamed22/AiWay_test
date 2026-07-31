@@ -540,16 +540,26 @@ export const PACKAGES = {
 
 // Prices are USD per token and mirror the paid Gemini Developer API rates.
 const GEMINI_MODELS = [
-  { id:'gemini-3.1-flash-lite', name:'Gemini 3.1 Flash-Lite', description:'Fast, economical model for everyday tasks.', created:1780000001, contextLength:1048576, pricing:{prompt:0.15/1e6,completion:1.25/1e6} },
-  { id:'gemini-3.5-flash', name:'Gemini 3.5 Flash', description:'Frontier-quality fast model for coding and agentic work.', created:1780000002, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6} },
-  { id:'gemini-3.1-pro-preview', name:'Gemini 3.1 Pro', description:'High-quality reasoning and complex software work.', created:1780000003, contextLength:1048576, pricing:{prompt:2.70/1e6,completion:13.50/1e6} },
-  { id:'gemini-2.5-flash', name:'Gemini 2.5 Flash', description:'Stable price-performance model.', created:1750118400, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6} }
-].map(m=>({...m,family:'gemini',familyLabel:'Gemini',tag:'Google',inputModalities:['text','image','audio','video','pdf'],outputModalities:['text'],isFree:false}));
+  { id:'gemini-2.5-flash-lite', name:'Gemini 2.5 Flash-Lite', description:'الأقل تكلفة للمهام النصية اليومية والمعالجة واسعة النطاق.', created:1750118400, contextLength:1048576, pricing:{prompt:0.10/1e6,completion:0.40/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
+  { id:'gemini-3.1-flash-lite', name:'Gemini 3.1 Flash-Lite', description:'سريع واقتصادي للترجمة والتلخيص والمهام المتكررة.', created:1780000001, contextLength:1048576, pricing:{prompt:0.25/1e6,completion:1.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
+  { id:'gemini-2.5-flash', name:'Gemini 2.5 Flash', description:'توازن قوي بين السرعة والجودة والاستدلال.', created:1750118401, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
+  { id:'gemini-3.5-flash-lite', name:'Gemini 3.5 Flash-Lite', description:'نموذج حديث اقتصادي للمهام الوكيلية والترجمة والمعالجة.', created:1780000002, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
+  { id:'gemini-3.5-flash', name:'Gemini 3.5 Flash', description:'جودة أعلى للبرمجة والكتابة والاستدلال المعقد.', created:1780000003, contextLength:1048576, pricing:{prompt:0.75/1e6,completion:4.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
+  { id:'gemini-2.5-pro', name:'Gemini 2.5 Pro', description:'نموذج قوي للبرمجة والاستدلال والمهام المعقدة.', created:1750118402, contextLength:1048576, pricing:{prompt:2.25/1e6,completion:18.00/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable', pricingNote:'حتى 200 ألف توكين إدخال' },
+  { id:'gemini-3.1-pro-preview', name:'Gemini 3.1 Pro', description:'أعلى جودة للمهام الاحترافية المعقدة.', created:1780000004, contextLength:1048576, pricing:{prompt:2.70/1e6,completion:13.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'preview' }
+];
+
+export const GEMINI_IMAGE_MODELS = [
+  { id:'gemini-3.1-flash-lite-image', name:'Nano Banana 2 Lite', description:'الأرخص والأسرع لتوليد الصور وتعديلها.', pricing:{prompt:0.25/1e6,completion:1.50/1e6,imageOutputPerMillion:30,request:0.0336}, inputModalities:['text','image','video'], outputModalities:['text','image'], supportedResolutions:['1K'], tier:'stable' },
+  { id:'gemini-2.5-flash-image', name:'Nano Banana', description:'توليد وتعديل صور سريع بدقة حتى 1K.', pricing:{prompt:0.30/1e6,completion:0,imageOutputPerMillion:30,request:0.039}, inputModalities:['text','image'], outputModalities:['image'], supportedResolutions:['1K'], tier:'stable' },
+  { id:'gemini-3.1-flash-image', name:'Nano Banana 2', description:'جودة وسرعة متوازنة مع دعم دقات متعددة.', pricing:{prompt:0.50/1e6,completion:3.00/1e6,imageOutputPerMillion:60,request:0.067}, inputModalities:['text','image'], outputModalities:['text','image'], supportedResolutions:['0.5K','1K','2K','4K'], tier:'stable' },
+  { id:'gemini-3-pro-image', name:'Nano Banana Pro', description:'إنتاج صور احترافية وتعليمات مركبة حتى 4K.', pricing:{prompt:2.70/1e6,completion:13.50/1e6,imageOutputPerMillion:120,request:0.134}, inputModalities:['text','image'], outputModalities:['text','image'], supportedResolutions:['1K','2K','4K'], tier:'stable' }
+];
 
 export async function getAvailableModels(){ return GEMINI_MODELS.map(model=>({...model,pricing:{...model.pricing}})); }
 
 export async function getToolModelSettings(){
-  const defaults={coding:'gemini-3.5-flash',summary:'gemini-3.1-flash-lite',ads:'gemini-3.1-flash-lite',writing:'gemini-3.5-flash',translate:'gemini-3.1-flash-lite',study:'gemini-3.5-flash',business:'gemini-3.5-flash',image:'gemini-3.1-flash-image-preview'};
+  const defaults={coding:'gemini-3.5-flash',summary:'gemini-3.1-flash-lite',ads:'gemini-3.1-flash-lite',writing:'gemini-3.5-flash',translate:'gemini-3.1-flash-lite',study:'gemini-3.5-flash',business:'gemini-3.5-flash',image:'gemini-3.1-flash-lite-image'};
   try{
     const {data,error}=await db().from('ai_settings').select('value').eq('key','tool_models').maybeSingle();
     if(error||!data?.value)return defaults;

@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -226,8 +226,8 @@ function estimateImageCharge(model, resolution = '', hasReferenceImage = false) 
   };
 }
 
-const FAST_IMAGE_MODEL_ID = 'gemini-3.1-flash-image-preview';
-const QUALITY_IMAGE_MODEL_ID = 'gemini-3-pro-image-preview';
+const FAST_IMAGE_MODEL_ID = 'gemini-3.1-flash-lite-image';
+const QUALITY_IMAGE_MODEL_ID = 'gemini-3-pro-image';
 
 function needsHighQualityImage(prompt = '', resolution = '', hasReferenceImage = false) {
   if (hasReferenceImage || /^(2K|4K)$/i.test(String(resolution || ''))) return true;
@@ -236,15 +236,20 @@ function needsHighQualityImage(prompt = '', resolution = '', hasReferenceImage =
 }
 
 async function getImageModels() {
-  return [
-    {id:FAST_IMAGE_MODEL_ID,name:'Nano Banana 2',pricing:{request:0.039},supported_parameters:{aspect_ratio:{type:'enum',values:['1:1','4:3','3:4','16:9','9:16']},resolution:{type:'enum',values:['1K','2K']}},architecture:{input_modalities:['text','image'],output_modalities:['image']}},
-    {id:QUALITY_IMAGE_MODEL_ID,name:'Nano Banana Pro',pricing:{request:0.134},supported_parameters:{aspect_ratio:{type:'enum',values:['1:1','4:3','3:4','16:9','9:16']},resolution:{type:'enum',values:['1K','2K','4K']}},architecture:{input_modalities:['text','image'],output_modalities:['image']}}
-  ];
+  return GEMINI_IMAGE_MODELS.map(model=>({
+    ...model,
+    supported_parameters:{aspect_ratio:{type:'enum',values:['1:1','4:3','3:4','16:9','9:16']},resolution:{type:'enum',values:model.supportedResolutions||['1K']}},
+    architecture:{input_modalities:model.inputModalities||['text'],output_modalities:model.outputModalities||['image']}
+  }));
 }
 
-async function getImageModel(preferQuality = false) {
+async function getImageModel(requestedId = '', preferQuality = false) {
   const models = await getImageModels();
-  return models.find(model => model.id === (preferQuality ? QUALITY_IMAGE_MODEL_ID : FAST_IMAGE_MODEL_ID)) || models[0];
+  const configured=(await getToolModelSettings()).image;
+  return models.find(model=>model.id===requestedId)
+    || models.find(model=>model.id===configured)
+    || models.find(model => model.id === (preferQuality ? QUALITY_IMAGE_MODEL_ID : FAST_IMAGE_MODEL_ID))
+    || models[0];
 }
 
 export default async function handler(req, res) {
@@ -284,7 +289,7 @@ export default async function handler(req, res) {
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
-    let model = await getImageModel(needsHighQualityImage(cleanPrompt, resolution, hasReferenceImage));
+    let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(cleanPrompt, resolution, hasReferenceImage));
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
     if (!profile.has_purchased && !freeImageModel) throw appError('MODEL_LOCKED');
     if (freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');

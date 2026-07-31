@@ -1,13 +1,10 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, GEMINI_IMAGE_MODELS
 } from './_lib.js';
 
-const IMAGE_MODELS = [
-  { id:'gemini-3.1-flash-image-preview', name:'Nano Banana 2', shortName:'Nano Banana 2', type:'image', provider:'google', providerLabel:'Google', pricing:{request:0.039}, inputModalities:['text','image'], outputModalities:['image'], supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'], supportedResolutions:['1K','2K'] },
-  { id:'gemini-3-pro-image-preview', name:'Nano Banana Pro', shortName:'Nano Banana Pro', type:'image', provider:'google', providerLabel:'Google', pricing:{request:0.134}, inputModalities:['text','image'], outputModalities:['image'], supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'], supportedResolutions:['1K','2K','4K'] }
-];
+const IMAGE_MODELS = GEMINI_IMAGE_MODELS.map(model=>({ ...model, shortName:model.name, type:'image', provider:'google', providerLabel:'Google', supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'] }));
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
