@@ -11,7 +11,7 @@
 <script>
 (async()=>{
   try{
-    const response=await fetch('/api/version?ts='+Date.now(),{cache:'no-store'});
+    const response=await fetch('/api/apps?mode=version&ts='+Date.now(),{cache:'no-store'});
     const {version}=await response.json();
     const old=localStorage.getItem('aiway_deployment_version');
     if(old&&old!==version){
@@ -880,6 +880,12 @@ async function loadModels(){
   window.aiwayModels=data.models||[];
   window.aiwayChatModelOrders=data.chatModelOrders||{};
   window.aiwayImageModels=(data.imageModels||[]).filter(m=>/^gemini-.*image/i.test(m.id));
+  for(const tool of (data.tools||[])){
+    if(!tool?.id)continue;
+    TASKS[tool.id]={ar:[tool.name_ar||tool.id,tool.description_ar||'',tool.description_ar||''],en:[tool.name_en||tool.id,tool.description_en||'',tool.description_en||'']};
+    if(!TASK_ICONS[tool.id])TASK_ICONS[tool.id]=tool.tool_type==='image'?TASK_ICONS.image:ICONS.sparkles;
+  }
+  if($('taskScreen')?.classList.contains('open'))renderTaskScreen();
   renderModelSelect(selected||data.trialModelId||'');
   renderPackages();
   return data;
