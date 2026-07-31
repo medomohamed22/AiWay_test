@@ -294,6 +294,7 @@ ${JSON.stringify(tool.prompt_config)}`;
     // Free image endpoints remain available before purchase, subject to a strict daily limit.
 
     const purchased = Boolean(profile.has_purchased);
+    if (!purchased) throw appError('MODEL_LOCKED');
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
     if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
     if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
