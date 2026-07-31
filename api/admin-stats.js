@@ -19,7 +19,8 @@ export default async function handler(req,res){
   try{
     const mode=String(req.query?.mode||'');
     if(mode==='model-settings'){
-      await requireAdminToken(req);
+      const adminUser=await requireUser(req);
+      await requireAdmin(adminUser);
       if(req.method==='GET'){
         const models=(await getAvailableModels()).sort((a,b)=>(a.pricing.prompt+a.pricing.completion)-(b.pricing.prompt+b.pricing.completion));
         const imageModels=GEMINI_IMAGE_MODELS.map(x=>({...x})).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
