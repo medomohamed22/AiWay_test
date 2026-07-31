@@ -1,7 +1,7 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, GEMINI_IMAGE_MODELS
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS
 } from './_lib.js';
 
 const IMAGE_MODELS = GEMINI_IMAGE_MODELS.map(model=>({ ...model, shortName:model.name, type:'image', provider:'google', providerLabel:'Google', supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'] }));
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:[] },
       trialModelId:await getTrialModelId(), packages,
       imageModels:IMAGE_MODELS.map(model => ({ ...model, locked:!unlocked, isFree:false })),
-      tokenUsd:TOKEN_USD, rankingsSource:'Google Gemini API pricing', refreshedAt:new Date().toISOString()
+      tokenUsd:TOKEN_USD, tools:await getAiTools(), rankingsSource:'Google Gemini API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {
     console.error(error);

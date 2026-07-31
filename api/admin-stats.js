@@ -26,15 +26,27 @@ export default async function handler(req,res){
         return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,pricingSource:'Google Gemini Developer API pricing',pricingSourceUrl:'https://ai.google.dev/gemini-api/docs/pricing',refreshedAt:'2026-07-31'});
       }
       const b=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
-      const tools=await getAiTools({includeInactive:true});
+      const action=String(b.action||'bulk-models');
       const validText=new Set((await getAvailableModels()).map(x=>x.id));
       const validImages=new Set(GEMINI_IMAGE_MODELS.map(x=>x.id));
-      const updates=[];
-      for(const tool of tools){
-        const value=b.settings?.[tool.id];
-        const valid=(tool.tool_type==='image'?validImages:validText).has(value);
-        if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()});
+      const clean=v=>String(v??'').trim();
+      const safeId=v=>clean(v).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48);
+      if(action==='delete'){
+        const id=safeId(b.id);
+        if(!id)return json(res,400,{error:localize(locale,'معرّف الأداة غير صالح.','Invalid tool id.')});
+        const {error}=await db().from('ai_tools').delete().eq('id',id);if(error)throw error;
+        return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }
+      if(action==='save-tool'){
+        const t=b.tool||{};const id=safeId(t.id);const type=t.tool_type==='image'?'image':'text';const model=clean(t.model_id);
+        if(!id||!clean(t.name_ar)||!clean(t.name_en))return json(res,400,{error:localize(locale,'أدخل معرّفًا واسمًا عربيًا وإنجليزيًا.','Enter an id plus Arabic and English names.')});
+        if(!(type==='image'?validImages:validText).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
+        const row={id,name_ar:clean(t.name_ar).slice(0,120),name_en:clean(t.name_en).slice(0,120),description_ar:clean(t.description_ar).slice(0,1000),description_en:clean(t.description_en).slice(0,1000),tool_type:type,model_id:model,is_active:t.is_active!==false,sort_order:Math.max(0,Math.min(9999,Number(t.sort_order)||0)),updated_at:new Date().toISOString()};
+        const {error}=await db().from('ai_tools').upsert(row,{onConflict:'id'});if(error)throw error;
+        return json(res,200,{ok:true,tool:row,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
+      }
+      const tools=await getAiTools({includeInactive:true});const updates=[];
+      for(const tool of tools){const value=b.settings?.[tool.id];const valid=(tool.tool_type==='image'?validImages:validText).has(value);if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()})}
       if(!updates.length)return json(res,400,{error:localize(locale,'لم يتم إرسال إعدادات صالحة.','No valid settings were submitted.')});
       const {error}=await db().from('ai_tools').upsert(updates,{onConflict:'id'});if(error)throw error;
       return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
