@@ -385,7 +385,7 @@ ${JSON.stringify(tool.prompt_config)}`;
         user_id: user.id,
         role: 'user',
         content: cleanPrompt,
-        token_usage: { image_request: true, reference_image: hasReferenceImage }
+        token_usage: { image_request: true, reference_image: hasReferenceImage, taskId: taskId || 'image' }
       }).select('id').single();
       if (userInsert.error || !userInsert.data) throw appError('DATABASE_ERROR', {}, userInsert.error);
       savedUser = userInsert.data;
@@ -396,7 +396,7 @@ ${JSON.stringify(tool.prompt_config)}`;
         role: 'assistant',
         content: localize(uiLocale, 'تم إنشاء الصورة المطلوبة.', 'The requested image has been generated.'),
         model_id: model.id,
-        token_usage: { ...payload.usage, ...charge, type: 'image' }
+        token_usage: { ...payload.usage, ...charge, type: 'image', taskId: taskId || 'image' }
       }).select('id').single();
       if (assistantInsert.error || !assistantInsert.data) throw appError('DATABASE_ERROR', {}, assistantInsert.error);
       savedAssistant = assistantInsert.data;

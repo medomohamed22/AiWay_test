@@ -250,6 +250,7 @@ export default async function handler(req, res) {
       });
     }
     if (!model) throw appError('MODEL_UNAVAILABLE');
+    if (webSearch && !/^gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(model.id || ''))) throw appError('SEARCH_MODEL_UNSUPPORTED');
     if (taskId && isFreeModel(model)) throw appError('MODEL_UNAVAILABLE');
     if (isFreeModel(model)) await claimFreeDailyUse(supabase, user.id, 'chat');
     const language = detectLanguage(latestTextValue);
@@ -315,14 +316,33 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     }
 
     const activeModel=model; const activeModelId=model.id; const fallbackUsed=false;
-    const contents=safeMessages.filter(m=>m.role!=='system').map(m=>({role:m.role==='assistant'?'model':'user',parts:[{text:typeof m.content==='string'?m.content:JSON.stringify(m.content)}]}));
+    const dataUrlPart = value => {
+      const match = String(value || '').match(/^data:([^;,]+);base64,(.+)$/s);
+      return match ? { inlineData: { mimeType: match[1], data: match[2] } } : null;
+    };
+    const geminiParts = content => {
+      if (typeof content === 'string') return [{ text: content }];
+      if (!Array.isArray(content)) return [{ text: String(content || '') }];
+      return content.flatMap(part => {
+        if (part?.type === 'text') return [{ text: String(part.text || '') }];
+        if (part?.type === 'image_url') { const item=dataUrlPart(part.image_url?.url); return item?[item]:[]; }
+        if (part?.type === 'file') { const item=dataUrlPart(part.file?.file_data); return item?[item]:[]; }
+        return [];
+      }).filter(Boolean);
+    };
+    const contents=safeMessages.filter(m=>m.role!=='system').map(m=>({role:m.role==='assistant'?'model':'user',parts:geminiParts(m.content)})).filter(item=>item.parts.length);
     const systemInstruction=safeMessages.filter(m=>m.role==='system').map(m=>typeof m.content==='string'?m.content:'').join('\n\n');
     const tools=webSearch?[{google_search:{}}]:undefined;
     const response=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModelId)}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents,systemInstruction:{parts:[{text:systemInstruction}]},tools,generationConfig:{temperature:Number(temperature),maxOutputTokens:Math.max(128,Math.floor(initialMaxTokens))}})
     },90000);
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:payload?.error?.message||''});
+    if(!response.ok){
+      const details=String(payload?.error?.message||'');
+      if(webSearch && (response.status===403 || response.status===429 || /billing|quota|grounding|google search/i.test(details))) throw appError('SEARCH_BILLING_REQUIRED',{status:response.status,provider:'gemini',details});
+      if(/not found|not supported|unsupported model/i.test(details)) throw appError('MODEL_UNAVAILABLE',{status:response.status,provider:'gemini',details});
+      throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details});
+    }
     const answer=(payload.candidates?.[0]?.content?.parts||[]).map(part=>part.text||'').join('');
     if(!answer.trim())throw appError('EMPTY_RESPONSE');
     const usage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),total_tokens:Number(payload.usageMetadata?.totalTokenCount||0)};

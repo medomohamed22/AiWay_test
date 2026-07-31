@@ -411,6 +411,8 @@ export function errorDetails(error, locale = 'ar') {
       ar: 'النموذج المختار لا يدعم الصور المرجعية. اختر نموذج صور يدعم إدخال الصور.',
       en: 'The selected model does not support reference images. Choose an image model that accepts image input.'
     }],
+    SEARCH_MODEL_UNSUPPORTED: [400, { ar: 'النموذج المختار لا يدعم بحث Google. اختر نموذجًا من Gemini 3 أو أحدث ثم أعد المحاولة؛ لم يتم خصم رصيدك.', en: 'The selected model does not support Google Search grounding. Choose Gemini 3 or newer and try again; your balance was not charged.' }],
+    SEARCH_BILLING_REQUIRED: [402, { ar: 'بحث Google غير متاح لمستوى الفوترة الحالي أو انتهت حصته. فعّل الفوترة أو راجع حدود البحث في Google AI Studio؛ لم يتم خصم رصيدك.', en: 'Google Search grounding is unavailable for the current billing tier or its allowance was exhausted. Enable billing or review search limits in Google AI Studio; your balance was not charged.' }],
     TRIAL_WEB_LOCKED: [403, { ar: 'بحث الويب متاح بعد أول عملية شراء.', en: 'Web search unlocks after your first purchase.' }],
     TRIAL_ENDED: [402, {
       ar: 'انتهت رسائلك التجريبية. اشحن رصيدًا لفتح جميع النماذج ومتابعة الاستخدام.',
@@ -865,10 +867,10 @@ function expectedOutputTokens(text, inputTokens, attachmentCount, imageCount, we
   const asksForCode = /```|\b(code|كود|برمج|برنامج|function|api|html|javascript|python|sql)\b/i.test(value);
   const asksForLong = /\b(explain|detailed|complete|full|report|article|essay|حلل|اشرح|بالتفصيل|كامل|تقرير|مقال)\b/i.test(value);
   const asksForShort = /\b(short|brief|one word|مختصر|باختصار|كلمة واحدة)\b/i.test(value);
-  let ratio = asksForCode ? 2.25 : asksForLong ? 1.75 : asksForShort ? 0.55 : 1.15;
-  let predicted = 150 + latestTokens * ratio + Math.sqrt(Math.max(1, inputTokens)) * 14;
-  predicted += attachmentCount * 110 + imageCount * 170 + (webSearch ? 360 : 0);
-  return Math.max(96, Math.min(8192, Math.ceil(predicted)));
+  let ratio = asksForCode ? 1.35 : asksForLong ? 1.05 : asksForShort ? 0.30 : 0.72;
+  let predicted = 48 + latestTokens * ratio + Math.sqrt(Math.max(1, inputTokens)) * 5.5;
+  predicted += attachmentCount * 45 + imageCount * 75 + (webSearch ? 120 : 0);
+  return Math.max(64, Math.min(4096, Math.ceil(predicted)));
 }
 
 export function estimateChatCharge(price, messages = [], webSearch = false, outputReserve = 0) {
@@ -880,7 +882,7 @@ export function estimateChatCharge(price, messages = [], webSearch = false, outp
   const imageCount = safeMessages.reduce((sum, message) => sum + (Array.isArray(message?.attachments) ? message.attachments.filter(item => String(item?.type || '').startsWith('image/')).length : 0), 0);
   const automaticOutput = expectedOutputTokens(latestUserText(safeMessages), inputTokens, attachmentCount, imageCount, webSearch);
   const requestedReserve = Number(outputReserve || 0);
-  const reservedOutputTokens = Math.max(96, Math.min(8192, Math.ceil(requestedReserve > 0 ? Math.max(requestedReserve, automaticOutput) : automaticOutput)));
+  const reservedOutputTokens = Math.max(64, Math.min(4096, Math.ceil(requestedReserve > 0 ? requestedReserve : automaticOutput)));
   const promptRate = Math.max(0, Number(price?.prompt || 0));
   const completionRate = Math.max(0, Number(price?.completion || 0));
   const requestUsd = Math.max(0, Number(price?.request || 0));
