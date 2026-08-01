@@ -12,6 +12,9 @@ export default async function handler(req, res) {
       const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const toolId=String(body.toolId||'');
       const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
+      const supportedVoices=['Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
+      const requestedVoice=String(body.voiceName||'Kore');
+      const voiceName=supportedVoices.includes(requestedVoice)?requestedVoice:'Kore';
       const tools=await getAiTools();
       const tool=tools.find(x=>x.id===toolId&&['live_audio','live_translate'].includes(x.tool_type));
       if(!tool)return json(res,404,{error:localize(locale,'الأداة الصوتية غير متاحة.','The live audio tool is unavailable.')});
@@ -28,7 +31,7 @@ export default async function handler(req, res) {
           config:{responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{}}
         }
       };
-      // Translation language is selected by the user in the browser, so this field must remain unlocked.
+      if(model.liveKind==='dialog')tokenRequest.liveConnectConstraints.config.speechConfig={voiceConfig:{prebuiltVoiceConfig:{voiceName}}};
       if(model.liveKind==='translate')tokenRequest.liveConnectConstraints.config={responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:false}};
       const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{
         method:'POST',
@@ -49,7 +52,7 @@ export default async function handler(req, res) {
         const en=code==='MODEL_NOT_AVAILABLE_FREE_TIER'?'This model is not available on the free tier for this project. Enable billing in Google AI Studio or select a free-tier model.':code==='GEMINI_QUOTA_EXCEEDED'?'The Gemini usage limit has been reached temporarily. Try again later or review the project quota and billing.':code==='GEMINI_ACCESS_DENIED'?'This Gemini project or API key does not have access to the selected model. Check the key, billing, and supported region.':code==='MODEL_UNAVAILABLE'?'The selected model is unavailable for this project or its model ID has changed. Select another model in the admin panel.':'Could not create the Gemini live audio session. Check the API key and billing settings, then try again.';
         return json(res,status,{error:localize(locale,ar,en),code,providerMessage:process.env.NODE_ENV==='development'?raw:undefined});
       }
-      return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,expiresAt:expireTime});
+      return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,expiresAt:expireTime});
     }
     if (String(req.query?.mode || '') === 'version') {
       const version = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.APP_VERSION || 'local-development';
