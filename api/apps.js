@@ -1,7 +1,5 @@
-import { allowMethods, appError, chargeGeminiUsage, db, errorDetails, finalizeAiTokens, json, localize, normalizeRequestId, releaseAiTokens, requestLocale, requireUser, reserveAiTokens, getAiTools, GEMINI_LIVE_MODELS, geminiFetchJson, getGeminiApiKeys, TOKEN_USD } from './_lib.js';
+import { allowMethods, appError, db, errorDetails, json, localize, requestLocale, requireUser, getAiTools } from './_lib.js';
 
-const LIVE_MINIMUM_START_TOKENS = 100; // Minimum balance required to open a paid Live session.
-const LIVE_MAX_USAGE_EVENTS = 1000;
 
 const APP_FIELDS = 'id,name,slug,category,network,short_description,website_url,icon_url,screenshot_urls,rating,ratings_count,views_count,get_clicks_count,is_verified,is_featured,featured_until,developer_name,created_at';
 
@@ -9,119 +7,7 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET','POST'])) return;
   const locale = requestLocale(req);
   try {
-    if (String(req.query?.mode || '') === 'live-token') {
-      if(req.method!=='POST') return json(res,405,{error:localize(locale,'طريقة الطلب غير مسموحة.','Method not allowed.')});
-      const user=await requireUser(req);
-      const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
-      const action=String(body.action||'start');
-      const supabase=db();
-      const sessionId=normalizeRequestId(body.sessionId || body.requestId);
-      const usageRequestId=sequence=>normalizeRequestId(`${sessionId}_u${sequence}`);
-      const readReservation=async requestId=>{
-        const {data,error}=await supabase.from('ai_usage_reservations')
-          .select('request_id,status')
-          .eq('user_id',user.id).eq('request_id',requestId).maybeSingle();
-        if(error) throw appError('DATABASE_ERROR',{},error);
-        return data||null;
-      };
-      const readBalance=async()=>{
-        const {data,error}=await supabase.from('users').select('ai_tokens,has_purchased').eq('id',user.id).single();
-        if(error||!data) throw appError('DATABASE_ERROR',{},error);
-        if(!data.has_purchased) throw appError('MODEL_LOCKED');
-        return Math.max(0,Number(data.ai_tokens||0));
-      };
-      const sanitizeUsage=raw=>{
-        const source=raw&&typeof raw==='object'?raw:{};
-        const cleanDetails=value=>(Array.isArray(value)?value:[]).slice(0,12).map(item=>({
-          modality:String(item?.modality||item?.type||'TEXT').toUpperCase().replace(/^MODALITY_/, '').slice(0,20),
-          tokenCount:Math.max(0,Math.floor(Number(item?.tokenCount||0)))
-        })).filter(item=>item.tokenCount>0);
-        return {
-          promptTokenCount:Math.max(0,Math.floor(Number(source.promptTokenCount||source.inputTokenCount||0))),
-          candidatesTokenCount:Math.max(0,Math.floor(Number(source.candidatesTokenCount||source.responseTokenCount||source.outputTokenCount||0))),
-          totalTokenCount:Math.max(0,Math.floor(Number(source.totalTokenCount||0))),
-          thoughtsTokenCount:Math.max(0,Math.floor(Number(source.thoughtsTokenCount||0))),
-          promptTokensDetails:cleanDetails(source.promptTokensDetails||source.inputTokensDetails),
-          candidatesTokensDetails:cleanDetails(source.candidatesTokensDetails||source.responseTokensDetails||source.outputTokensDetails)
-        };
-      };
 
-      if(action==='confirm'){
-        // Do not create a database reservation before Gemini confirms the Live
-        // session. The provider connection must remain independent from a
-        // temporary billing write; actual usage is charged idempotently below.
-        return json(res,200,{confirmed:true,chargedTokens:0,remainingTokens:await readBalance(),startedAt:new Date().toISOString(),billing:'gemini_usage_metadata'});
-      }
-
-      if(action==='usage'){
-        const sequence=Math.floor(Number(body.sequence)||0);
-        if(sequence<1||sequence>LIVE_MAX_USAGE_EVENTS) throw appError('INVALID_REQUEST');
-        const model=GEMINI_LIVE_MODELS.find(item=>item.id===String(body.modelId||''));
-        if(!model) throw appError('MODEL_UNAVAILABLE');
-        const usage=sanitizeUsage(body.usageMetadata);
-        if(!usage.promptTokenCount&&!usage.candidatesTokenCount&&!usage.promptTokensDetails.length&&!usage.candidatesTokensDetails.length){
-          return json(res,200,{chargedTokens:0,totalChargedTokens:Math.max(0,Number(body.clientTotalCharged||0)),remainingTokens:await readBalance(),sequence,ignored:true});
-        }
-        const charge=chargeGeminiUsage(model.pricing,usage);
-        const requiredTokens=Math.max(1,charge.chargedTokens);
-        const requestId=usageRequestId(sequence);
-        const existing=await readReservation(requestId);
-        if(existing?.status==='completed') return json(res,200,{chargedTokens:requiredTokens,remainingTokens:await readBalance(),sequence,idempotent:true,cost:charge});
-        if(existing?.status==='reserved') throw appError('REQUEST_IN_PROGRESS');
-
-        const availableTokens=await readBalance();
-        if(availableTokens<requiredTokens) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens,shortfall:requiredTokens-availableTokens});
-        // Each provider usage event has its own idempotent reservation. Nothing
-        // is written before setupComplete, so a transient database write cannot
-        // prevent the microphone/WebSocket session from starting.
-        await reserveAiTokens(supabase,user.id,requestId,'chat',requiredTokens);
-        const remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
-        return json(res,200,{chargedTokens:requiredTokens,remainingTokens,sequence,cost:{providerUsd:charge.providerUsd,inputUsd:charge.inputUsd,outputUsd:charge.outputUsd,costSource:charge.costSource,modalityUsage:charge.modalityUsage,tokenUsd:TOKEN_USD}});
-      }
-
-      if(action==='release'||action==='finish'){
-        // There is no pre-session hold. Completed usage events have already
-        // been finalized individually and cannot be charged twice.
-        return json(res,200,{released:false,remainingTokens:await readBalance()});
-      }
-
-      if(action!=='start') throw appError('INVALID_REQUEST');
-      const availableTokens=await readBalance();
-      if(availableTokens<LIVE_MINIMUM_START_TOKENS) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:LIVE_MINIMUM_START_TOKENS,shortfall:LIVE_MINIMUM_START_TOKENS-availableTokens});
-      // Starting Gemini Live performs no billing write. Billing starts only
-      // after setupComplete when Gemini reports real usageMetadata.
-      try {
-        const toolId=String(body.toolId||'');
-        const supportedTranslateLanguages=new Set(['af','ak','sq','am','ar','hy','az','eu','be','bn','bg','my','ca','zh-Hans','zh-Hant','hr','cs','da','nl','en','et','fil','fi','fr','gl','ka','de','el','gu','ha','he','hi','hu','is','id','it','ja','jv','kn','kk','km','rw','ko','lo','lv','lt','mk','ms','ml','mr','mn','ne','no','nb','fa','pl','pt-BR','pt-PT','pa','ro','ru','sr','sd','si','sk','sl','es','su','sw','sv','ta','te','th','tr','uk','ur','uz','vi','zu']);
-        const requestedTargetLanguage=String(body.targetLanguage||'en').slice(0,16);
-        const targetLanguage=supportedTranslateLanguages.has(requestedTargetLanguage)?requestedTargetLanguage:'en';
-        const supportedVoices=['Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
-        const requestedVoice=String(body.voiceName||'Kore');
-        const voiceName=supportedVoices.includes(requestedVoice)?requestedVoice:'Kore';
-        const tools=await getAiTools();
-        const tool=tools.find(x=>x.id===toolId&&['live_audio','live_translate'].includes(x.tool_type));
-        if(!tool)throw appError('MODEL_UNAVAILABLE');
-        const model=GEMINI_LIVE_MODELS.find(x=>x.id===tool.model_id);
-        if(!model)throw appError('MODEL_UNAVAILABLE');
-        if(!getGeminiApiKeys().length)throw appError('MISSING_CONFIGURATION');
-        const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
-        // Keep the Live setup outside auth_tokens. Some Gemini projects expose
-        // an auth token schema that rejects preview configuration fields even
-        // though the same fields are accepted by the Live WebSocket endpoint.
-        // A short-lived, single-use token still keeps the permanent API key out
-        // of the browser while avoiding provider-schema incompatibilities.
-        const setup=model.liveKind==='translate'
-          ? {model:`models/${model.id}`,generationConfig:{responseModalities:['AUDIO'],translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}}
-          : {model:`models/${model.id}`,generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
-        const plainRequest={uses:1,expireTime,newSessionExpireTime};
-        const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(plainRequest)},12000);
-        const {response,payload:data}=geminiResult;
-        if(!response?.ok) throw appError('PROVIDER_ERROR',{status:response?.status||502,provider:'gemini',details:data?.error?.message||'Could not create Gemini ephemeral token.'});
-        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked:false,setup});
-      } catch(error) {
-        throw error;
-      }
-    }
     if (String(req.query?.mode || '') === 'version') {
       const version = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.APP_VERSION || 'local-development';
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
