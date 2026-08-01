@@ -539,7 +539,7 @@ export function handleError(error, res, fallback = 'Server error', locale = 'ar'
 export const TOKEN_USD = 0.00001;
 export const MARKUP = 2;
 export const TRIAL_MESSAGE_LIMIT = 5;
-export const TRIAL_TOKENS = 1500;
+export const TRIAL_TOKENS = 100;
 export const TRIAL_MODEL_FALLBACK = 'gemini-3.1-flash-lite';
 const tokensForUsd = usd => Math.round(Number(usd) / MARKUP / TOKEN_USD);
 export const PACKAGES = {
