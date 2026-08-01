@@ -108,11 +108,25 @@ export default async function handler(req, res) {
         const liveConfig=model.liveKind==='translate'
           ? {responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}
           : {responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Always detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
-        const tokenRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
-        const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(tokenRequest)},12000);
-        const {response,payload:data}=geminiResult;
-        if(!response.ok) throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:data?.error?.message||''});
-        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked:true});
+        const constrainedRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
+        let geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(constrainedRequest)},12000);
+        let {response,payload:data}=geminiResult;
+        let setupLocked=true;
+        const providerMessage=String(data?.error?.message||'');
+        // Some Gemini projects currently expose ephemeral tokens but reject the
+        // preview liveConnectConstraints field. Fall back to an ordinary
+        // single-use ephemeral token and send the server-built setup object to
+        // the client. This is a provider capability mismatch, not a DB error.
+        if(!response?.ok&&response?.status===400&&/liveConnectConstraints/i.test(providerMessage)){
+          const plainRequest={uses:1,expireTime,newSessionExpireTime};
+          geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(plainRequest)},12000);
+          response=geminiResult.response;data=geminiResult.payload;setupLocked=false;
+        }
+        if(!response?.ok) throw appError('PROVIDER_ERROR',{status:response?.status||502,provider:'gemini',details:data?.error?.message||providerMessage});
+        const setup=model.liveKind==='translate'
+          ? {model:`models/${model.id}`,generationConfig:liveConfig}
+          : {model:`models/${model.id}`,generationConfig:{responseModalities:liveConfig.responseModalities,speechConfig:liveConfig.speechConfig},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:liveConfig.systemInstruction};
+        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked,setup:setupLocked?undefined:setup});
       } catch(error) {
         throw error;
       }
