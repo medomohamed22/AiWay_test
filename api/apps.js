@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       const usageRequestId=sequence=>normalizeRequestId(`${sessionId}_u${sequence}`);
       const readReservation=async requestId=>{
         const {data,error}=await supabase.from('ai_usage_reservations')
-          .select('request_id,status,reserved_tokens,charged_tokens')
+          .select('request_id,status')
           .eq('user_id',user.id).eq('request_id',requestId).maybeSingle();
         if(error) throw appError('DATABASE_ERROR',{},error);
         return data||null;
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
         const requiredTokens=Math.max(1,charge.chargedTokens);
         const requestId=usageRequestId(sequence);
         const existing=await readReservation(requestId);
-        if(existing?.status==='completed') return json(res,200,{chargedTokens:Number(existing.charged_tokens||0),remainingTokens:await readBalance(),sequence,idempotent:true,cost:charge});
+        if(existing?.status==='completed') return json(res,200,{chargedTokens:requiredTokens,remainingTokens:await readBalance(),sequence,idempotent:true,cost:charge});
         if(existing?.status==='reserved') throw appError('REQUEST_IN_PROGRESS');
 
         const availableTokens=await readBalance();
@@ -92,7 +92,9 @@ export default async function handler(req, res) {
       // after setupComplete when Gemini reports real usageMetadata.
       try {
         const toolId=String(body.toolId||'');
-        const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
+        const supportedTranslateLanguages=new Set(['af','ak','sq','am','ar','hy','az','eu','be','bn','bg','my','ca','zh-Hans','zh-Hant','hr','cs','da','nl','en','et','fil','fi','fr','gl','ka','de','el','gu','ha','he','hi','hu','is','id','it','ja','jv','kn','kk','km','rw','ko','lo','lv','lt','mk','ms','ml','mr','mn','ne','no','nb','fa','pl','pt-BR','pt-PT','pa','ro','ru','sr','sd','si','sk','sl','es','su','sw','sv','ta','te','th','tr','uk','ur','uz','vi','zu']);
+        const requestedTargetLanguage=String(body.targetLanguage||'en').slice(0,16);
+        const targetLanguage=supportedTranslateLanguages.has(requestedTargetLanguage)?requestedTargetLanguage:'en';
         const supportedVoices=['Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
         const requestedVoice=String(body.voiceName||'Kore');
         const voiceName=supportedVoices.includes(requestedVoice)?requestedVoice:'Kore';
@@ -103,11 +105,14 @@ export default async function handler(req, res) {
         if(!model)throw appError('MODEL_UNAVAILABLE');
         if(!getGeminiApiKeys().length)throw appError('MISSING_CONFIGURATION');
         const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
-        const tokenRequest={uses:1,expireTime,newSessionExpireTime};
+        const liveConfig=model.liveKind==='translate'
+          ? {responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}
+          : {responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Always detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
+        const tokenRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
         const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(tokenRequest)},12000);
         const {response,payload:data}=geminiResult;
         if(!response.ok) throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:data?.error?.message||''});
-        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing});
+        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked:true});
       } catch(error) {
         throw error;
       }
