@@ -1,4 +1,4 @@
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeGeminiUsage, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -358,7 +358,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     for(let i=0;i<answer.length;i+=180)res.write(`data: ${JSON.stringify({type:'delta',text:answer.slice(i,i+180)})}
 
 `);
-    const charge=chargeTokens(activeModel.pricing,usage,webSearch);
+    const charge=chargeGeminiUsage(activeModel.pricing,payload.usageMetadata||{},{webSearch});
     if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
 
     const previousUsage = continuationTarget?.token_usage && typeof continuationTarget.token_usage === 'object' ? continuationTarget.token_usage : {};

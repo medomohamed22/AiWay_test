@@ -854,6 +854,62 @@ export async function getModel(modelId) {
   return (await getAvailableModels()).find(model => model.id === modelId) || null;
 }
 
+export function chargeGeminiUsage(price = {}, usageMetadata = {}, { webSearch = false, fallbackUsd = 0 } = {}) {
+  const promptBase = Math.max(0, Number(usageMetadata.promptTokenCount || usageMetadata.inputTokenCount || 0));
+  const toolPromptTotal = Math.max(0, Number(usageMetadata.toolUsePromptTokenCount || 0));
+  const promptTotal = promptBase + toolPromptTotal;
+  const responseTotal = Math.max(0, Number(usageMetadata.candidatesTokenCount || usageMetadata.responseTokenCount || usageMetadata.outputTokenCount || 0));
+  const thoughtsTotal = Math.max(0, Number(usageMetadata.thoughtsTokenCount || 0));
+  const outputTotal = responseTotal + thoughtsTotal;
+  const normalizeModality = value => String(value || '').toUpperCase().replace(/^MODALITY_/, '');
+  const sumDetails = details => (Array.isArray(details) ? details : []).reduce((map, item) => {
+    const key = normalizeModality(item?.modality || item?.type || 'TEXT');
+    map[key] = (map[key] || 0) + Math.max(0, Number(item?.tokenCount || 0));
+    return map;
+  }, {});
+  const inputDetails = sumDetails(usageMetadata.promptTokensDetails || usageMetadata.inputTokensDetails);
+  const toolInputDetails = sumDetails(usageMetadata.toolUsePromptTokensDetails);
+  for (const [modality,count] of Object.entries(toolInputDetails)) inputDetails[modality]=(inputDetails[modality]||0)+count;
+  const outputDetails = sumDetails(usageMetadata.candidatesTokensDetails || usageMetadata.responseTokensDetails || usageMetadata.outputTokensDetails);
+  const hasInputDetails = Object.keys(inputDetails).length > 0;
+  const hasOutputDetails = Object.keys(outputDetails).length > 0;
+  const rate = (side, modality) => {
+    const input = side === 'input';
+    const key = `${modality.toLowerCase()}${input ? 'Input' : 'Output'}`;
+    const imageOutputRate = !input && modality === 'IMAGE' ? Number(price.imageOutputPerMillion || 0) / 1e6 : 0;
+    return Math.max(0, Number(price[key] || imageOutputRate || (input ? price.prompt : price.completion) || 0));
+  };
+  const calculate = (details, total, side) => {
+    if (!Object.keys(details).length) return total * rate(side, 'TEXT');
+    return Object.entries(details).reduce((sum, [modality, count]) => sum + Number(count) * rate(side, modality), 0);
+  };
+  const inputUsd = calculate(inputDetails, promptTotal, 'input');
+  const outputUsd = calculate(outputDetails, responseTotal, 'output') + thoughtsTotal * rate('output', 'TEXT');
+  const requestUsd = hasOutputDetails ? 0 : Math.max(0, Number(price.request || 0));
+  const webUsd = webSearch ? Math.max(0, Number(price.web_search ?? price.webSearch ?? 0.01)) : 0;
+  let providerUsd = inputUsd + outputUsd + requestUsd + webUsd;
+  let costSource = (hasInputDetails || hasOutputDetails) ? 'gemini_usage_by_modality' : 'gemini_usage_tokens';
+  if (!hasInputDetails && !hasOutputDetails && Number(fallbackUsd) > 0) {
+    providerUsd = Number(fallbackUsd);
+    costSource = 'model_fixed_price_fallback';
+  }
+  return {
+    input: promptTotal,
+    output: outputTotal,
+    inputUsd,
+    outputUsd,
+    requestUsd,
+    webUsd,
+    providerUsd,
+    costSource,
+    tokenUsd: TOKEN_USD,
+    markup: MARKUP,
+    chargedTokens: Math.max(1, Math.ceil(providerUsd / TOKEN_USD)),
+    thoughts: thoughtsTotal,
+    modalityUsage: { input: inputDetails, output: outputDetails }
+  };
+}
+
 export function chargeTokens(price, usage = {}, webSearch = false) {
   const input = Number(usage.prompt_tokens || usage.input_tokens || 0);
   const output = Number(usage.completion_tokens || usage.output_tokens || 0);

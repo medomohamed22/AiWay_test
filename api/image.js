@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { allowMethods, appError, chargeGeminiUsage, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -378,8 +378,8 @@ ${JSON.stringify(tool.prompt_config)}`;
     if(!imagePart)throw appError('EMPTY_RESPONSE');
     const mediaType=imagePart.inlineData.mimeType||'image/png';
     const thumbnailData=`data:${mediaType};base64,${imagePart.inlineData.data}`; const sourceUrl=null;
-    const imageUsage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),cost:estimatedCharge.providerUsd};
-    const charge=chargeTokens({},imageUsage,false);
+    const imageUsage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),total_tokens:Number(payload.usageMetadata?.totalTokenCount||0)};
+    const charge=chargeGeminiUsage(model.pricing,payload.usageMetadata||{},{fallbackUsd:estimatedCharge.providerUsd});
     if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
     const item={width:null,height:null};
 

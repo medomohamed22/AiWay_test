@@ -1,4 +1,7 @@
-import { allowMethods, db, json, localize, requestLocale, requireUser, getAiTools, GEMINI_LIVE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { allowMethods, appError, chargeGeminiUsage, db, errorDetails, finalizeAiTokens, json, localize, normalizeRequestId, releaseAiTokens, requestLocale, requireUser, reserveAiTokens, getAiTools, GEMINI_LIVE_MODELS, geminiFetchJson, getGeminiApiKeys, TOKEN_USD } from './_lib.js';
+
+const LIVE_MINIMUM_START_TOKENS = 100; // Minimum balance required to open a paid Live session.
+const LIVE_MAX_USAGE_EVENTS = 1000;
 
 const APP_FIELDS = 'id,name,slug,category,network,short_description,website_url,icon_url,screenshot_urls,rating,ratings_count,views_count,get_clicks_count,is_verified,is_featured,featured_until,developer_name,created_at';
 
@@ -8,51 +11,115 @@ export default async function handler(req, res) {
   try {
     if (String(req.query?.mode || '') === 'live-token') {
       if(req.method!=='POST') return json(res,405,{error:localize(locale,'طريقة الطلب غير مسموحة.','Method not allowed.')});
-      await requireUser(req);
+      const user=await requireUser(req);
       const body=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
-      const toolId=String(body.toolId||'');
-      const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
-      const supportedVoices=['Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
-      const requestedVoice=String(body.voiceName||'Kore');
-      const voiceName=supportedVoices.includes(requestedVoice)?requestedVoice:'Kore';
-      const tools=await getAiTools();
-      const tool=tools.find(x=>x.id===toolId&&['live_audio','live_translate'].includes(x.tool_type));
-      if(!tool)return json(res,404,{error:localize(locale,'الأداة الصوتية غير متاحة.','The live audio tool is unavailable.')});
-      const model=GEMINI_LIVE_MODELS.find(x=>x.id===tool.model_id);
-      if(!model)return json(res,400,{error:localize(locale,'النموذج الصوتي المختار غير صالح.','The selected live model is invalid.')});
-      if(!getGeminiApiKeys().length)return json(res,503,{error:localize(locale,'مفتاح Gemini غير مضبوط.','Gemini API key is not configured.')});
-      const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
-      const tokenRequest={
-        uses:1,
-        expireTime,
-        newSessionExpireTime,
-        liveConnectConstraints:{
-          model:`models/${model.id}`,
-          config:{responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{}}
-        }
+      const action=String(body.action||'start');
+      const supabase=db();
+      const sessionId=normalizeRequestId(body.sessionId || body.requestId);
+      const holdRequestId=normalizeRequestId(`${sessionId}_hold`);
+      const usageRequestId=sequence=>normalizeRequestId(`${sessionId}_u${sequence}`);
+      const readReservation=async requestId=>{
+        const {data,error}=await supabase.from('ai_usage_reservations')
+          .select('request_id,status,reserved_tokens,charged_tokens,response_meta,created_at,completed_at')
+          .eq('user_id',user.id).eq('request_id',requestId).maybeSingle();
+        if(error) throw appError('DATABASE_ERROR',{},error);
+        return data||null;
       };
-      if(model.liveKind==='dialog')tokenRequest.liveConnectConstraints.config.speechConfig={voiceConfig:{prebuiltVoiceConfig:{voiceName}}};
-      if(model.liveKind==='translate')tokenRequest.liveConnectConstraints.config={responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:false}};
-      const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        geminiKeyMode:'header',
-        body:JSON.stringify(tokenRequest)
-      },12000);
-      const {response,payload:data}=geminiResult;
-      if(!response.ok){
-        const raw=String(data?.error?.message||'');
-        const quota=/quota|resource_exhausted|rate limit|limit: 0/i.test(raw);
-        const billing=/billing|paid tier|free tier|not available.*free|payment/i.test(raw);
-        const denied=response.status===403||/permission_denied|not authorized|access denied/i.test(raw);
-        const unavailable=response.status===404||/not found|not supported|unsupported|not available/i.test(raw);
-        const status=quota?429:(billing?402:(denied?403:(unavailable?400:response.status)));
-        const code=billing||(/free[_ -]?tier/i.test(raw)&&/limit:\s*0/i.test(raw))?'MODEL_NOT_AVAILABLE_FREE_TIER':quota?'GEMINI_QUOTA_EXCEEDED':denied?'GEMINI_ACCESS_DENIED':unavailable?'MODEL_UNAVAILABLE':'GEMINI_LIVE_ERROR';
-        const ar=code==='MODEL_NOT_AVAILABLE_FREE_TIER'?'هذا النموذج غير متاح ضمن التجربة المجانية لهذا المشروع. فعّل الفوترة في Google AI Studio أو اختر نموذجًا متاحًا مجانًا.':code==='GEMINI_QUOTA_EXCEEDED'?'تم الوصول إلى حد استخدام Gemini مؤقتًا. انتظر قليلًا أو راجع حدود المشروع والفوترة.':code==='GEMINI_ACCESS_DENIED'?'المشروع أو مفتاح Gemini لا يملك صلاحية استخدام هذا النموذج. راجع المفتاح والفوترة والمنطقة المدعومة.':code==='MODEL_UNAVAILABLE'?'النموذج المختار غير متاح حاليًا لهذا المشروع أو تم تغيير معرّفه. اختر نموذجًا آخر من لوحة الإدارة.':'تعذر إنشاء جلسة Gemini الصوتية حاليًا. راجع إعدادات المفتاح والفوترة ثم حاول مرة أخرى.';
-        const en=code==='MODEL_NOT_AVAILABLE_FREE_TIER'?'This model is not available on the free tier for this project. Enable billing in Google AI Studio or select a free-tier model.':code==='GEMINI_QUOTA_EXCEEDED'?'The Gemini usage limit has been reached temporarily. Try again later or review the project quota and billing.':code==='GEMINI_ACCESS_DENIED'?'This Gemini project or API key does not have access to the selected model. Check the key, billing, and supported region.':code==='MODEL_UNAVAILABLE'?'The selected model is unavailable for this project or its model ID has changed. Select another model in the admin panel.':'Could not create the Gemini live audio session. Check the API key and billing settings, then try again.';
-        return json(res,status,{error:localize(locale,ar,en),code,providerMessage:process.env.NODE_ENV==='development'?raw:undefined});
+      const readBalance=async()=>{
+        const {data,error}=await supabase.from('users').select('ai_tokens,has_purchased').eq('id',user.id).single();
+        if(error||!data) throw appError('DATABASE_ERROR',{},error);
+        if(!data.has_purchased) throw appError('MODEL_LOCKED');
+        return Math.max(0,Number(data.ai_tokens||0));
+      };
+      const sanitizeUsage=raw=>{
+        const source=raw&&typeof raw==='object'?raw:{};
+        const cleanDetails=value=>(Array.isArray(value)?value:[]).slice(0,12).map(item=>({
+          modality:String(item?.modality||item?.type||'TEXT').toUpperCase().replace(/^MODALITY_/, '').slice(0,20),
+          tokenCount:Math.max(0,Math.floor(Number(item?.tokenCount||0)))
+        })).filter(item=>item.tokenCount>0);
+        return {
+          promptTokenCount:Math.max(0,Math.floor(Number(source.promptTokenCount||source.inputTokenCount||0))),
+          candidatesTokenCount:Math.max(0,Math.floor(Number(source.candidatesTokenCount||source.responseTokenCount||source.outputTokenCount||0))),
+          totalTokenCount:Math.max(0,Math.floor(Number(source.totalTokenCount||0))),
+          thoughtsTokenCount:Math.max(0,Math.floor(Number(source.thoughtsTokenCount||0))),
+          promptTokensDetails:cleanDetails(source.promptTokensDetails||source.inputTokensDetails),
+          candidatesTokensDetails:cleanDetails(source.candidatesTokensDetails||source.responseTokensDetails||source.outputTokensDetails)
+        };
+      };
+
+      if(action==='confirm'){
+        const hold=await readReservation(holdRequestId);
+        if(!hold||hold.status!=='reserved') throw appError('INVALID_REQUEST');
+        return json(res,200,{confirmed:true,chargedTokens:0,remainingTokens:await readBalance(),startedAt:new Date().toISOString(),billing:'gemini_usage_metadata'});
       }
-      return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,expiresAt:expireTime});
+
+      if(action==='usage'){
+        const sequence=Math.floor(Number(body.sequence)||0);
+        if(sequence<1||sequence>LIVE_MAX_USAGE_EVENTS) throw appError('INVALID_REQUEST');
+        const model=GEMINI_LIVE_MODELS.find(item=>item.id===String(body.modelId||''));
+        if(!model) throw appError('MODEL_UNAVAILABLE');
+        const usage=sanitizeUsage(body.usageMetadata);
+        if(!usage.promptTokenCount&&!usage.candidatesTokenCount&&!usage.promptTokensDetails.length&&!usage.candidatesTokensDetails.length){
+          return json(res,200,{chargedTokens:0,totalChargedTokens:Math.max(0,Number(body.clientTotalCharged||0)),remainingTokens:await readBalance(),sequence,ignored:true});
+        }
+        const charge=chargeGeminiUsage(model.pricing,usage);
+        const requiredTokens=Math.max(1,charge.chargedTokens);
+        const requestId=usageRequestId(sequence);
+        const existing=await readReservation(requestId);
+        if(existing?.status==='completed') return json(res,200,{chargedTokens:Number(existing.charged_tokens||0),remainingTokens:await readBalance(),sequence,idempotent:true,cost:existing.response_meta?.cost||charge});
+        if(existing) throw appError('REQUEST_IN_PROGRESS');
+
+        const hold=await readReservation(holdRequestId);
+        let remainingTokens;
+        if(sequence===1&&hold?.status==='reserved'){
+          // Settle the first provider usage event against the start hold and refund any unused hold.
+          remainingTokens=await finalizeAiTokens(supabase,user.id,holdRequestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
+        }else{
+          const availableTokens=await readBalance();
+          if(availableTokens<requiredTokens) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens,shortfall:requiredTokens-availableTokens});
+          await reserveAiTokens(supabase,user.id,requestId,'live_audio_usage',requiredTokens);
+          remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
+        }
+        return json(res,200,{chargedTokens:requiredTokens,remainingTokens,sequence,cost:{providerUsd:charge.providerUsd,inputUsd:charge.inputUsd,outputUsd:charge.outputUsd,costSource:charge.costSource,modalityUsage:charge.modalityUsage,tokenUsd:TOKEN_USD}});
+      }
+
+      if(action==='release'||action==='finish'){
+        const hold=await readReservation(holdRequestId);
+        if(hold?.status==='reserved') await releaseAiTokens(supabase,user.id,holdRequestId,{sessionId,reason:String(body.reason||action).slice(0,80)});
+        return json(res,200,{released:hold?.status==='reserved',remainingTokens:await readBalance()});
+      }
+
+      if(action!=='start') throw appError('INVALID_REQUEST');
+      const availableTokens=await readBalance();
+      if(availableTokens<LIVE_MINIMUM_START_TOKENS) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:LIVE_MINIMUM_START_TOKENS,shortfall:LIVE_MINIMUM_START_TOKENS-availableTokens});
+      // Hold the current balance only until the first provider usage event. This guarantees
+      // that the first real Gemini turn can be settled without exposing the site to loss;
+      // finalize_ai_tokens immediately refunds the unused part of the hold.
+      await reserveAiTokens(supabase,user.id,holdRequestId,'live_audio_start_hold',availableTokens);
+      let reservationActive=true;
+      try {
+        const toolId=String(body.toolId||'');
+        const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
+        const supportedVoices=['Zephyr','Puck','Charon','Kore','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
+        const requestedVoice=String(body.voiceName||'Kore');
+        const voiceName=supportedVoices.includes(requestedVoice)?requestedVoice:'Kore';
+        const tools=await getAiTools();
+        const tool=tools.find(x=>x.id===toolId&&['live_audio','live_translate'].includes(x.tool_type));
+        if(!tool)throw appError('MODEL_UNAVAILABLE');
+        const model=GEMINI_LIVE_MODELS.find(x=>x.id===tool.model_id);
+        if(!model)throw appError('MODEL_UNAVAILABLE');
+        if(!getGeminiApiKeys().length)throw appError('MISSING_CONFIGURATION');
+        const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
+        const tokenRequest={uses:1,expireTime,newSessionExpireTime};
+        const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(tokenRequest)},12000);
+        const {response,payload:data}=geminiResult;
+        if(!response.ok) throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:data?.error?.message||''});
+        reservationActive=false;
+        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:availableTokens,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing});
+      } catch(error) {
+        if(reservationActive) await releaseAiTokens(supabase,user.id,holdRequestId,{sessionId,reason:'token_creation_failed',code:String(error?.code||'SERVER_ERROR')});
+        throw error;
+      }
     }
     if (String(req.query?.mode || '') === 'version') {
       const version = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.APP_VERSION || 'local-development';
@@ -96,6 +163,10 @@ export default async function handler(req, res) {
     return json(res, 200, { apps, total: count ?? apps.length, nextCursor: apps.length === limit ? apps[apps.length - 1]?.created_at || null : null });
   } catch (error) {
     console.error(error);
+    if (String(req.query?.mode || '') === 'live-token') {
+      const details=errorDetails(error,locale);
+      return json(res,details.status||500,{error:details.message,code:details.code,...(details.meta||{})});
+    }
     return json(res, 500, { error: localize(locale, 'تعذر تحميل التطبيقات حاليًا.', 'Could not load the apps right now.'), code: 'SERVER_ERROR' });
   }
 }
