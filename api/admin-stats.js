@@ -1,4 +1,4 @@
-import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
+import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 const num=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
 const isoDay=v=>new Date(v).toISOString().slice(0,10);
@@ -12,15 +12,16 @@ function latency(u){return u&&typeof u==='object'?Math.max(0,num(u.latency_ms||u
 function tokens(u){if(!u||typeof u!=='object')return 0;return num(u.total_tokens||u.totalTokens)+num(u.prompt_tokens||u.promptTokens)+num(u.completion_tokens||u.completionTokens)}
 function groupDaily(rows,dateKey,days=30){const out=[];for(let i=days-1;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);out.push({date:d,value:0})}const map=new Map(out.map(x=>[x.date,x]));for(const r of rows){const raw=r[dateKey];if(!raw)continue;const x=map.get(isoDay(raw));if(x)x.value++}return out}
 async function gemini(){
-  const configured=Boolean(process.env.GEMINI_API_KEY);
+  const configuredKeys=getGeminiApiKeys();
+  const configured=configuredKeys.length>0;
   const manualBalance=process.env.GEMINI_ACCOUNT_BALANCE_USD;
   const credits=manualBalance!==undefined&&manualBalance!==''?{remaining:Math.max(0,num(manualBalance)),source:'manual-env'}:null;
   if(!configured)return {configured:false,status:'missing',credits,key:{label:'Gemini Developer API'},modelsApi:false,billingNote:'أضف GEMINI_API_KEY في متغيرات البيئة.'};
   try{
-    const response=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,{headers:{Accept:'application/json'}},10000);
-    const body=await response.json().catch(()=>({}));
+    const result=await geminiFetchJson('/v1beta/models',{headers:{Accept:'application/json'}},10000);
+    const {response,payload:body}=result;
     if(!response.ok)throw new Error(body?.error?.message||`Gemini ${response.status}`);
-    return {configured:true,status:'ok',credits,key:{label:'Gemini Developer API'},modelsApi:true,availableModels:Array.isArray(body.models)?body.models.length:0,billingNote:credits?'الرصيد معروض من GEMINI_ACCOUNT_BALANCE_USD.':'Gemini API Key لا يتيح قراءة رصيد الفوترة تلقائيًا؛ الاستهلاك أدناه محسوب من طلبات الموقع.'};
+    return {configured:true,status:'ok',credits,key:{label:'Gemini Developer API',configuredKeys:configuredKeys.length,activeKeyIndex:result.keyIndex},modelsApi:true,availableModels:Array.isArray(body.models)?body.models.length:0,billingNote:credits?'الرصيد معروض من GEMINI_ACCOUNT_BALANCE_USD.':'Gemini API Key لا يتيح قراءة رصيد الفوترة تلقائيًا؛ الاستهلاك أدناه محسوب من طلبات الموقع.'};
   }catch(error){
     return {configured:true,status:'error',credits,key:{label:'Gemini Developer API'},modelsApi:false,error:String(error?.message||error),billingNote:credits?'الرصيد معروض من GEMINI_ACCOUNT_BALANCE_USD.':'تعذر قراءة رصيد حساب Google تلقائيًا باستخدام API Key.'};
   }

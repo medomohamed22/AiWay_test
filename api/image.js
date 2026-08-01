@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -298,7 +298,7 @@ ${JSON.stringify(tool.prompt_config)}`;
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
     if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
     if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
-    if (!process.env.GEMINI_API_KEY) throw appError('MISSING_CONFIGURATION');
+    if (!getGeminiApiKeys().length) throw appError('MISSING_CONFIGURATION');
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
@@ -371,8 +371,8 @@ ${JSON.stringify(tool.prompt_config)}`;
 
     const parts=[{text:cleanPrompt}];
     if(hasReferenceImage){const match=referenceImage.match(/^data:([^;]+);base64,(.+)$/);if(match)parts.push({inlineData:{mimeType:match[1],data:match[2]}});}
-    const response=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model.id)}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseModalities:['TEXT','IMAGE'],imageConfig:{aspectRatio:selectedAspectRatio||'1:1',imageSize:selectedResolution||'1K'}}})},120000);
-    const payload=await response.json().catch(()=>({}));
+    const geminiResult=await geminiFetchJson(`/v1beta/models/${encodeURIComponent(model.id)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseModalities:['TEXT','IMAGE'],imageConfig:{aspectRatio:selectedAspectRatio||'1:1',imageSize:selectedResolution||'1K'}}})},120000);
+    const {response,payload}=geminiResult;
     if(!response.ok)throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:payload?.error?.message||''});
     const imagePart=(payload.candidates?.[0]?.content?.parts||[]).find(part=>part.inlineData?.data);
     if(!imagePart)throw appError('EMPTY_RESPONSE');
@@ -403,7 +403,7 @@ ${JSON.stringify(tool.prompt_config)}`;
         role: 'assistant',
         content: localize(uiLocale, 'تم إنشاء الصورة المطلوبة.', 'The requested image has been generated.'),
         model_id: model.id,
-        token_usage: { ...payload.usage, ...charge, type: 'image', taskId: taskId || 'image' }
+        token_usage: { ...payload.usage, ...charge, type: 'image', taskId: taskId || 'image', geminiKeyIndex: geminiResult.keyIndex, geminiAttempts: geminiResult.attempts }
       }).select('id').single();
       if (assistantInsert.error || !assistantInsert.data) throw appError('DATABASE_ERROR', {}, assistantInsert.error);
       savedAssistant = assistantInsert.data;

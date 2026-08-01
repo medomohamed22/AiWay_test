@@ -85,6 +85,71 @@ export function json(res, status, body) {
   return res.end(JSON.stringify(body));
 }
 
+export function getGeminiApiKeys() {
+  const names = ['GEMINI_API_KEY', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'];
+  const seen = new Set();
+  return names.flatMap((name, index) => {
+    const value = String(process.env[name] || '').trim();
+    if (!value || seen.has(value)) return [];
+    seen.add(value);
+    return [{ name, value, index: index + 1 }];
+  });
+}
+
+function geminiFailureText(payload) {
+  if (payload && typeof payload === 'object') return String(payload?.error?.message || payload?.message || '');
+  return String(payload || '');
+}
+
+function shouldFailoverGemini(status, payload, error) {
+  if (error) return true;
+  const text = geminiFailureText(payload).toLowerCase();
+  if ([401, 403, 404, 408, 409, 429, 500, 502, 503, 504].includes(Number(status))) return true;
+  return /quota|rate limit|resource[_ -]?exhausted|billing|free tier|limit:\s*0|api key|permission|access denied|not authorized|temporar|overload|unavailable|timeout|deadline|internal error|backend error|not found|not supported/.test(text);
+}
+
+/**
+ * Calls the Gemini Developer API with transparent sequential key failover.
+ * The exact same path, model and request body are used for every attempt.
+ */
+export async function geminiFetchJson(path, options = {}, timeoutMs = 15000) {
+  const keys = getGeminiApiKeys();
+  if (!keys.length) throw appError('MISSING_CONFIGURATION', { missing: ['GEMINI_API_KEY'] });
+
+  const normalizedPath = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
+  const attempts = [];
+  let lastResult = null;
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const url = new URL(`https://generativelanguage.googleapis.com${normalizedPath}`);
+    const headers = { ...(options.headers || {}) };
+    const keyMode = options.geminiKeyMode === 'header' ? 'header' : 'query';
+    if (keyMode === 'header') headers['x-goog-api-key'] = key.value;
+    else url.searchParams.set('key', key.value);
+
+    try {
+      const response = await fetchWithTimeout(url.toString(), { ...options, headers, geminiKeyMode: undefined }, timeoutMs);
+      const payload = await response.json().catch(() => ({}));
+      const result = { response, payload, keyIndex: key.index, keyName: key.name, attempts: i + 1 };
+      if (response.ok) return result;
+
+      attempts.push({ keyIndex: key.index, status: response.status, message: geminiFailureText(payload).slice(0, 300) });
+      lastResult = result;
+      if (i === keys.length - 1 || !shouldFailoverGemini(response.status, payload, null)) return { ...result, failoverAttempts: attempts };
+      console.warn('[GEMINI_FAILOVER]', { fromKey: key.index, status: response.status, nextKey: keys[i + 1]?.index });
+    } catch (error) {
+      attempts.push({ keyIndex: key.index, status: 0, message: String(error?.message || error).slice(0, 300) });
+      lastResult = { response: null, payload: {}, error, keyIndex: key.index, keyName: key.name, attempts: i + 1 };
+      if (i === keys.length - 1 || !shouldFailoverGemini(0, {}, error)) throw error;
+      console.warn('[GEMINI_FAILOVER]', { fromKey: key.index, status: 0, nextKey: keys[i + 1]?.index });
+    }
+  }
+
+  if (lastResult?.error) throw lastResult.error;
+  return { ...lastResult, failoverAttempts: attempts };
+}
+
 export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const timeout = Math.max(1, Number(timeoutMs) || 15000);
   const timeoutController = new AbortController();

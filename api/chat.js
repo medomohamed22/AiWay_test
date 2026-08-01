@@ -1,4 +1,4 @@
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -301,7 +301,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       });
     }
 
-    if (!process.env.GEMINI_API_KEY) throw appError('MISSING_CONFIGURATION');
+    if (!getGeminiApiKeys().length) throw appError('MISSING_CONFIGURATION');
 
     if (purchased) {
       await reserveAiTokens(supabase, user.id, requestId, 'chat', availableTokens);
@@ -340,10 +340,10 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     const contents=safeMessages.filter(m=>m.role!=='system').map(m=>({role:m.role==='assistant'?'model':'user',parts:geminiParts(m.content)})).filter(item=>item.parts.length);
     const systemInstruction=safeMessages.filter(m=>m.role==='system').map(m=>typeof m.content==='string'?m.content:'').join('\n\n');
     const tools=webSearch?[{google_search:{}}]:undefined;
-    const response=await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(activeModelId)}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,{
+    const geminiResult=await geminiFetchJson(`/v1beta/models/${encodeURIComponent(activeModelId)}:generateContent`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents,systemInstruction:{parts:[{text:systemInstruction}]},tools,generationConfig:{temperature:Number(temperature),maxOutputTokens:Math.max(128,Math.floor(initialMaxTokens))}})
     },90000);
-    const payload=await response.json().catch(()=>({}));
+    const {response,payload}=geminiResult;
     if(!response.ok){
       const details=String(payload?.error?.message||'');
       if(webSearch && (response.status===403 || response.status===429 || /billing|quota|grounding|google search/i.test(details))) throw appError('SEARCH_BILLING_REQUIRED',{status:response.status,provider:'gemini',details});
@@ -377,7 +377,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       fallbackUsed,
       routedModelId: routedModelId || activeModelId,
       generationId: generationId || null,
-      routerMetadata,
+      routerMetadata: { ...(routerMetadata || {}), geminiKeyIndex: geminiResult.keyIndex, geminiAttempts: geminiResult.attempts },
       webSearch: Boolean(webSearch),
       taskId: taskId || previousUsage.taskId || null
     };

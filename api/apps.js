@@ -1,4 +1,4 @@
-import { allowMethods, db, json, localize, requestLocale, requireUser, fetchWithTimeout, getAiTools, GEMINI_LIVE_MODELS } from './_lib.js';
+import { allowMethods, db, json, localize, requestLocale, requireUser, getAiTools, GEMINI_LIVE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
 
 const APP_FIELDS = 'id,name,slug,category,network,short_description,website_url,icon_url,screenshot_urls,rating,ratings_count,views_count,get_clicks_count,is_verified,is_featured,featured_until,developer_name,created_at';
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       if(!tool)return json(res,404,{error:localize(locale,'الأداة الصوتية غير متاحة.','The live audio tool is unavailable.')});
       const model=GEMINI_LIVE_MODELS.find(x=>x.id===tool.model_id);
       if(!model)return json(res,400,{error:localize(locale,'النموذج الصوتي المختار غير صالح.','The selected live model is invalid.')});
-      if(!process.env.GEMINI_API_KEY)return json(res,503,{error:localize(locale,'مفتاح Gemini غير مضبوط.','Gemini API key is not configured.')});
+      if(!getGeminiApiKeys().length)return json(res,503,{error:localize(locale,'مفتاح Gemini غير مضبوط.','Gemini API key is not configured.')});
       const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
       const tokenRequest={
         uses:1,
@@ -30,12 +30,13 @@ export default async function handler(req, res) {
       };
       // Translation language is selected by the user in the browser, so this field must remain unlocked.
       if(model.liveKind==='translate')tokenRequest.liveConnectConstraints.config={responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:false}};
-      const response=await fetchWithTimeout('https://generativelanguage.googleapis.com/v1beta/auth_tokens',{
+      const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-goog-api-key':process.env.GEMINI_API_KEY},
+        headers:{'Content-Type':'application/json'},
+        geminiKeyMode:'header',
         body:JSON.stringify(tokenRequest)
       },12000);
-      const data=await response.json().catch(()=>({}));
+      const {response,payload:data}=geminiResult;
       if(!response.ok){
         const raw=String(data?.error?.message||'');
         const quota=/quota|resource_exhausted|rate limit|limit: 0/i.test(raw);
