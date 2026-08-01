@@ -898,7 +898,7 @@ async function loadModels(){
     const arDescription=cleanToolDescription(tool.description_ar,tool.tool_type);
     const enDescription=cleanToolDescription(tool.description_en,tool.tool_type);
     TASKS[tool.id]={ar:[tool.name_ar||tool.id,arDescription,arDescription],en:[tool.name_en||tool.id,enDescription,enDescription],tool_type:tool.tool_type,model_id:tool.model_id};
-    if(!TASK_ICONS[tool.id])TASK_ICONS[tool.id]=tool.tool_type==='image'?TASK_ICONS.image:tool.tool_type==='live_audio'?LIVE_TOOL_ICONS.voice:tool.tool_type==='live_translate'?LIVE_TOOL_ICONS.translate:ICONS.sparkles;
+    const customToolIcon=tool.prompt_config?._ui?.icon_svg;if(customToolIcon)TASK_ICONS[tool.id]=customToolIcon;else if(!TASK_ICONS[tool.id])TASK_ICONS[tool.id]=tool.tool_type==='image'?TASK_ICONS.image:tool.tool_type==='live_audio'?LIVE_TOOL_ICONS.voice:tool.tool_type==='live_translate'?LIVE_TOOL_ICONS.translate:ICONS.sparkles;
   }
   if($('taskScreen')?.classList.contains('open'))renderTaskScreen();
   renderModelSelect(selected||data.trialModelId||'');
