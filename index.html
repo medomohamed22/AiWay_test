@@ -1714,10 +1714,10 @@ async function startLiveSession(){
       closeVoiceMenu();closeLanguageMenu();
     };
     liveSocket.onopen=()=>{
-      // The complete, validated setup is locked into the ephemeral token on the
-      // server. The constrained WebSocket therefore receives only the model in
-      // the first client message and cannot be altered from DevTools.
-      liveSocket.send(JSON.stringify({setup:{model:`models/${info.model}`}}));
+      // Prefer a server-constrained token. If Gemini rejected constraints for
+      // this project, the API returns the exact server-built setup object.
+      const setup=info.setupLocked?{model:`models/${info.model}`}:(info.setup||{model:`models/${info.model}`});
+      liveSocket.send(JSON.stringify({setup}));
     };
     liveSocket.onmessage=async e=>{
       try{
