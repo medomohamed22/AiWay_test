@@ -74,7 +74,7 @@ export default async function handler(req, res) {
         // Each provider usage event has its own idempotent reservation. Nothing
         // is written before setupComplete, so a transient database write cannot
         // prevent the microphone/WebSocket session from starting.
-        await reserveAiTokens(supabase,user.id,requestId,'live_audio_usage',requiredTokens);
+        await reserveAiTokens(supabase,user.id,requestId,'chat',requiredTokens);
         const remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
         return json(res,200,{chargedTokens:requiredTokens,remainingTokens,sequence,cost:{providerUsd:charge.providerUsd,inputUsd:charge.inputUsd,outputUsd:charge.outputUsd,costSource:charge.costSource,modalityUsage:charge.modalityUsage,tokenUsd:TOKEN_USD}});
       }
@@ -108,24 +108,33 @@ export default async function handler(req, res) {
         const liveConfig=model.liveKind==='translate'
           ? {responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}
           : {responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Always detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
-        const constrainedRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
+        const setup=model.liveKind==='translate'
+          ? {model:`models/${model.id}`,generationConfig:liveConfig}
+          : {model:`models/${model.id}`,generationConfig:{responseModalities:liveConfig.responseModalities,speechConfig:liveConfig.speechConfig},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:liveConfig.systemInstruction};
+        // The current auth_tokens REST schema accepts the complete locked Live
+        // setup as bidiGenerateContentSetup. This avoids sending preview-only
+        // translation fields again from the browser and keeps the API key secret.
+        const constrainedRequest={uses:1,expireTime,newSessionExpireTime,bidiGenerateContentSetup:setup};
         let geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(constrainedRequest)},12000);
         let {response,payload:data}=geminiResult;
         let setupLocked=true;
-        const providerMessage=String(data?.error?.message||'');
-        // Some Gemini projects currently expose ephemeral tokens but reject the
-        // preview liveConnectConstraints field. Fall back to an ordinary
-        // single-use ephemeral token and send the server-built setup object to
-        // the client. This is a provider capability mismatch, not a DB error.
-        if(!response?.ok&&response?.status===400&&/liveConnectConstraints/i.test(providerMessage)){
+        let providerMessage=String(data?.error?.message||'');
+        // Compatibility fallback for projects still exposing the preview
+        // liveConnectConstraints spelling documented by Live Translation.
+        if(!response?.ok&&response?.status===400&&/bidiGenerateContentSetup/i.test(providerMessage)){
+          const legacyRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
+          geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(legacyRequest)},12000);
+          response=geminiResult.response;data=geminiResult.payload;providerMessage=String(data?.error?.message||providerMessage);
+        }
+        // Last fallback: create a plain single-use token and send the exact
+        // server-built setup to the client. This preserves compatibility for
+        // dialog sessions. Translation remains on the official v1beta shape.
+        if(!response?.ok&&response?.status===400&&/(liveConnectConstraints|bidiGenerateContentSetup)/i.test(providerMessage)){
           const plainRequest={uses:1,expireTime,newSessionExpireTime};
           geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(plainRequest)},12000);
           response=geminiResult.response;data=geminiResult.payload;setupLocked=false;
         }
         if(!response?.ok) throw appError('PROVIDER_ERROR',{status:response?.status||502,provider:'gemini',details:data?.error?.message||providerMessage});
-        const setup=model.liveKind==='translate'
-          ? {model:`models/${model.id}`,generationConfig:liveConfig}
-          : {model:`models/${model.id}`,generationConfig:{responseModalities:liveConfig.responseModalities,speechConfig:liveConfig.speechConfig},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:liveConfig.systemInstruction};
         return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked,setup:setupLocked?undefined:setup});
       } catch(error) {
         throw error;
