@@ -16,11 +16,10 @@ export default async function handler(req, res) {
       const action=String(body.action||'start');
       const supabase=db();
       const sessionId=normalizeRequestId(body.sessionId || body.requestId);
-      const holdRequestId=normalizeRequestId(`${sessionId}_hold`);
       const usageRequestId=sequence=>normalizeRequestId(`${sessionId}_u${sequence}`);
       const readReservation=async requestId=>{
         const {data,error}=await supabase.from('ai_usage_reservations')
-          .select('request_id,status,reserved_tokens,charged_tokens,response_meta,created_at,completed_at')
+          .select('request_id,status,reserved_tokens,charged_tokens')
           .eq('user_id',user.id).eq('request_id',requestId).maybeSingle();
         if(error) throw appError('DATABASE_ERROR',{},error);
         return data||null;
@@ -48,8 +47,9 @@ export default async function handler(req, res) {
       };
 
       if(action==='confirm'){
-        const hold=await readReservation(holdRequestId);
-        if(!hold||hold.status!=='reserved') throw appError('INVALID_REQUEST');
+        // Do not create a database reservation before Gemini confirms the Live
+        // session. The provider connection must remain independent from a
+        // temporary billing write; actual usage is charged idempotently below.
         return json(res,200,{confirmed:true,chargedTokens:0,remainingTokens:await readBalance(),startedAt:new Date().toISOString(),billing:'gemini_usage_metadata'});
       }
 
@@ -66,37 +66,30 @@ export default async function handler(req, res) {
         const requiredTokens=Math.max(1,charge.chargedTokens);
         const requestId=usageRequestId(sequence);
         const existing=await readReservation(requestId);
-        if(existing?.status==='completed') return json(res,200,{chargedTokens:Number(existing.charged_tokens||0),remainingTokens:await readBalance(),sequence,idempotent:true,cost:existing.response_meta?.cost||charge});
-        if(existing) throw appError('REQUEST_IN_PROGRESS');
+        if(existing?.status==='completed') return json(res,200,{chargedTokens:Number(existing.charged_tokens||0),remainingTokens:await readBalance(),sequence,idempotent:true,cost:charge});
+        if(existing?.status==='reserved') throw appError('REQUEST_IN_PROGRESS');
 
-        const hold=await readReservation(holdRequestId);
-        let remainingTokens;
-        if(sequence===1&&hold?.status==='reserved'){
-          // Settle the first provider usage event against the start hold and refund any unused hold.
-          remainingTokens=await finalizeAiTokens(supabase,user.id,holdRequestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
-        }else{
-          const availableTokens=await readBalance();
-          if(availableTokens<requiredTokens) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens,shortfall:requiredTokens-availableTokens});
-          await reserveAiTokens(supabase,user.id,requestId,'live_audio_usage',requiredTokens);
-          remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
-        }
+        const availableTokens=await readBalance();
+        if(availableTokens<requiredTokens) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens,shortfall:requiredTokens-availableTokens});
+        // Each provider usage event has its own idempotent reservation. Nothing
+        // is written before setupComplete, so a transient database write cannot
+        // prevent the microphone/WebSocket session from starting.
+        await reserveAiTokens(supabase,user.id,requestId,'live_audio_usage',requiredTokens);
+        const remainingTokens=await finalizeAiTokens(supabase,user.id,requestId,requiredTokens,{sessionId,sequence,modelId:model.id,kind:'gemini_live_usage',usage,cost:charge,pricingSource:'Google Gemini Developer API pricing'});
         return json(res,200,{chargedTokens:requiredTokens,remainingTokens,sequence,cost:{providerUsd:charge.providerUsd,inputUsd:charge.inputUsd,outputUsd:charge.outputUsd,costSource:charge.costSource,modalityUsage:charge.modalityUsage,tokenUsd:TOKEN_USD}});
       }
 
       if(action==='release'||action==='finish'){
-        const hold=await readReservation(holdRequestId);
-        if(hold?.status==='reserved') await releaseAiTokens(supabase,user.id,holdRequestId,{sessionId,reason:String(body.reason||action).slice(0,80)});
-        return json(res,200,{released:hold?.status==='reserved',remainingTokens:await readBalance()});
+        // There is no pre-session hold. Completed usage events have already
+        // been finalized individually and cannot be charged twice.
+        return json(res,200,{released:false,remainingTokens:await readBalance()});
       }
 
       if(action!=='start') throw appError('INVALID_REQUEST');
       const availableTokens=await readBalance();
       if(availableTokens<LIVE_MINIMUM_START_TOKENS) throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:LIVE_MINIMUM_START_TOKENS,shortfall:LIVE_MINIMUM_START_TOKENS-availableTokens});
-      // Hold the current balance only until the first provider usage event. This guarantees
-      // that the first real Gemini turn can be settled without exposing the site to loss;
-      // finalize_ai_tokens immediately refunds the unused part of the hold.
-      await reserveAiTokens(supabase,user.id,holdRequestId,'live_audio_start_hold',availableTokens);
-      let reservationActive=true;
+      // Starting Gemini Live performs no billing write. Billing starts only
+      // after setupComplete when Gemini reports real usageMetadata.
       try {
         const toolId=String(body.toolId||'');
         const targetLanguage=String(body.targetLanguage||'en').slice(0,16);
@@ -114,10 +107,8 @@ export default async function handler(req, res) {
         const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(tokenRequest)},12000);
         const {response,payload:data}=geminiResult;
         if(!response.ok) throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:data?.error?.message||''});
-        reservationActive=false;
-        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:availableTokens,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing});
+        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing});
       } catch(error) {
-        if(reservationActive) await releaseAiTokens(supabase,user.id,holdRequestId,{sessionId,reason:'token_creation_failed',code:String(error?.code||'SERVER_ERROR')});
         throw error;
       }
     }
