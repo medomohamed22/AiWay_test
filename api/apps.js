@@ -105,37 +105,19 @@ export default async function handler(req, res) {
         if(!model)throw appError('MODEL_UNAVAILABLE');
         if(!getGeminiApiKeys().length)throw appError('MISSING_CONFIGURATION');
         const now=Date.now(),expireTime=new Date(now+30*60*1000).toISOString(),newSessionExpireTime=new Date(now+60*1000).toISOString();
-        const liveConfig=model.liveKind==='translate'
-          ? {responseModalities:['AUDIO'],inputAudioTranscription:{},outputAudioTranscription:{},translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}
-          : {responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Always detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
+        // Keep the Live setup outside auth_tokens. Some Gemini projects expose
+        // an auth token schema that rejects preview configuration fields even
+        // though the same fields are accepted by the Live WebSocket endpoint.
+        // A short-lived, single-use token still keeps the permanent API key out
+        // of the browser while avoiding provider-schema incompatibilities.
         const setup=model.liveKind==='translate'
-          ? {model:`models/${model.id}`,generationConfig:liveConfig}
-          : {model:`models/${model.id}`,generationConfig:{responseModalities:liveConfig.responseModalities,speechConfig:liveConfig.speechConfig},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:liveConfig.systemInstruction};
-        // The current auth_tokens REST schema accepts the complete locked Live
-        // setup as bidiGenerateContentSetup. This avoids sending preview-only
-        // translation fields again from the browser and keeps the API key secret.
-        const constrainedRequest={uses:1,expireTime,newSessionExpireTime,bidiGenerateContentSetup:setup};
-        let geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(constrainedRequest)},12000);
-        let {response,payload:data}=geminiResult;
-        let setupLocked=true;
-        let providerMessage=String(data?.error?.message||'');
-        // Compatibility fallback for projects still exposing the preview
-        // liveConnectConstraints spelling documented by Live Translation.
-        if(!response?.ok&&response?.status===400&&/bidiGenerateContentSetup/i.test(providerMessage)){
-          const legacyRequest={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${model.id}`,config:liveConfig}};
-          geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(legacyRequest)},12000);
-          response=geminiResult.response;data=geminiResult.payload;providerMessage=String(data?.error?.message||providerMessage);
-        }
-        // Last fallback: create a plain single-use token and send the exact
-        // server-built setup to the client. This preserves compatibility for
-        // dialog sessions. Translation remains on the official v1beta shape.
-        if(!response?.ok&&response?.status===400&&/(liveConnectConstraints|bidiGenerateContentSetup)/i.test(providerMessage)){
-          const plainRequest={uses:1,expireTime,newSessionExpireTime};
-          geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(plainRequest)},12000);
-          response=geminiResult.response;data=geminiResult.payload;setupLocked=false;
-        }
-        if(!response?.ok) throw appError('PROVIDER_ERROR',{status:response?.status||502,provider:'gemini',details:data?.error?.message||providerMessage});
-        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked,setup:setupLocked?undefined:setup});
+          ? {model:`models/${model.id}`,generationConfig:{responseModalities:['AUDIO'],translationConfig:{targetLanguageCode:targetLanguage,echoTargetLanguage:true}}}
+          : {model:`models/${model.id}`,generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName}}}},inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'You are a natural real-time voice assistant. Detect the language and dialect of the user latest spoken utterance and reply in that same language and dialect. If the user speaks Arabic, reply only in natural Arabic matching their dialect. Never switch to English unless the user speaks English or explicitly asks for English.'}]}};
+        const plainRequest={uses:1,expireTime,newSessionExpireTime};
+        const geminiResult=await geminiFetchJson('/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json'},geminiKeyMode:'header',body:JSON.stringify(plainRequest)},12000);
+        const {response,payload:data}=geminiResult;
+        if(!response?.ok) throw appError('PROVIDER_ERROR',{status:response?.status||502,provider:'gemini',details:data?.error?.message||'Could not create Gemini ephemeral token.'});
+        return json(res,200,{token:data.name,model:model.id,kind:model.liveKind,voiceName:model.liveKind==='dialog'?voiceName:undefined,targetLanguage:model.liveKind==='translate'?targetLanguage:undefined,expiresAt:expireTime,sessionId,reservedTokens:0,billing:'gemini_usage_metadata',tokenUsd:TOKEN_USD,pricing:model.pricing,setupLocked:false,setup});
       } catch(error) {
         throw error;
       }
