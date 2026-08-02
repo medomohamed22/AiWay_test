@@ -27,6 +27,53 @@ export default async function handler(request, response) {
 
     if (request.method === 'POST') {
       const body = request.body && typeof request.body === 'object' ? request.body : {};
+
+      if (body.action === 'translate') {
+        const configuredAdminKey = process.env.ADMIN_API_KEY;
+        const suppliedAdminKey = request.headers['x-admin-key'];
+        if (!configuredAdminKey || suppliedAdminKey !== configuredAdminKey) {
+          return json(response, 401, { error: 'Unauthorized' });
+        }
+
+        const target = body.target === 'ar' ? 'ar' : null;
+        const items = Array.isArray(body.items) ? body.items.slice(0, 500) : [];
+        if (!target || !items.length) {
+          return json(response, 400, { error: 'Invalid translation request' });
+        }
+
+        const translations = [];
+        for (const item of items) {
+          const id = String(item?.id || '').slice(0, 100);
+          const text = typeof item?.text === 'string' ? item.text.trim().slice(0, 1200) : '';
+          if (!id || !text) continue;
+
+          const url = new URL('https://translate.googleapis.com/translate_a/single');
+          url.searchParams.set('client', 'gtx');
+          url.searchParams.set('sl', 'auto');
+          url.searchParams.set('tl', target);
+          url.searchParams.set('dt', 't');
+          url.searchParams.set('q', text);
+
+          try {
+            const translateResponse = await fetch(url, {
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+              signal: AbortSignal.timeout(10000),
+            });
+            if (!translateResponse.ok) throw new Error('Translation provider failed');
+            const translated = await translateResponse.json();
+            const translatedText = Array.isArray(translated?.[0])
+              ? translated[0].map(part => part?.[0] || '').join('').trim()
+              : '';
+            translations.push({ id, text: translatedText || text });
+          } catch (translationError) {
+            console.error('Translation item error:', translationError);
+            translations.push({ id, text });
+          }
+        }
+
+        return json(response, 200, { translations });
+      }
+
       const choice = typeof body.choice === 'string' && allowedChoices.has(body.choice)
         ? body.choice
         : null;
