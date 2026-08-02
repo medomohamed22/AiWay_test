@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#6f2dbd" />
+  <title>AiWay — Help Shape What Comes Next</title>
+  <link rel="icon" href="./aiway-logo.png" />
+  <style>
+    :root{--purple:#6f2dbd;--purple2:#9657df;--soft:#f5edff;--ink:#24172f;--muted:#746a7c;--line:#eadff2;--white:#fff;--bg:#fbf9fd;--ok:#16845f;--danger:#c33f5a;--shadow:0 24px 70px rgba(82,38,117,.14)}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;color:var(--ink);background:radial-gradient(circle at 12% 10%,#f1e3ff 0,transparent 30%),radial-gradient(circle at 88% 90%,#eee0ff 0,transparent 28%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    button,input,textarea{font:inherit}.page{min-height:100vh;position:relative;overflow:hidden}.orb{position:fixed;border-radius:50%;filter:blur(8px);pointer-events:none;opacity:.45}.orb.one{width:230px;height:230px;background:#d9b8ff;top:-100px;right:-80px}.orb.two{width:180px;height:180px;background:#efe0ff;bottom:-70px;left:-40px}
+    .topbar{width:min(1120px,calc(100% - 32px));margin:auto;padding:20px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;position:relative;z-index:5}.brand{display:flex;align-items:center;gap:11px;font-weight:900;font-size:20px}.brand img{width:45px;height:45px;border-radius:15px;box-shadow:0 10px 24px rgba(111,45,189,.2)}
+    .translate-wrap{position:relative}.translate-btn{border:1px solid var(--line);background:rgba(255,255,255,.9);color:var(--purple);border-radius:14px;padding:11px 15px;font-weight:800;cursor:pointer;display:flex;gap:8px;align-items:center;box-shadow:0 8px 24px rgba(82,38,117,.08)}.translate-btn:hover{transform:translateY(-1px)}
+    .language-panel{position:absolute;right:0;top:54px;width:min(360px,calc(100vw - 32px));background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px;box-shadow:var(--shadow);display:none;z-index:20}.language-panel.open{display:block;animation:pop .18s ease}.language-search{width:100%;border:1px solid var(--line);border-radius:13px;padding:12px 13px;outline:none}.language-search:focus{border-color:#b98be8;box-shadow:0 0 0 4px #f1e7fb}.language-list{max-height:260px;overflow:auto;margin:10px 0;display:grid;gap:5px}.language-option{width:100%;text-align:left;border:0;background:#fff;border-radius:11px;padding:10px 11px;cursor:pointer;color:var(--ink)}.language-option:hover,.language-option.active{background:var(--soft);color:var(--purple)}.language-actions{display:flex;justify-content:flex-end}.select-language{border:0;border-radius:12px;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;padding:11px 17px;font-weight:850;cursor:pointer}.select-language:disabled{opacity:.5;cursor:not-allowed}
+    main{width:min(900px,calc(100% - 32px));margin:35px auto 70px;position:relative;z-index:2}.hero{text-align:center;margin-bottom:28px}.eyebrow{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);color:var(--purple);padding:8px 12px;border-radius:999px;font-size:13px;font-weight:850;box-shadow:0 8px 24px rgba(82,38,117,.07)}h1{font-size:clamp(34px,7vw,64px);line-height:1.04;margin:18px auto 14px;max-width:800px;letter-spacing:-2px}.hero p{max-width:650px;margin:auto;color:var(--muted);font-size:17px;line-height:1.75}
+    .card{background:rgba(255,255,255,.92);border:1px solid rgba(230,214,241,.95);border-radius:28px;padding:clamp(20px,4vw,38px);box-shadow:var(--shadow);backdrop-filter:blur(15px)}.card-head{text-align:center;margin-bottom:24px}.card-head h2{margin:0 0 8px;font-size:clamp(24px,4vw,34px)}.card-head p{margin:0;color:var(--muted);line-height:1.65}
+    .poll-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.poll-option{display:block;position:relative}.poll-option input{position:absolute;opacity:0;pointer-events:none}.choice{height:100%;border:2px solid var(--line);border-radius:20px;padding:22px;cursor:pointer;transition:.18s ease;background:#fff}.choice:hover{transform:translateY(-3px);border-color:#cfa9ec;box-shadow:0 14px 30px rgba(85,43,116,.09)}.poll-option input:checked+.choice{border-color:var(--purple);background:linear-gradient(145deg,#fff,#f6edff);box-shadow:0 0 0 4px #eee0fa}.choice-icon{width:48px;height:48px;border-radius:15px;background:var(--soft);color:var(--purple);display:grid;place-items:center;font-size:23px;margin-bottom:16px}.choice h3{margin:0 0 8px;font-size:19px}.choice p{margin:0;color:var(--muted);line-height:1.6;font-size:14px}.check{position:absolute;top:15px;right:15px;width:24px;height:24px;border:2px solid #c6b5d2;border-radius:50%;background:#fff}.poll-option input:checked+.choice .check{background:var(--purple);border-color:var(--purple)}.poll-option input:checked+.choice .check:after{content:"✓";display:grid;place-items:center;color:#fff;font-size:14px;font-weight:900}
+    .other{margin-top:20px}.label{display:block;font-weight:850;margin-bottom:9px}.other textarea{width:100%;min-height:120px;resize:vertical;border:1px solid var(--line);border-radius:17px;padding:15px;outline:none;background:#fff;line-height:1.6}.other textarea:focus{border-color:#b98be8;box-shadow:0 0 0 4px #f1e7fb}.meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}.privacy{color:var(--muted);font-size:12px}.submit{border:0;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;padding:13px 20px;font-weight:900;cursor:pointer;min-width:140px;box-shadow:0 12px 28px rgba(111,45,189,.25)}.submit:hover{transform:translateY(-1px)}.submit:disabled{opacity:.65;cursor:not-allowed;transform:none}.message{display:none;margin-top:14px;padding:12px 14px;border-radius:13px;font-weight:750}.message.show{display:block}.message.ok{background:#eaf8f2;color:var(--ok)}.message.error{background:#fff0f3;color:var(--danger)}
+    .coming{text-align:center;margin-top:28px}.coming span{display:inline-block;font-size:clamp(30px,6vw,52px);font-weight:950;letter-spacing:.04em;background:linear-gradient(135deg,var(--purple),#b178e7);-webkit-background-clip:text;background-clip:text;color:transparent}.coming p{color:var(--muted);margin:8px 0 0}.footer{text-align:center;color:#958a9d;font-size:12px;margin-top:34px}
+    .spinner{width:17px;height:17px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;display:inline-block;vertical-align:-3px;animation:spin .7s linear infinite}.translated-note{font-size:11px;color:var(--muted);margin-top:8px;text-align:center}
+    @keyframes spin{to{transform:rotate(360deg)}}@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}@media(max-width:700px){.poll-grid{grid-template-columns:1fr}.topbar{padding-top:14px}main{margin-top:18px}.meta{align-items:stretch;flex-direction:column}.submit{width:100%}h1{letter-spacing:-1px}.card{border-radius:23px}}
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="orb one"></div><div class="orb two"></div>
+  <header class="topbar">
+    <div class="brand"><img src="./aiway-logo.png" alt="AiWay logo"><span>AiWay</span></div>
+    <div class="translate-wrap">
+      <button class="translate-btn" id="translateBtn" type="button" aria-expanded="false">🌐 <span data-i18n>Translate</span></button>
+      <div class="language-panel" id="languagePanel">
+        <input class="language-search" id="languageSearch" type="search" placeholder="Search for a language..." />
+        <div class="language-list" id="languageList"></div>
+        <div class="language-actions"><button class="select-language" id="selectLanguage" disabled type="button">Select</button></div>
+        <div class="translated-note">Translation uses Google Translate's public web endpoint.</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow" data-i18n>✨ Your opinion shapes AiWay</div>
+      <h1 data-i18n>How should the future of AiWay look?</h1>
+      <p data-i18n>Choose the experience you would love to use. Your vote will help us build a simpler and more useful AI platform.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-i18n>Choose your preferred experience</h2>
+        <p data-i18n>Select one option, or share a completely different idea below.</p>
+      </div>
+      <form id="pollForm">
+        <div class="poll-grid">
+          <label class="poll-option">
+            <input type="radio" name="choice" value="all_models" />
+            <div class="choice"><div class="check"></div><div class="choice-icon">🧠</div><h3 data-i18n>All AI models in one place</h3><p data-i18n>AiWay provides many AI models and lets each user choose which model to use for every task.</p></div>
+          </label>
+          <label class="poll-option">
+            <input type="radio" name="choice" value="simple_tools" />
+            <div class="choice"><div class="check"></div><div class="choice-icon">🧰</div><h3 data-i18n>Simple ready-made AI tools</h3><p data-i18n>AiWay offers clear tools such as image creation, summarization, coding, writing, and more.</p></div>
+          </label>
+        </div>
+        <div class="other">
+          <label class="label" for="idea" data-i18n>Have another idea?</label>
+          <textarea id="idea" maxlength="1200" placeholder="Write your idea here..."></textarea>
+        </div>
+        <div class="meta">
+          <div class="privacy" data-i18n>No sign-in required. One response is stored for each submission.</div>
+          <button class="submit" id="submitBtn" type="submit" data-i18n>Send feedback</button>
+        </div>
+        <div class="message" id="message"></div>
+      </form>
+    </section>
+
+    <section class="coming"><span data-i18n>COMING SOON</span><p data-i18n>We are building the next AiWay experience with you.</p></section>
+    <div class="footer">© <span id="year"></span> AiWay</div>
+  </main>
+</div>
+
+<script>
+  const languages = [
+    ['af','Afrikaans'],['sq','Albanian'],['am','Amharic'],['ar','Arabic'],['hy','Armenian'],['as','Assamese'],['ay','Aymara'],['az','Azerbaijani'],['bm','Bambara'],['eu','Basque'],['be','Belarusian'],['bn','Bengali'],['bho','Bhojpuri'],['bs','Bosnian'],['bg','Bulgarian'],['ca','Catalan'],['ceb','Cebuano'],['zh-CN','Chinese (Simplified)'],['zh-TW','Chinese (Traditional)'],['co','Corsican'],['hr','Croatian'],['cs','Czech'],['da','Danish'],['dv','Dhivehi'],['doi','Dogri'],['nl','Dutch'],['en','English'],['eo','Esperanto'],['et','Estonian'],['ee','Ewe'],['fil','Filipino'],['fi','Finnish'],['fr','French'],['fy','Frisian'],['gl','Galician'],['ka','Georgian'],['de','German'],['el','Greek'],['gn','Guarani'],['gu','Gujarati'],['ht','Haitian Creole'],['ha','Hausa'],['haw','Hawaiian'],['he','Hebrew'],['hi','Hindi'],['hmn','Hmong'],['hu','Hungarian'],['is','Icelandic'],['ig','Igbo'],['ilo','Ilocano'],['id','Indonesian'],['ga','Irish'],['it','Italian'],['ja','Japanese'],['jv','Javanese'],['kn','Kannada'],['kk','Kazakh'],['km','Khmer'],['rw','Kinyarwanda'],['gom','Konkani'],['ko','Korean'],['kri','Krio'],['ku','Kurdish'],['ckb','Kurdish (Sorani)'],['ky','Kyrgyz'],['lo','Lao'],['la','Latin'],['lv','Latvian'],['ln','Lingala'],['lt','Lithuanian'],['lg','Luganda'],['lb','Luxembourgish'],['mk','Macedonian'],['mai','Maithili'],['mg','Malagasy'],['ms','Malay'],['ml','Malayalam'],['mt','Maltese'],['mi','Maori'],['mr','Marathi'],['mni-Mtei','Meiteilon'],['lus','Mizo'],['mn','Mongolian'],['my','Myanmar'],['ne','Nepali'],['no','Norwegian'],['ny','Nyanja'],['or','Odia'],['om','Oromo'],['ps','Pashto'],['fa','Persian'],['pl','Polish'],['pt','Portuguese'],['pa','Punjabi'],['qu','Quechua'],['ro','Romanian'],['ru','Russian'],['sm','Samoan'],['sa','Sanskrit'],['gd','Scots Gaelic'],['nso','Sepedi'],['sr','Serbian'],['st','Sesotho'],['sn','Shona'],['sd','Sindhi'],['si','Sinhala'],['sk','Slovak'],['sl','Slovenian'],['so','Somali'],['es','Spanish'],['su','Sundanese'],['sw','Swahili'],['sv','Swedish'],['tg','Tajik'],['ta','Tamil'],['tt','Tatar'],['te','Telugu'],['th','Thai'],['ti','Tigrinya'],['ts','Tsonga'],['tr','Turkish'],['tk','Turkmen'],['ak','Twi'],['uk','Ukrainian'],['ur','Urdu'],['ug','Uyghur'],['uz','Uzbek'],['vi','Vietnamese'],['cy','Welsh'],['xh','Xhosa'],['yi','Yiddish'],['yo','Yoruba'],['zu','Zulu']
+  ];
+
+  const panel=document.getElementById('languagePanel'), list=document.getElementById('languageList'), search=document.getElementById('languageSearch'), selectBtn=document.getElementById('selectLanguage');
+  let selectedLanguage=null;
+  function renderLanguages(query=''){
+    const q=query.trim().toLowerCase(); list.innerHTML='';
+    languages.filter(([code,name])=>name.toLowerCase().includes(q)||code.toLowerCase().includes(q)).forEach(([code,name])=>{
+      const b=document.createElement('button'); b.type='button'; b.className='language-option'+(selectedLanguage?.[0]===code?' active':''); b.textContent=name;
+      b.onclick=()=>{selectedLanguage=[code,name];selectBtn.disabled=false;renderLanguages(search.value)}; list.appendChild(b);
+    });
+  }
+  renderLanguages();
+  document.getElementById('translateBtn').onclick=()=>{panel.classList.toggle('open');document.getElementById('translateBtn').setAttribute('aria-expanded',panel.classList.contains('open'));if(panel.classList.contains('open')) search.focus()};
+  search.oninput=()=>renderLanguages(search.value);
+  document.addEventListener('click',e=>{if(!e.target.closest('.translate-wrap')) panel.classList.remove('open')});
+
+  async function googleTranslate(text,target){
+    if(!text.trim()||target==='en') return text;
+    const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+encodeURIComponent(target)+'&dt=t&q='+encodeURIComponent(text);
+    const r=await fetch(url); if(!r.ok) throw new Error('Translation failed'); const data=await r.json(); return (data[0]||[]).map(x=>x[0]).join('');
+  }
+  selectBtn.onclick=async()=>{
+    if(!selectedLanguage)return; selectBtn.disabled=true;selectBtn.innerHTML='<span class="spinner"></span>';
+    try{
+      const nodes=[...document.querySelectorAll('[data-i18n]')];
+      for(const node of nodes){if(!node.dataset.original)node.dataset.original=node.textContent;node.textContent=selectedLanguage[0]==='en'?node.dataset.original:await googleTranslate(node.dataset.original,selectedLanguage[0])}
+      for(const el of [search,document.getElementById('idea')]){if(!el.dataset.originalPlaceholder)el.dataset.originalPlaceholder=el.placeholder;el.placeholder=selectedLanguage[0]==='en'?el.dataset.originalPlaceholder:await googleTranslate(el.dataset.originalPlaceholder,selectedLanguage[0])}
+      document.documentElement.lang=selectedLanguage[0]; document.documentElement.dir=['ar','fa','he','ur','ps','ckb'].includes(selectedLanguage[0])?'rtl':'ltr'; panel.classList.remove('open');
+    }catch(e){alert('Translation is temporarily unavailable. Please try again.')}finally{selectBtn.textContent='Select';selectBtn.disabled=false}
+  };
+
+  const form=document.getElementById('pollForm'), message=document.getElementById('message'), submitBtn=document.getElementById('submitBtn');
+  function showMessage(text,type){message.textContent=text;message.className='message show '+type}
+  form.addEventListener('submit',async e=>{
+    e.preventDefault(); const choice=form.elements.choice.value||null; const idea=document.getElementById('idea').value.trim();
+    if(!choice&&!idea){showMessage('Please select an option or write your own idea.','error');return}
+    submitBtn.disabled=true;submitBtn.innerHTML='<span class="spinner"></span> Sending...';
+    try{
+      const response=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice,idea:idea||null,language:document.documentElement.lang||'en'})});
+      if(!response.ok)throw new Error(await response.text()); form.reset();showMessage('Thank you! Your feedback has been sent successfully.','ok');
+    }catch(err){console.error(err);showMessage('We could not send your feedback. Please try again.','error')}
+    finally{submitBtn.disabled=false;submitBtn.textContent='Send feedback'}
+  });
+  document.getElementById('year').textContent=new Date().getFullYear();
+</script>
+</body>
+</html>
