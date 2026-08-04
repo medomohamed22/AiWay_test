@@ -45,13 +45,36 @@ export default async function handler(req, res) {
       unlocked = Boolean(data?.has_purchased);
     } catch {}
 
-    const models = (await getAvailableModels()).map(model => ({
-      ...model,
-      type:'chat',
-      locked:!unlocked && model.id !== 'openrouter/free',
-      trial:model.id === 'openrouter/free',
-      costPerMillion:(model.pricing.prompt + model.pricing.completion) * 1e6
-    })).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
+    const catalog = await getAvailableModels();
+    const freeModels = catalog.filter(model =>
+      model.id === 'openrouter/free' ||
+      model.id.endsWith(':free') ||
+      (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0)
+    );
+    const latestFive = matcher => catalog
+      .filter(model => matcher(model) && !freeModels.some(free => free.id === model.id))
+      .sort((a,b) => Number(b.created || 0) - Number(a.created || 0) || String(a.name).localeCompare(String(b.name)))
+      .slice(0, 5);
+    const featuredPaid = [
+      ...latestFive(model => /^openai\/(?:gpt|chatgpt)/i.test(model.id) || /\bGPT\b/i.test(model.name)),
+      ...latestFive(model => /^google\/gemini/i.test(model.id) || /\bGemini\b/i.test(model.name)),
+      ...latestFive(model => /^anthropic\/claude/i.test(model.id) || /\bClaude\b/i.test(model.name)),
+      ...latestFive(model => /^x-ai\/grok/i.test(model.id) || /\bGrok\b/i.test(model.name)),
+      ...latestFive(model => /^deepseek\/deepseek/i.test(model.id) || /\bDeepSeek\b/i.test(model.name))
+    ];
+    const visibleCatalog = [...new Map([...featuredPaid, ...freeModels].map(model => [model.id, model])).values()];
+    const models = visibleCatalog.map(model => {
+      const isFree = model.id === 'openrouter/free' || model.id.endsWith(':free') ||
+        (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0);
+      return {
+        ...model,
+        type:'chat',
+        isFree,
+        locked:!unlocked && model.id !== 'openrouter/free',
+        trial:model.id === 'openrouter/free',
+        costPerMillion:(Number(model.pricing?.prompt || 0) + Number(model.pricing?.completion || 0)) * 1e6
+      };
+    }).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
     const packages = {};
     for (const id of Object.keys(PACKAGES)) {
       try { packages[id] = await packageQuote(id); }
