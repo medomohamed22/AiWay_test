@@ -482,6 +482,53 @@ body.all-models-active .model-trigger{width:100%!important;max-width:none!import
 @media(max-width:390px){.compact-hero-actions{grid-template-columns:1fr}.compact-hero-actions .intro-start{grid-column:auto}.compact-tool-grid{grid-template-columns:1fr 1fr}.compact-tool-grid button{min-height:80px}.compact-tool-grid small{display:none}.top-login-btn{max-width:86px}.credits{max-width:70px!important}.credit-coin{display:none!important}}
 @media(max-width:340px){.compact-tool-grid{grid-template-columns:1fr}.top-login-btn span:first-child{display:none}.top-login-btn{max-width:74px}.model-trigger-copy b{font-size:11px!important}}
 </style>
+
+<style id="aiway-final-header-layout">
+/* One consistent, uncluttered header on phones and desktop. */
+.topbar{
+  display:grid!important;
+  grid-template-columns:88px minmax(0,1fr) 48px!important;
+  grid-template-areas:"credits center menu"!important;
+  align-items:center!important;
+  gap:10px!important;
+  height:70px!important;min-height:70px!important;
+  padding:10px 16px!important;overflow:visible!important;
+}
+.topbar>.mobile-menu{grid-area:menu!important;display:grid!important;position:static!important;width:48px!important;min-width:48px!important;height:48px!important;margin:0!important}
+.topbar>.credits{grid-area:credits!important;position:static!important;width:88px!important;min-width:0!important;max-width:88px!important;height:46px!important;margin:0!important;padding:7px 8px!important;justify-content:center!important;overflow:hidden!important;font-size:13px!important}
+.topbar>.credits .credit-coin,.topbar>.credits .label,.topbar>.credits .credit-buy-label{display:none!important}
+.topbar>.task-context{grid-area:center!important;position:static!important;transform:none!important;display:flex!important;width:100%!important;min-width:0!important;max-width:560px!important;margin:auto!important;justify-content:center!important;gap:9px!important;overflow:hidden!important}
+.topbar>.task-context .task-context-icon{width:42px!important;height:42px!important;min-width:42px!important;flex:0 0 42px!important}
+.topbar>.task-context .task-context-copy{display:block!important;min-width:0!important;max-width:calc(100% - 52px)!important}
+.topbar>.task-context .task-context-copy b{display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:15px!important}
+.topbar>.task-context .task-context-copy small,.topbar>.task-context .task-change{display:none!important}
+.topbar>.model-wrap{grid-area:center!important;position:static!important;transform:none!important;display:none!important;width:100%!important;min-width:0!important;max-width:620px!important;margin:auto!important}
+body.all-models-active .topbar>.task-context{display:none!important}
+body.all-models-active .topbar>.model-wrap{display:block!important}
+body.all-models-active .model-trigger{width:100%!important;max-width:none!important;min-width:0!important;height:48px!important;border-radius:16px!important}
+body.all-models-active .model-trigger-copy{min-width:0!important}
+body.all-models-active .model-trigger-copy b{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.topbar>.top-tools-btn,.topbar>.top-login-btn,.topbar>.spacer,.topbar>.export{display:none!important}
+@media(max-width:620px){
+ .topbar{grid-template-columns:70px minmax(0,1fr) 44px!important;gap:7px!important;height:62px!important;min-height:62px!important;padding:7px 9px!important}
+ .topbar>.credits{width:70px!important;max-width:70px!important;height:46px!important;font-size:12px!important;padding:6px!important}
+ .topbar>.mobile-menu{width:44px!important;min-width:44px!important;height:48px!important}
+ .topbar>.task-context{gap:7px!important}
+ .topbar>.task-context .task-context-icon{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
+ .topbar>.task-context .task-context-copy{max-width:calc(100% - 44px)!important}
+ .topbar>.task-context .task-context-copy b{font-size:12px!important}
+ body.all-models-active .model-trigger{height:48px!important;padding:5px 8px!important}
+ body.all-models-active .model-trigger-icon{display:none!important}
+ body.all-models-active .model-trigger-copy b{font-size:12px!important}
+}
+@media(max-width:360px){
+ .topbar{grid-template-columns:58px minmax(0,1fr) 42px!important;gap:5px!important;padding-inline:6px!important}
+ .topbar>.credits{width:58px!important;max-width:58px!important;font-size:11px!important}
+ .topbar>.mobile-menu{width:42px!important;min-width:42px!important}
+ .topbar>.task-context .task-context-icon{width:34px!important;height:34px!important;min-width:34px!important;flex-basis:34px!important}
+ .topbar>.task-context .task-context-copy b,body.all-models-active .model-trigger-copy b{font-size:11px!important}
+}
+</style>
 </head>
 <body>
 
@@ -706,6 +753,7 @@ function setBalanceDisplay(value){
 }
 function routedTaskId(){return activeTask==='all-models'?null:activeTask}
 function taskRoutedModelId(){
+  if(userProfile && !userProfile.has_purchased && activeTask!=='image') return 'openrouter/free';
   const selected=selectedModel();
   return routedTaskId()&&selected?.type!=='image'?'aiway/auto':($('model').value||'openrouter/auto');
 }
@@ -861,11 +909,12 @@ function officialModelBadges(m){
 function renderModelSelect(selected=''){
   const select=$('model'),chatModels=window.aiwayModels||[],imageModels=window.aiwayImageModels||[],all=[...chatModels,...imageModels];
   if(!all.length){select.innerHTML=`<option value="">${lang==='ar'?'لا توجد نماذج متاحة':'No models available'}</option>`;updateModelTrigger();return}
-  const preferred=selected&&all.some(m=>m.id===selected&&!m.locked)?selected:(chatModels.find(m=>m.trial&&!m.locked)||chatModels.find(m=>!m.locked)||all.find(m=>!m.locked)||all[0]).id;
+  const forcedTrial=Boolean(userProfile&&!userProfile.has_purchased);
+  const preferred=forcedTrial&&chatModels.some(m=>m.id==='openrouter/free')?'openrouter/free':(selected&&all.some(m=>m.id===selected&&!m.locked)?selected:(chatModels.find(m=>m.id==='openrouter/free')||chatModels.find(m=>m.trial&&!m.locked)||chatModels.find(m=>!m.locked)||all.find(m=>!m.locked)||all[0]).id);
   select.innerHTML=all.map(m=>`<option value="${esc(m.id)}" ${m.locked?'disabled':''}>${esc(shortModelName(m.shortName||m.name||m.id))}</option>`).join('');select.value=preferred;
   renderModelMenu('cheap');updateModelTrigger();syncModelMode();
 }
-const ONLY_FREE_MODEL_ID='google/gemma-4-26b-a4b-it:free';
+const ONLY_FREE_MODEL_ID='openrouter/free';
 function isFreeModel(m){return Boolean(m&&m.type!=='image'&&(m.id===ONLY_FREE_MODEL_ID||m.isFree))}
 function modelsByBackendOrder(models,orderIds,fallbackCompare){
  const list=[...models],order=Array.isArray(orderIds)?orderIds:[];
@@ -1068,7 +1117,7 @@ function taskText(id){return TASKS[id]?.[lang]||TASKS[id]?.en||['AiWay','','']}
 function renderTaskScreen(){const grid=$('taskGrid');if(!grid)return;grid.innerHTML=Object.keys(TASKS).map(id=>{const t=taskText(id),locked=Boolean((!userProfile||!userProfile.has_purchased)&&['coding','image'].includes(id));return `<button class="task-card ${locked?'trial-locked '+(lang==='ar'?'lock-left':'lock-right'):''}" type="button" data-task="${id}" aria-disabled="${locked}"><span class="task-card-icon">${TASK_ICONS[id]}</span><b>${esc(t[0])}</b><small>${esc(t[1])}</small></button>`}).join('');$('taskKicker').textContent=lang==='ar'?'✦ منفعة حقيقية لعملة Pi':'✦ Real utility for Pi';$('taskTitle').innerHTML=lang==='ar'?'ماذا تريد أن <span>تنجز اليوم؟</span>':'What do you want to <span>get done?</span>';$('taskCopy').textContent=lang==='ar'?'اختر المهمة، وسيستخدم AiWay تلقائيًا نموذجًا مناسبًا وموفرًا للتكلفة، وتدفع باستخدام Pi.':'Choose a task. AiWay automatically uses a suitable, cost-efficient model, and you pay with Pi.';$('taskFooter').textContent=lang==='ar'?'لا تحتاج لاختيار نموذج — اختر المهمة وابدأ فقط.':'No model selection needed — choose a task and start.';if($('taskLanguageBtn')){$('taskLanguageBtn').textContent=lang==='ar'?'EN':'AR';$('taskLanguageBtn').setAttribute('aria-label',lang==='ar'?'Switch to English':'التبديل إلى العربية')}updateTaskContext()}
 function openTaskScreen(){$('taskScreen')?.classList.add('open');document.body.classList.add('task-mode');closeMenu();renderTaskScreen()}
 function closeTaskScreen(){$('taskScreen')?.classList.remove('open');document.body.classList.remove('task-mode');try{$('prompt')?.blur()}catch{}}
-function chooseTaskModel(id){if(id==='image'){const list=(window.aiwayImageModels||[]).filter(m=>!m.locked&&!m.isFree).sort(compareCostAsc);return list[0]?.id||''}return 'aiway/auto'}
+function chooseTaskModel(id){if(userProfile&&!userProfile.has_purchased&&id!=='image')return 'openrouter/free';if(id==='image'){const list=(window.aiwayImageModels||[]).filter(m=>!m.locked&&!m.isFree).sort(compareCostAsc);return list[0]?.id||''}return 'aiway/auto'}
 function selectTask(id){if(!TASKS[id])return;if((!userProfile||!userProfile.has_purchased)&&['coding','image'].includes(id)){toast(lang==='ar'?'هذه الأداة تتفعل بعد أول عملية شراء.':'This tool unlocks after your first purchase.');return;}if(['live_audio','live_translate'].includes(TASKS[id].tool_type)){closeTaskScreen();openLiveTool(id);return}activeTask=id;storageSet('aiway_active_task',id);const modelId=chooseTaskModel(id);if(modelId&&$('model')){$('model').value=modelId;updateModelTrigger();syncModelMode()}current=null;history=[];closeTaskScreen();updateTaskContext();render();setTimeout(()=>{try{$('prompt')?.blur()}catch{}},50)}
 function updateTaskContext(){const t=taskText(activeTask),allModels=activeTask==='all-models';document.body.classList.toggle('all-models-active',allModels);if($('taskContext'))$('taskContext').style.setProperty('display',allModels?'none':'flex','important');if($('modelWrap'))$('modelWrap').style.setProperty('display',allModels?'block':'none','important');if($('taskContextName'))$('taskContextName').textContent=activeTask?t[0]:'AiWay';if($('taskContextHint'))$('taskContextHint').textContent=activeTask?t[2]:(lang==='ar'?'اختر مهمة للبدء':'Choose a task to start');if($('taskContextIcon'))$('taskContextIcon').innerHTML=TASK_ICONS[activeTask]||ICONS.sparkles;if($('taskChangeBtn'))$('taskChangeBtn').textContent=lang==='ar'?'تغيير المهمة':'Change task';if($('prompt')&&activeTask)$('prompt').placeholder=activeTask==='image'?(lang==='ar'?'صف الصورة التي تريد إنشاءها...':'Describe the image you want to create...'):(lang==='ar'?`اكتب طلبك في ${t[0]}...`:`Enter your ${t[0].toLowerCase()} request...`)}
 
