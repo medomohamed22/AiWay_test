@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeGeminiUsage, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -226,8 +226,8 @@ function estimateImageCharge(model, resolution = '', hasReferenceImage = false) 
   };
 }
 
-const FAST_IMAGE_MODEL_ID = 'gemini-3.1-flash-lite-image';
-const QUALITY_IMAGE_MODEL_ID = 'gemini-3-pro-image';
+const FAST_IMAGE_MODEL_ID = 'black-forest-labs/flux.2-klein-4b';
+const QUALITY_IMAGE_MODEL_ID = 'black-forest-labs/flux.2-pro';
 
 function needsHighQualityImage(prompt = '', resolution = '', hasReferenceImage = false) {
   if (hasReferenceImage || /^(2K|4K)$/i.test(String(resolution || ''))) return true;
@@ -236,7 +236,7 @@ function needsHighQualityImage(prompt = '', resolution = '', hasReferenceImage =
 }
 
 async function getImageModels() {
-  return GEMINI_IMAGE_MODELS.map(model=>({
+  return (await getOpenRouterImageModels()).map(model=>({
     ...model,
     supported_parameters:{aspect_ratio:{type:'enum',values:['1:1','4:3','3:4','16:9','9:16']},resolution:{type:'enum',values:model.supportedResolutions||['1K']}},
     architecture:{input_modalities:model.inputModalities||['text'],output_modalities:model.outputModalities||['image']}
@@ -298,7 +298,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
     if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
     if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
-    if (!getGeminiApiKeys().length) throw appError('MISSING_CONFIGURATION');
+    if (!String(process.env.OPENROUTER_API_KEY || '').trim()) throw appError('MISSING_CONFIGURATION', { missing:['OPENROUTER_API_KEY'] });
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
@@ -338,7 +338,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         }
         return values[0];
       };
-      const requestBody = { model: selectedModel.id, prompt: imagePrompt };
+      const requestBody = { model: selectedModel.id, prompt: imagePrompt, provider:{sort:'price',allow_fallbacks:true} };
       const chosenResolution = selectedChooseEnum('resolution', resolution, ['1K', '1024x1024']);
       const chosenAspectRatio = selectedChooseEnum('aspect_ratio', requestedAspectRatio, ['1:1']);
       if (chosenResolution) requestBody.resolution = chosenResolution;
@@ -362,25 +362,31 @@ ${JSON.stringify(safeToolConfig)}`; }
     }
 
     if (purchased) {
-      await reserveAiTokens(supabase,user.id,requestId,'image',availableTokens);
+      const reservedTokens = reservationTokens(estimatedCharge.chargedTokens, 'image');
+      if (availableTokens < reservedTokens) {
+        throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
+          availableTokens, requiredTokens: reservedTokens, shortfall: reservedTokens - availableTokens
+        });
+      }
+      await reserveAiTokens(supabase,user.id,requestId,'image',reservedTokens);
       reservationActive=true;
     } else {
       await claimFreeTrialToken(supabase,user.id,requestId,taskId || 'image');
       freeTrialActive=true;
     }
 
-    const parts=[{text:cleanPrompt}];
-    if(hasReferenceImage){const match=referenceImage.match(/^data:([^;]+);base64,(.+)$/);if(match)parts.push({inlineData:{mimeType:match[1],data:match[2]}});}
-    const geminiResult=await geminiFetchJson(`/v1beta/models/${encodeURIComponent(model.id)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseModalities:['TEXT','IMAGE'],imageConfig:{aspectRatio:selectedAspectRatio||'1:1',imageSize:selectedResolution||'1K'}}})},120000);
-    const {response,payload}=geminiResult;
-    if(!response.ok)throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details:payload?.error?.message||''});
-    const imagePart=(payload.candidates?.[0]?.content?.parts||[]).find(part=>part.inlineData?.data);
-    if(!imagePart)throw appError('EMPTY_RESPONSE');
-    const mediaType=imagePart.inlineData.mimeType||'image/png';
-    const thumbnailData=`data:${mediaType};base64,${imagePart.inlineData.data}`; const sourceUrl=null;
-    const imageUsage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),total_tokens:Number(payload.usageMetadata?.totalTokenCount||0)};
-    const charge=chargeGeminiUsage(model.pricing,payload.usageMetadata||{},{fallbackUsd:estimatedCharge.providerUsd});
-    if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images',{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'},body:JSON.stringify(body)
+    },120000);
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw openRouterError(response.status,payload);
+    const imagePart=payload?.data?.[0];
+    if(!imagePart?.b64_json)throw appError('EMPTY_RESPONSE');
+    const mediaType=imagePart.media_type||'image/png';
+    const thumbnailData=`data:${mediaType};base64,${imagePart.b64_json}`; const sourceUrl=null;
+    const imageUsage={prompt_tokens:Number(payload.usage?.prompt_tokens||0),completion_tokens:Number(payload.usage?.completion_tokens||0),total_tokens:Number(payload.usage?.total_tokens||0),cost:Number(payload.usage?.cost||0)};
+    const generationId = String(payload.id || payload?.data?.[0]?.id || '');
+    const charge = await resolveOpenRouterCharge({ usage: imageUsage, generationId, price: model.pricing, webSearch: false });
     const item={width:null,height:null};
 
     let savedUser = null;
@@ -403,7 +409,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         role: 'assistant',
         content: localize(uiLocale, 'تم إنشاء الصورة المطلوبة.', 'The requested image has been generated.'),
         model_id: model.id,
-        token_usage: { ...payload.usage, ...charge, type: 'image', taskId: taskId || 'image', geminiKeyIndex: geminiResult.keyIndex, geminiAttempts: geminiResult.attempts }
+        token_usage: { ...imageUsage, ...charge, type: 'image', taskId: taskId || 'image', provider:'openrouter', providerRouting:'lowest-price' }
       }).select('id').single();
       if (assistantInsert.error || !assistantInsert.data) throw appError('DATABASE_ERROR', {}, assistantInsert.error);
       savedAssistant = assistantInsert.data;
@@ -421,7 +427,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         width: Number(item.width) || null,
         height: Number(item.height) || null,
         token_usage: {
-          ...payload.usage,
+          ...imageUsage,
           ...charge,
           aspectRatio: selectedAspectRatio || null,
           resolution: selectedResolution || null

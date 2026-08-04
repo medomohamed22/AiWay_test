@@ -1,4 +1,4 @@
-import { affordableOutputLimit, allowMethods, appError, chargeGeminiUsage, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -284,15 +284,18 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     const safeMessages = [{ role: 'system', content: formatSystemPrompt(model, language) + taskPrompt }, ...cleaned.filter(message => message.role !== 'system')];
 
     const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, 512);
-    if (purchased && availableTokens < initialEstimate.chargedTokens) {
+    const reservedTokenAmount = purchased ? reservationTokens(initialEstimate.chargedTokens, 'chat') : 0;
+    if (purchased && availableTokens < reservedTokenAmount) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
-        requiredTokens: initialEstimate.chargedTokens,
-        shortfall: initialEstimate.chargedTokens - availableTokens
+        requiredTokens: reservedTokenAmount,
+        shortfall: reservedTokenAmount - availableTokens
       });
     }
 
-    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, availableTokens, initialEstimate) : 2048;
+    // The provider output cap is calculated from the reserved amount, not the user's
+    // whole wallet, so one request cannot consume more than the protected reservation.
+    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, reservedTokenAmount, initialEstimate) : 2048;
     if (purchased && initialMaxTokens < 128) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
@@ -301,10 +304,10 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       });
     }
 
-    if (!getGeminiApiKeys().length) throw appError('MISSING_CONFIGURATION');
+    if (!String(process.env.OPENROUTER_API_KEY || '').trim()) throw appError('MISSING_CONFIGURATION', { missing:['OPENROUTER_API_KEY'] });
 
     if (purchased) {
-      await reserveAiTokens(supabase, user.id, requestId, 'chat', availableTokens);
+      await reserveAiTokens(supabase, user.id, requestId, 'chat', reservedTokenAmount);
       reservationActive=true;
     } else {
       await claimFreeTrialToken(supabase, user.id, requestId, taskId || 'chat');
@@ -323,43 +326,23 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     }
 
     const activeModel=model; const activeModelId=model.id; const fallbackUsed=false;
-    const dataUrlPart = value => {
-      const match = String(value || '').match(/^data:([^;,]+);base64,(.+)$/s);
-      return match ? { inlineData: { mimeType: match[1], data: match[2] } } : null;
+    const openRouterHeaders={
+      'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,
+      'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'
     };
-    const geminiParts = content => {
-      if (typeof content === 'string') return [{ text: content }];
-      if (!Array.isArray(content)) return [{ text: String(content || '') }];
-      return content.flatMap(part => {
-        if (part?.type === 'text') return [{ text: String(part.text || '') }];
-        if (part?.type === 'image_url') { const item=dataUrlPart(part.image_url?.url); return item?[item]:[]; }
-        if (part?.type === 'file') { const item=dataUrlPart(part.file?.file_data); return item?[item]:[]; }
-        return [];
-      }).filter(Boolean);
-    };
-    const contents=safeMessages.filter(m=>m.role!=='system').map(m=>({role:m.role==='assistant'?'model':'user',parts:geminiParts(m.content)})).filter(item=>item.parts.length);
-    const systemInstruction=safeMessages.filter(m=>m.role==='system').map(m=>typeof m.content==='string'?m.content:'').join('\n\n');
-    const tools=webSearch?[{google_search:{}}]:undefined;
-    const geminiResult=await geminiFetchJson(`/v1beta/models/${encodeURIComponent(activeModelId)}:generateContent`,{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents,systemInstruction:{parts:[{text:systemInstruction}]},tools,generationConfig:{temperature:Number(temperature),maxOutputTokens:Math.max(128,Math.floor(initialMaxTokens))}})
-    },90000);
-    const {response,payload}=geminiResult;
-    if(!response.ok){
-      const details=String(payload?.error?.message||'');
-      if(webSearch && (response.status===403 || response.status===429 || /billing|quota|grounding|google search/i.test(details))) throw appError('SEARCH_BILLING_REQUIRED',{status:response.status,provider:'gemini',details});
-      if(/not found|not supported|unsupported model/i.test(details)) throw appError('MODEL_UNAVAILABLE',{status:response.status,provider:'gemini',details});
-      throw appError('PROVIDER_ERROR',{status:response.status,provider:'gemini',details});
-    }
-    const answer=(payload.candidates?.[0]?.content?.parts||[]).map(part=>part.text||'').join('');
+    const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),provider:{sort:'price',allow_fallbacks:true}};
+    if(webSearch)requestBody.plugins=[{id:'web',max_results:5}];
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},90000);
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw openRouterError(response.status,payload,{webSearch});
+    const message=payload?.choices?.[0]?.message||{};
+    const answer=typeof message.content==='string'?message.content:(Array.isArray(message.content)?message.content.map(x=>x?.text||'').join(''):'');
     if(!answer.trim())throw appError('EMPTY_RESPONSE');
-    const usage={prompt_tokens:Number(payload.usageMetadata?.promptTokenCount||0),completion_tokens:Number(payload.usageMetadata?.candidatesTokenCount||0),total_tokens:Number(payload.usageMetadata?.totalTokenCount||0)};
-    const generationId=payload.responseId||''; const routedModelId=activeModelId; const routerMetadata=null;
+    const usage={prompt_tokens:Number(payload.usage?.prompt_tokens||0),completion_tokens:Number(payload.usage?.completion_tokens||0),total_tokens:Number(payload.usage?.total_tokens||0),cost:Number(payload.usage?.cost||0)};
+    const generationId=payload.id||''; const routedModelId=payload.model||activeModelId; const routerMetadata={provider:payload.provider||null,routing:'lowest-price',allowFallbacks:true};
     res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');
-    for(let i=0;i<answer.length;i+=180)res.write(`data: ${JSON.stringify({type:'delta',text:answer.slice(i,i+180)})}
-
-`);
-    const charge=chargeGeminiUsage(activeModel.pricing,payload.usageMetadata||{},{webSearch});
-    if(purchased&&charge.chargedTokens>availableTokens)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens,requiredTokens:charge.chargedTokens,shortfall:charge.chargedTokens-availableTokens});
+    for(let i=0;i<answer.length;i+=180)res.write(`data: ${JSON.stringify({type:'delta',text:answer.slice(i,i+180)})}\n\n`);
+    const charge = await resolveOpenRouterCharge({ usage, generationId, price: activeModel.pricing, webSearch });
 
     const previousUsage = continuationTarget?.token_usage && typeof continuationTarget.token_usage === 'object' ? continuationTarget.token_usage : {};
     const previousChargedTokens = Math.max(0, Number(previousUsage.chargedTokens || 0));
@@ -377,7 +360,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       fallbackUsed,
       routedModelId: routedModelId || activeModelId,
       generationId: generationId || null,
-      routerMetadata: { ...(routerMetadata || {}), geminiKeyIndex: geminiResult.keyIndex, geminiAttempts: geminiResult.attempts },
+      routerMetadata: routerMetadata || {},
       webSearch: Boolean(webSearch),
       taskId: taskId || previousUsage.taskId || null
     };

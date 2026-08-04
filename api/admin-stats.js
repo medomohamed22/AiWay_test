@@ -1,4 +1,4 @@
-import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd, geminiFetchJson, getGeminiApiKeys } from './_lib.js';
+import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, getOpenRouterImageModels, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
 
 const num=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
 const isoDay=v=>new Date(v).toISOString().slice(0,10);
@@ -26,19 +26,16 @@ function latency(u){return u&&typeof u==='object'?Math.max(0,num(u.latency_ms||u
 function tokens(u){if(!u||typeof u!=='object')return 0;return num(u.total_tokens||u.totalTokens)+num(u.prompt_tokens||u.promptTokens)+num(u.completion_tokens||u.completionTokens)}
 function groupDaily(rows,dateKey,days=30){const out=[];for(let i=days-1;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);out.push({date:d,value:0})}const map=new Map(out.map(x=>[x.date,x]));for(const r of rows){const raw=r[dateKey];if(!raw)continue;const x=map.get(isoDay(raw));if(x)x.value++}return out}
 async function gemini(){
-  const configuredKeys=getGeminiApiKeys();
-  const configured=configuredKeys.length>0;
-  const manualBalance=process.env.GEMINI_ACCOUNT_BALANCE_USD;
+  const configured=Boolean(String(process.env.OPENROUTER_API_KEY||'').trim());
+  const manualBalance=process.env.OPENROUTER_ACCOUNT_BALANCE_USD;
   const credits=manualBalance!==undefined&&manualBalance!==''?{remaining:Math.max(0,num(manualBalance)),source:'manual-env'}:null;
-  if(!configured)return {configured:false,status:'missing',credits,key:{label:'Gemini Developer API'},modelsApi:false,billingNote:'أضف GEMINI_API_KEY في متغيرات البيئة.'};
+  if(!configured)return {configured:false,status:'missing',credits,key:{label:'OpenRouter API'},modelsApi:false,billingNote:'أضف OPENROUTER_API_KEY في متغيرات البيئة.'};
   try{
-    const result=await geminiFetchJson('/v1beta/models',{headers:{Accept:'application/json'}},10000);
-    const {response,payload:body}=result;
-    if(!response.ok)throw new Error(body?.error?.message||`Gemini ${response.status}`);
-    return {configured:true,status:'ok',credits,key:{label:'Gemini Developer API',configuredKeys:configuredKeys.length,activeKeyIndex:result.keyIndex},modelsApi:true,availableModels:Array.isArray(body.models)?body.models.length:0,billingNote:credits?'الرصيد معروض من GEMINI_ACCOUNT_BALANCE_USD.':'Gemini API Key لا يتيح قراءة رصيد الفوترة تلقائيًا؛ الاستهلاك أدناه محسوب من طلبات الموقع.'};
-  }catch(error){
-    return {configured:true,status:'error',credits,key:{label:'Gemini Developer API'},modelsApi:false,error:String(error?.message||error),billingNote:credits?'الرصيد معروض من GEMINI_ACCOUNT_BALANCE_USD.':'تعذر قراءة رصيد حساب Google تلقائيًا باستخدام API Key.'};
-  }
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models',{headers:{Accept:'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`}},10000);
+    const body=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(body?.error?.message||`OpenRouter ${response.status}`);
+    return {configured:true,status:'ok',credits,key:{label:'OpenRouter API'},modelsApi:true,availableModels:Array.isArray(body.data)?body.data.length:0,billingNote:credits?'الرصيد معروض من OPENROUTER_ACCOUNT_BALANCE_USD.':'الاستهلاك محسوب من طلبات الموقع؛ يمكن ضبط الرصيد يدويًا بمتغير OPENROUTER_ACCOUNT_BALANCE_USD.'};
+  }catch(error){return {configured:true,status:'error',credits,key:{label:'OpenRouter API'},modelsApi:false,error:String(error?.message||error),billingNote:'تعذر قراءة كتالوج OpenRouter.'};}
 }
 
 export default async function handler(req,res){
@@ -52,13 +49,13 @@ export default async function handler(req,res){
       if(req.method==='GET'){
         const models=(await getAvailableModels()).sort((a,b)=>(a.pricing.prompt+a.pricing.completion)-(b.pricing.prompt+b.pricing.completion));
         const liveModels=GEMINI_LIVE_MODELS.map(x=>({...x}));
-        const imageModels=GEMINI_IMAGE_MODELS.map(x=>({...x})).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
-        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,liveModels,pricingSource:'Google Gemini Developer API pricing',pricingSourceUrl:'https://ai.google.dev/gemini-api/docs/pricing',refreshedAt:'2026-07-31',catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
+        const imageModels=(await getOpenRouterImageModels()).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
+        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,liveModels,pricingSource:'OpenRouter Models API pricing',pricingSourceUrl:'https://openrouter.ai/models',refreshedAt:new Date().toISOString(),catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
       }
       const b=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const action=String(b.action||'bulk-models');
       const validText=new Set((await getAvailableModels()).map(x=>x.id));
-      const validImages=new Set(GEMINI_IMAGE_MODELS.map(x=>x.id));
+      const validImages=new Set((await getOpenRouterImageModels()).map(x=>x.id));
       const validLive=new Set(GEMINI_LIVE_MODELS.map(x=>x.id));
       const clean=v=>String(v??'').trim();
       const safeId=v=>clean(v).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48);
@@ -133,10 +130,10 @@ export default async function handler(req,res){
       finance:{pendingPayments:pending,failedPayments,topSpenders:usersTable.slice().sort((a,b)=>b.paidUsd-a.paidUsd).slice(0,10),totalBalances:remainingUserTokens,paidUsersRemainingTokens,excludedTrialTokens:freeUsersRemainingTokens,providerSharePercent,ownerProfitPercent,geminiReserveFromSalesUsd,ownerGrossProfitFromSalesUsd,geminiRequiredForBalancesUsd,geminiAvailableUsd,geminiTopUpRequiredUsd,geminiCoveragePercent},
       api:{gemini:{...geminiInfo,trackedUsage:{textRequests:assistants.length,imageRequests:images.length,inputTokens:models.reduce((a,m)=>a+num(m.inputTokens),0),outputTokens:models.reduce((a,m)=>a+num(m.outputTokens),0),providerCostUsd,period:'all-time',source:'AiWay database'}},database:{status:'ok',rowsRead:users.length+payments.length+messages.length+images.length+conversations.length+reservations.length},requests:reservations.length,success:successful.length,errors:errors.length,recentErrors:errors.slice(0,20).map(r=>({kind:r.kind,createdAt:r.created_at,code:r.response_meta?.code||'REQUEST_RELEASED',userId:r.user_id}))},
       alerts:[
-        ...(geminiInfo.credits&&geminiInfo.credits.remaining<5?[{level:'danger',title:'رصيد Gemini منخفض',message:`المتبقي $${geminiInfo.credits.remaining.toFixed(2)}`}]:[]),
+        ...(geminiInfo.credits&&geminiInfo.credits.remaining<5?[{level:'danger',title:'رصيد OpenRouter منخفض',message:`المتبقي $${geminiInfo.credits.remaining.toFixed(2)}`}]:[]),
         ...(pct(errors.length,reservations.length)>5?[{level:'danger',title:'ارتفاع نسبة الأخطاء',message:`نسبة الأخطاء ${pct(errors.length,reservations.length)}٪`}]:[]),
         ...(pending>0?[{level:'warning',title:'مدفوعات معلقة',message:`يوجد ${pending} طلب دفع معلق`}]:[]),
-        ...(geminiRequiredForBalancesUsd>(geminiInfo.credits?.remaining||Infinity)?[{level:'warning',title:'التزام الرصيد أعلى من رصيد المزود',message:'راجع رصيد Gemini ورصيد المستخدمين.'}]:[])
+        ...(geminiRequiredForBalancesUsd>(geminiInfo.credits?.remaining||Infinity)?[{level:'warning',title:'التزام الرصيد أعلى من رصيد المزود',message:'راجع رصيد OpenRouter ورصيد المستخدمين.'}]:[])
       ],
       reports:{today:{newUsers:newUsers(day1),activeUsers:active(day1),messages:assistants.filter(m=>new Date(m.created_at).getTime()>=day1).length,images:images.filter(i=>new Date(i.created_at).getTime()>=day1).length},week:{newUsers:newUsers(day7),activeUsers:active(day7),messages:assistants.filter(m=>new Date(m.created_at).getTime()>=day7).length,images:images.filter(i=>new Date(i.created_at).getTime()>=day7).length}}
     });

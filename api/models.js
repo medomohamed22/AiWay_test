@@ -1,10 +1,10 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, GEMINI_IMAGE_MODELS
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels
 } from './_lib.js';
 
-const IMAGE_MODELS = GEMINI_IMAGE_MODELS.map(model=>({ ...model, shortName:model.name, type:'image', provider:'google', providerLabel:'Google', supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'] }));
+const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:model.supported_parameters?.aspect_ratio?.values||['1:1','4:3','3:4','16:9','9:16'] }));
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
@@ -20,6 +20,7 @@ export default async function handler(req, res) {
         estimatePurchased = Boolean(estimateProfile?.has_purchased);
       } catch {}
       const models = await getAvailableModels();
+      const IMAGE_MODELS=await imageModels();
       const image = IMAGE_MODELS.find(model => model.id === body.modelId) || (body.taskId === 'image' ? IMAGE_MODELS[0] : null);
       if (image) {
         const providerUsd = Number(image.pricing.request);
@@ -47,10 +48,10 @@ export default async function handler(req, res) {
     const models = (await getAvailableModels()).map(model => ({
       ...model,
       type:'chat',
-      locked:!unlocked && model.id !== 'gemini-3.1-flash-lite',
-      trial:model.id === 'gemini-3.1-flash-lite',
+      locked:!unlocked && model.id !== 'openrouter/free',
+      trial:model.id === 'openrouter/free',
       costPerMillion:(model.pricing.prompt + model.pricing.completion) * 1e6
-    }));
+    })).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
     const packages = {};
     for (const id of Object.keys(PACKAGES)) {
       try { packages[id] = await packageQuote(id); }
@@ -58,10 +59,10 @@ export default async function handler(req, res) {
     }
     return json(res, 200, {
       name:'AiWay', models,
-      chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:[] },
+      chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
       trialModelId:await getTrialModelId(), packages,
-      imageModels:IMAGE_MODELS.map(model => ({ ...model, locked:false, isFree:!unlocked })),
-      tokenUsd:TOKEN_USD, tools:await getAiTools(), rankingsSource:'Google Gemini API pricing', refreshedAt:new Date().toISOString()
+      imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
+      tokenUsd:TOKEN_USD, tools:await getAiTools(), providerRouting:{sort:'price',allowFallbacks:true,label:'Lowest-price provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {
     console.error(error);

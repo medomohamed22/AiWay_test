@@ -85,70 +85,6 @@ export function json(res, status, body) {
   return res.end(JSON.stringify(body));
 }
 
-export function getGeminiApiKeys() {
-  const names = ['GEMINI_API_KEY', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'];
-  const seen = new Set();
-  return names.flatMap((name, index) => {
-    const value = String(process.env[name] || '').trim();
-    if (!value || seen.has(value)) return [];
-    seen.add(value);
-    return [{ name, value, index: index + 1 }];
-  });
-}
-
-function geminiFailureText(payload) {
-  if (payload && typeof payload === 'object') return String(payload?.error?.message || payload?.message || '');
-  return String(payload || '');
-}
-
-function shouldFailoverGemini(status, payload, error) {
-  if (error) return true;
-  const text = geminiFailureText(payload).toLowerCase();
-  if ([401, 403, 404, 408, 409, 429, 500, 502, 503, 504].includes(Number(status))) return true;
-  return /quota|rate limit|resource[_ -]?exhausted|billing|free tier|limit:\s*0|api key|permission|access denied|not authorized|temporar|overload|unavailable|timeout|deadline|internal error|backend error|not found|not supported/.test(text);
-}
-
-/**
- * Calls the Gemini Developer API with transparent sequential key failover.
- * The exact same path, model and request body are used for every attempt.
- */
-export async function geminiFetchJson(path, options = {}, timeoutMs = 15000) {
-  const keys = getGeminiApiKeys();
-  if (!keys.length) throw appError('MISSING_CONFIGURATION', { missing: ['GEMINI_API_KEY'] });
-
-  const normalizedPath = String(path || '').startsWith('/') ? String(path) : `/${String(path || '')}`;
-  const attempts = [];
-  let lastResult = null;
-
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    const url = new URL(`https://generativelanguage.googleapis.com${normalizedPath}`);
-    const headers = { ...(options.headers || {}) };
-    const keyMode = options.geminiKeyMode === 'header' ? 'header' : 'query';
-    if (keyMode === 'header') headers['x-goog-api-key'] = key.value;
-    else url.searchParams.set('key', key.value);
-
-    try {
-      const response = await fetchWithTimeout(url.toString(), { ...options, headers, geminiKeyMode: undefined }, timeoutMs);
-      const payload = await response.json().catch(() => ({}));
-      const result = { response, payload, keyIndex: key.index, keyName: key.name, attempts: i + 1 };
-      if (response.ok) return result;
-
-      attempts.push({ keyIndex: key.index, status: response.status, message: geminiFailureText(payload).slice(0, 300) });
-      lastResult = result;
-      if (i === keys.length - 1 || !shouldFailoverGemini(response.status, payload, null)) return { ...result, failoverAttempts: attempts };
-      console.warn('[GEMINI_FAILOVER]', { fromKey: key.index, status: response.status, nextKey: keys[i + 1]?.index });
-    } catch (error) {
-      attempts.push({ keyIndex: key.index, status: 0, message: String(error?.message || error).slice(0, 300) });
-      lastResult = { response: null, payload: {}, error, keyIndex: key.index, keyName: key.name, attempts: i + 1 };
-      if (i === keys.length - 1 || !shouldFailoverGemini(0, {}, error)) throw error;
-      console.warn('[GEMINI_FAILOVER]', { fromKey: key.index, status: 0, nextKey: keys[i + 1]?.index });
-    }
-  }
-
-  if (lastResult?.error) throw lastResult.error;
-  return { ...lastResult, failoverAttempts: attempts };
-}
 
 export async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   const timeout = Math.max(1, Number(timeoutMs) || 15000);
@@ -599,53 +535,101 @@ export function handleError(error, res, fallback = 'Server error', locale = 'ar'
   return json(res, 500, { error: fallback, code: 'SERVER_ERROR' });
 }
 
-// Each AiWay token represents $0.00001 of the actual Gemini provider cost.
+// Each AiWay token represents $0.00001 of the actual provider cost through OpenRouter.
 // Purchases keep the original 50/50 split: $1 buys $0.50 of provider capacity.
 export const TOKEN_USD = 0.00001;
-export const MARKUP = 2;
-export const TRIAL_MESSAGE_LIMIT = 5;
-export const TRIAL_TOKENS = 100;
-export const TRIAL_MODEL_FALLBACK = 'gemini-3.1-flash-lite';
-const tokensForUsd = usd => Math.round(Number(usd) / MARKUP / TOKEN_USD);
+export const PROVIDER_BUDGET_SHARE = 0.44;
+export const MARKUP = 1 / PROVIDER_BUDGET_SHARE;
+export const TRIAL_MESSAGE_LIMIT = 10;
+export const TRIAL_TOKENS = 10;
+export const PI_PRICE_BUFFER = 0.05;
+export const TRIAL_MODEL_FALLBACK = 'openrouter/free';
+const tokensForUsd = usd => Math.floor(Number(usd) * PROVIDER_BUDGET_SHARE / TOKEN_USD);
 export const PACKAGES = {
-  starter: { usd: 1, tokens: tokensForUsd(1) },
-  plus: { usd: 5, tokens: tokensForUsd(5) },
-  pro: { usd: 10, tokens: tokensForUsd(10) }
+  lite: { name_ar:'لايت', name_en:'Lite', usd:2, tokens:tokensForUsd(2), recommendedFor:'light' },
+  starter: { name_ar:'ستارتر', name_en:'Starter', usd:5, tokens:tokensForUsd(5), recommendedFor:'regular' },
+  plus: { name_ar:'بلس', name_en:'Plus', usd:10, tokens:tokensForUsd(10), recommendedFor:'advanced', popular:true },
+  pro: { name_ar:'برو', name_en:'Pro', usd:20, tokens:tokensForUsd(20), recommendedFor:'power' }
 };
 
-// Prices are USD per token and mirror the paid Gemini Developer API rates.
-const GEMINI_MODELS = [
-  { id:'gemini-2.5-flash-lite', name:'Gemini 2.5 Flash-Lite', description:'الأقل تكلفة للمهام النصية اليومية والمعالجة واسعة النطاق.', created:1750118400, contextLength:1048576, pricing:{prompt:0.10/1e6,completion:0.40/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
-  { id:'gemini-3.1-flash-lite', name:'Gemini 3.1 Flash-Lite', description:'سريع واقتصادي للترجمة والتلخيص والمهام المتكررة.', created:1780000001, contextLength:1048576, pricing:{prompt:0.25/1e6,completion:1.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
-  { id:'gemini-2.5-flash', name:'Gemini 2.5 Flash', description:'توازن قوي بين السرعة والجودة والاستدلال.', created:1750118401, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
-  { id:'gemini-3.5-flash-lite', name:'Gemini 3.5 Flash-Lite', description:'نموذج حديث اقتصادي للمهام الوكيلية والترجمة والمعالجة.', created:1780000002, contextLength:1048576, pricing:{prompt:0.30/1e6,completion:2.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
-  { id:'gemini-3.5-flash', name:'Gemini 3.5 Flash', description:'جودة أعلى للبرمجة والكتابة والاستدلال المعقد.', created:1780000003, contextLength:1048576, pricing:{prompt:0.75/1e6,completion:4.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable' },
-  { id:'gemini-3.6-flash', name:'Gemini 3.6 Flash', description:'أحدث نموذج Flash متوازن للبرمجة والمهام الوكيلية والاستدلال متعدد الوسائط.', created:1785456000, contextLength:1048576, pricing:{prompt:1.50/1e6,completion:7.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable', pricingNote:'السعر القياسي لكل مليون توكين' },
-  { id:'gemini-2.5-pro', name:'Gemini 2.5 Pro', description:'نموذج قوي للبرمجة والاستدلال والمهام المعقدة.', created:1750118402, contextLength:1048576, pricing:{prompt:2.25/1e6,completion:18.00/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'stable', pricingNote:'حتى 200 ألف توكين إدخال' },
-  { id:'gemini-3.1-pro-preview', name:'Gemini 3.1 Pro', description:'أعلى جودة للمهام الاحترافية المعقدة.', created:1780000004, contextLength:1048576, pricing:{prompt:2.70/1e6,completion:13.50/1e6}, inputModalities:['text','image','video','audio','files'], outputModalities:['text'], tier:'preview' }
+// OpenRouter catalog. Prices are normalized to USD per token; image pricing is USD per request/megapixel when exposed.
+const CURATED_MODEL_IDS = [
+  'deepseek/deepseek-v4-flash',
+  'openai/gpt-5.4', 'openai/gpt-5.4-mini', 'openai/gpt-5.4-nano',
+  'google/gemini-3.1-pro-preview', 'google/gemini-3.1-flash-lite-preview',
+  'x-ai/grok-4.1-fast', 'x-ai/grok-4',
+  'deepseek/deepseek-v4', 'deepseek/deepseek-r1-0528',
+  'z-ai/glm-5', 'z-ai/glm-4.7',
+  'anthropic/claude-opus-4.6', 'anthropic/claude-sonnet-4.6',
+  'qwen/qwen3.5-397b-a17b', 'meta-llama/llama-4-maverick'
 ];
+const FALLBACK_OPENROUTER_MODELS = [
+  {id:'deepseek/deepseek-v4-flash',name:'DeepSeek V4 Flash',description:'سريع واقتصادي للبرمجة والتلخيص والكتابة والمهام العامة.',contextLength:1048576,pricing:{prompt:0.08806/1e6,completion:0.1761/1e6},inputModalities:['text'],outputModalities:['text'],provider:'deepseek'},
+  {id:'openrouter/free',name:'OpenRouter Free Router',description:'يوجّه الطلب إلى نموذج مجاني متاح يدعم خصائص الطلب.',contextLength:128000,pricing:{prompt:0,completion:0},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openrouter'},
+  {id:'openrouter/auto',name:'OpenRouter Auto',description:'اختيار تلقائي ذكي من OpenRouter.',contextLength:128000,pricing:{prompt:1/1e6,completion:3/1e6},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openrouter'}
+];
+
+function normalizeOpenRouterModel(model){
+  const architecture=model?.architecture||{}; const pricing=model?.pricing||{};
+  const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:0};
+  const provider=String(model?.id||'').split('/')[0]||'openrouter';
+  return {
+    id:String(model.id), name:String(model.name||model.id), description:String(model.description||''),
+    created:Number(model.created||0), contextLength:Number(model.context_length||model.contextLength||0),
+    pricing:{prompt:num(pricing.prompt),completion:num(pricing.completion),request:num(pricing.request),image:num(pricing.image),web_search:num(pricing.web_search)},
+    inputModalities:Array.isArray(architecture.input_modalities)?architecture.input_modalities:['text'],
+    outputModalities:Array.isArray(architecture.output_modalities)?architecture.output_modalities:['text'],
+    supported_parameters:model.supported_parameters||{}, provider, providerLabel:provider,
+    tier:String(model.id).endsWith(':free')?'free':'stable'
+  };
+}
+
+let modelCatalogCache={expires:0,data:null};
+export async function getAvailableModels(){
+  if(modelCatalogCache.data&&Date.now()<modelCatalogCache.expires)return modelCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
+  try{
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=text',{headers:{Accept:'application/json'}},15000);
+    if(!response.ok)throw new Error(`OpenRouter models ${response.status}`);
+    const payload=await response.json();
+    const all=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.id&&x.outputModalities.includes('text'));
+    const famous=/^(openai|google|x-ai|deepseek|z-ai|anthropic|qwen|meta-llama|mistralai|moonshotai)\//;
+    let selected=all.filter(x=>CURATED_MODEL_IDS.includes(x.id)||famous.test(x.id)||x.id.endsWith(':free'));
+    selected=[...new Map([...FALLBACK_OPENROUTER_MODELS,...selected].map(x=>[x.id,x])).values()];
+    modelCatalogCache={expires:Date.now()+15*60*1000,data:selected};
+    return selected.map(x=>({...x,pricing:{...x.pricing}}));
+  }catch(error){console.warn('[OPENROUTER_CATALOG_FALLBACK]',error?.message||error);return FALLBACK_OPENROUTER_MODELS.map(x=>({...x,pricing:{...x.pricing}}));}
+}
+
+let imageCatalogCache={expires:0,data:null};
+export async function getOpenRouterImageModels(){
+  if(imageCatalogCache.data&&Date.now()<imageCatalogCache.expires)return imageCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
+  try{
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images/models',{headers:{Accept:'application/json'}},15000);
+    if(!response.ok)throw new Error(`OpenRouter image models ${response.status}`);
+    const payload=await response.json();
+    const items=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.outputModalities.includes('image'));
+    imageCatalogCache={expires:Date.now()+15*60*1000,data:items}; return items.map(x=>({...x,pricing:{...x.pricing}}));
+  }catch(error){console.warn('[OPENROUTER_IMAGE_CATALOG_FALLBACK]',error?.message||error);return GEMINI_IMAGE_MODELS.map(x=>({...x,pricing:{...x.pricing}}));}
+}
 
 export const GEMINI_IMAGE_MODELS = [
-  { id:'gemini-3.1-flash-lite-image', name:'Nano Banana 2 Lite', description:'الأرخص والأسرع لتوليد الصور وتعديلها.', pricing:{prompt:0.25/1e6,completion:1.50/1e6,imageOutputPerMillion:30,request:0.0336}, inputModalities:['text','image','video'], outputModalities:['text','image'], supportedResolutions:['1K'], tier:'stable' },
-  { id:'gemini-2.5-flash-image', name:'Nano Banana', description:'توليد وتعديل صور سريع بدقة حتى 1K.', pricing:{prompt:0.30/1e6,completion:0,imageOutputPerMillion:30,request:0.039}, inputModalities:['text','image'], outputModalities:['image'], supportedResolutions:['1K'], tier:'stable' },
-  { id:'gemini-3.1-flash-image', name:'Nano Banana 2', description:'جودة وسرعة متوازنة مع دعم دقات متعددة.', pricing:{prompt:0.50/1e6,completion:3.00/1e6,imageOutputPerMillion:60,request:0.067}, inputModalities:['text','image'], outputModalities:['text','image'], supportedResolutions:['0.5K','1K','2K','4K'], tier:'stable' },
-  { id:'gemini-3-pro-image', name:'Nano Banana Pro', description:'إنتاج صور احترافية وتعليمات مركبة حتى 4K.', pricing:{prompt:2.70/1e6,completion:13.50/1e6,imageOutputPerMillion:120,request:0.134}, inputModalities:['text','image'], outputModalities:['text','image'], supportedResolutions:['1K','2K','4K'], tier:'stable' }
+  {id:'black-forest-labs/flux.2-klein-4b',name:'FLUX.2 Klein 4B',description:'أرخص نموذج FLUX وسريع لتوليد الصور.',pricing:{request:0.014,image:0.014},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['512','1K','2K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'},
+  {id:'black-forest-labs/flux.2-pro',name:'FLUX.2 Pro',description:'جودة أعلى للصور والتعديل متعدد المراجع.',pricing:{request:0.03,image:0.03},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['1K','2K','4K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'}
 ];
-
 
 export const GEMINI_LIVE_MODELS = [];
 
-export async function getAvailableModels(){ return GEMINI_MODELS.map(model=>({...model,pricing:{...model.pricing}})); }
 
 export const DEFAULT_AI_TOOLS = [
-  {id:'coding',name_ar:'البرمجة',name_en:'Coding',description_ar:'كتابة الكود، إصلاح الأخطاء وشرح الحلول التقنية.',description_en:'Write code, fix bugs, and explain technical solutions.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:10},
-  {id:'summary',name_ar:'التلخيص',name_en:'Summarization',description_ar:'تلخيص النصوص والمقالات والملفات مع الحفاظ على أهم النقاط.',description_en:'Summarize text, articles, and files while preserving key points.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:20},
-  {id:'ads',name_ar:'الإعلانات',name_en:'Advertising',description_ar:'إنشاء نصوص إعلانية وأفكار حملات وتسويق.',description_en:'Create advertising copy, campaign ideas, and marketing content.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:30},
-  {id:'writing',name_ar:'الكتابة',name_en:'Writing',description_ar:'كتابة وإعادة صياغة المحتوى بأساليب مختلفة.',description_en:'Write and rewrite content in different styles.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:40},
-  {id:'translate',name_ar:'الترجمة',name_en:'Translation',description_ar:'ترجمة النصوص مع الحفاظ على المعنى والسياق.',description_en:'Translate text while preserving meaning and context.',tool_type:'text',model_id:'gemini-3.1-flash-lite',is_active:true,sort_order:50},
-  {id:'study',name_ar:'الدراسة',name_en:'Study',description_ar:'شرح الدروس، حل الأسئلة وإنشاء خطط ومراجعات دراسية.',description_en:'Explain lessons, solve questions, and create study plans and reviews.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:60},
-  {id:'business',name_ar:'الأعمال',name_en:'Business',description_ar:'تحليل الأفكار وخطط الأعمال والمحتوى المهني.',description_en:'Analyze ideas, business plans, and professional content.',tool_type:'text',model_id:'gemini-3.5-flash',is_active:true,sort_order:70},
-  {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام نماذج Gemini للصور.',description_en:'Generate and edit images with Gemini image models.',tool_type:'image',model_id:'gemini-3.1-flash-lite-image',is_active:true,sort_order:100}
+  {id:'coding',name_ar:'البرمجة',name_en:'Coding',description_ar:'كتابة الكود، إصلاح الأخطاء وشرح الحلول التقنية.',description_en:'Write code, fix bugs, and explain technical solutions.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:10},
+  {id:'summary',name_ar:'التلخيص',name_en:'Summarization',description_ar:'تلخيص النصوص والمقالات والملفات مع الحفاظ على أهم النقاط.',description_en:'Summarize text, articles, and files while preserving key points.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:20},
+  {id:'ads',name_ar:'الإعلانات',name_en:'Advertising',description_ar:'إنشاء نصوص إعلانية وأفكار حملات وتسويق.',description_en:'Create advertising copy, campaign ideas, and marketing content.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:30},
+  {id:'writing',name_ar:'الكتابة',name_en:'Writing',description_ar:'كتابة وإعادة صياغة المحتوى بأساليب مختلفة.',description_en:'Write and rewrite content in different styles.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:40},
+  {id:'translate',name_ar:'الترجمة',name_en:'Translation',description_ar:'ترجمة النصوص مع الحفاظ على المعنى والسياق.',description_en:'Translate text while preserving meaning and context.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:50},
+  {id:'study',name_ar:'الدراسة',name_en:'Study',description_ar:'شرح الدروس، حل الأسئلة وإنشاء خطط ومراجعات دراسية.',description_en:'Explain lessons, solve questions, and create study plans and reviews.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:60},
+  {id:'business',name_ar:'الأعمال',name_en:'Business',description_ar:'تحليل الأفكار وخطط الأعمال والمحتوى المهني.',description_en:'Analyze ideas, business plans, and professional content.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:70},
+  {id:'all-models',name_ar:'كل نماذج الذكاء الاصطناعي',name_en:'All AI Models',description_ar:'شات عادي مع اختيار النموذج من قائمة مرتبة حسب السعر والمجاني.',description_en:'General chat with a model picker sorted by price and free options.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',prompt_config:{_ui:{icon_svg:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg>'}},is_active:true,sort_order:5},
+  {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام أرخص نموذج FLUX.',description_en:'Generate and edit images with the cheapest FLUX model.',tool_type:'image',model_id:'black-forest-labs/flux.2-klein-4b',is_active:true,sort_order:100}
 ];
 
 export async function getAiTools({includeInactive=false}={}){
@@ -841,7 +825,7 @@ export async function claimFreeDailyUse(supabase, userId, kind = 'chat') {
 }
 
 export async function getTrialModelId() {
-  // Keep the trial pinned to the configured economical Gemini model.
+  // Keep the trial pinned to OpenRouter free routing.
   return TRIAL_MODEL_FALLBACK;
 }
 
@@ -1023,6 +1007,50 @@ export function estimateChatCharge(price, messages = [], webSearch = false, outp
   };
 }
 
+
+export function reservationTokens(estimatedTokens, kind = 'chat') {
+  const estimate = Math.max(1, Math.ceil(Number(estimatedTokens) || 1));
+  const multiplier = kind === 'image' ? 1.30 : 1.25;
+  const minimumBuffer = kind === 'image' ? 250 : 50;
+  return Math.max(estimate, Math.ceil(estimate * multiplier), estimate + minimumBuffer);
+}
+
+export async function resolveOpenRouterCharge({ usage = {}, generationId = '', price = {}, webSearch = false } = {}) {
+  let normalizedUsage = {
+    prompt_tokens: Number(usage?.prompt_tokens || usage?.input_tokens || 0),
+    completion_tokens: Number(usage?.completion_tokens || usage?.output_tokens || 0),
+    total_tokens: Number(usage?.total_tokens || 0),
+    cost: Number(usage?.cost || 0)
+  };
+
+  // OpenRouter normally returns usage.cost in the completed response. If a provider
+  // omits it, query the generation record by ID before falling back to catalog prices.
+  if (!(normalizedUsage.cost > 0) && generationId && String(process.env.OPENROUTER_API_KEY || '').trim()) {
+    try {
+      const response = await fetchWithTimeout(
+        `https://openrouter.ai/api/v1/generation?id=${encodeURIComponent(String(generationId))}`,
+        { headers: { Authorization: `Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`, Accept: 'application/json' } },
+        12000
+      );
+      if (response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const data = payload?.data || payload || {};
+        const fetchedCost = Number(data?.usage?.cost ?? data?.cost ?? data?.total_cost ?? 0);
+        normalizedUsage = {
+          prompt_tokens: Number(data?.usage?.prompt_tokens ?? data?.tokens_prompt ?? normalizedUsage.prompt_tokens ?? 0),
+          completion_tokens: Number(data?.usage?.completion_tokens ?? data?.tokens_completion ?? normalizedUsage.completion_tokens ?? 0),
+          total_tokens: Number(data?.usage?.total_tokens ?? data?.tokens_total ?? normalizedUsage.total_tokens ?? 0),
+          cost: fetchedCost > 0 ? fetchedCost : normalizedUsage.cost
+        };
+      }
+    } catch (error) {
+      console.warn('[OPENROUTER_GENERATION_COST_LOOKUP_FAILED]', error?.message || error);
+    }
+  }
+
+  return chargeTokens(price, normalizedUsage, webSearch);
+}
+
 export function affordableOutputLimit(price, availableTokens, estimate, cap = 8192) {
   const completionPrice = Number(price?.completion || 0);
   if (!(completionPrice > 0)) return Math.max(128, cap);
@@ -1059,12 +1087,19 @@ export async function classifyTokenChargeFailure(supabase, userId, requiredToken
   return appError('DATABASE_ERROR', {}, cause);
 }
 
+let piPriceCache={price:0,expires:0,quotedAt:null};
 export async function getPiUsd() {
-  const response = await fetchWithTimeout('https://www.okx.com/api/v5/market/ticker?instId=PI-USDT', { headers: { 'User-Agent': 'AiWay/1.0' } }, 10000);
-  if (!response.ok) throw new Error('OKX_PRICE_UNAVAILABLE');
+  if(piPriceCache.price>0&&Date.now()<piPriceCache.expires)return piPriceCache.price;
+  const response = await fetchWithTimeout('https://www.okx.com/api/v5/market/ticker?instId=PI-USDT', { headers: { Accept:'application/json', 'User-Agent': 'AiWay/1.0' } }, 10000);
+  if (!response.ok) throw appError('OKX_PRICE_UNAVAILABLE',{providerStatus:response.status});
   const payload = await response.json();
-  const price = Number(payload?.data?.[0]?.last);
-  if (!price || price <= 0) throw new Error('OKX_PRICE_UNAVAILABLE');
+  if(String(payload?.code||'0')!=='0')throw appError('OKX_PRICE_UNAVAILABLE',{internalMessage:String(payload?.msg||'OKX ticker failed')});
+  const ticker=payload?.data?.[0]||{};
+  const last=Number(ticker.last), bid=Number(ticker.bidPx), ask=Number(ticker.askPx);
+  const midpoint=bid>0&&ask>0?(bid+ask)/2:0;
+  const price=last>0?last:midpoint;
+  if (!Number.isFinite(price) || price <= 0) throw appError('OKX_PRICE_UNAVAILABLE');
+  piPriceCache={price,expires:Date.now()+60_000,quotedAt:new Date().toISOString()};
   return price;
 }
 
@@ -1072,7 +1107,9 @@ export async function packageQuote(id) {
   const pack = PACKAGES[id];
   if (!pack) return null;
   const piUsd = await getPiUsd();
-  return { ...pack, piUsd, amountPi: Number((pack.usd / piUsd).toFixed(7)), quotedAt: new Date().toISOString() };
+  const baseAmountPi=pack.usd/piUsd;
+  const amountPi=Number((baseAmountPi*(1+PI_PRICE_BUFFER)).toFixed(7));
+  return { ...pack, piUsd, baseAmountPi:Number(baseAmountPi.toFixed(7)), priceBufferPercent:PI_PRICE_BUFFER*100, amountPi, quotedAt:new Date().toISOString(), quoteExpiresAt:new Date(Date.now()+5*60_000).toISOString(), pricingSource:'OKX PI-USDT spot ticker' };
 }
 
 
