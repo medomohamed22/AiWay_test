@@ -1679,7 +1679,10 @@ function estimateMessagesForBackend(text,attachments){
 }
 function formatApproximateCost(estimate){
  const tokens=Math.max(1,Number(estimate?.chargedTokens||0));
- const model=estimate?.modelName||estimate?.routedModelId||$('model').value;
+ const isFreeTrial=Boolean(userProfile&&!userProfile.has_purchased);
+ const model=isFreeTrial
+  ? (lang==='ar'?'OpenRouter المجاني':'OpenRouter Free')
+  : (estimate?.modelName||estimate?.routedModelId||$('model').value);
  const formatted=tokens.toLocaleString(lang==='ar'?'ar-EG':'en-US');
  const names=Array.isArray(estimate?.attachmentNames)?estimate.attachmentNames.filter(Boolean):[];
  const fileLine=names.length?(lang==='ar'?`\n\nالملف المتضمن: ${names.join('، ')}`:`\n\nIncluded file${names.length>1?'s':''}: ${names.join(', ')}`):'';
