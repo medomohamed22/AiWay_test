@@ -199,9 +199,7 @@ export default async function handler(req, res) {
 
     const purchased = Boolean(profile.has_purchased);
     const availableTokens = Math.max(0, Number(profile.ai_tokens || 0));
-    if (!purchased && !taskId && modelId !== trialModelId && modelId !== 'aiway/auto' && !isFreeModel(model)) throw appError('MODEL_LOCKED');
     if (!purchased && webSearch) throw appError('TRIAL_WEB_LOCKED');
-    if (!purchased && ['coding','voice-chat','voice-translate'].includes(taskId)) throw appError('MODEL_LOCKED');
     if (!purchased && Number(profile.free_trial_tokens ?? profile.trial_messages_remaining ?? 0) <= 0) throw appError('TRIAL_ENDED');
     if (purchased && availableTokens < 1) throw appError('INSUFFICIENT_TOKENS', { availableTokens });
 
@@ -250,10 +248,12 @@ export default async function handler(req, res) {
         hasAttachments: safeAttachments.length > 0
       });
     }
+    // Every account that has not completed its first purchase is routed through
+    // OpenRouter's free router, regardless of the selected open text tool.
+    if (!purchased) model = await getModel('openrouter/free') || await getModel(trialModelId);
     if (!model) throw appError('MODEL_UNAVAILABLE');
     if (webSearch && !/^gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(model.id || ''))) throw appError('SEARCH_MODEL_UNSUPPORTED');
-    if (taskId && isFreeModel(model)) throw appError('MODEL_UNAVAILABLE');
-    if (isFreeModel(model)) await claimFreeDailyUse(supabase, user.id, 'chat');
+    if (isFreeModel(model) && purchased) await claimFreeDailyUse(supabase, user.id, 'chat');
     const language = detectLanguage(latestTextValue);
     let toolConfig = null;
     if (taskId) {

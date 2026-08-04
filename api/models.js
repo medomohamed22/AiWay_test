@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     return json(res, 200, {
       name:'AiWay', models,
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
-      trialModelId:await getTrialModelId(), packages,
+      trialModelId:'openrouter/free', packages,
       imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
       tokenUsd:TOKEN_USD, tools:await getAiTools(), providerRouting:{sort:'price',allowFallbacks:true,label:'Lowest-price provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
