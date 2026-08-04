@@ -74,10 +74,41 @@ export default async function handler(req,res){
       return json(res,200,{resolved:true,cancelled:true,paymentId});
     }
 
-    const found=await supabase.from('payments').select('*').eq('payment_id',paymentId).maybeSingle();
+    let found=await supabase.from('payments').select('*').eq('payment_id',paymentId).maybeSingle();
     if(found.error)throw appError('DATABASE_ERROR',{},found.error);
-    const payment=found.data;
-    if(!payment)mismatch('PAYMENT_NOT_FOUND',{paymentId,userId:user.id});
+    let payment=found.data;
+
+    // Recover a Pi payment that was approved remotely but was not persisted locally
+    // (for example, when an outdated package_id CHECK constraint rejected the insert).
+    if(!payment){
+      const remotePackage=pkg(remote);
+      const pack=PACKAGES[remotePackage];
+      const remoteTokens=Number(remote?.metadata?.tokens);
+      const remoteUsd=Number(remote?.metadata?.usd);
+      const amountPi=Number(remote?.amount);
+      if(!pack||!Number.isFinite(amountPi)||amountPi<=0||remoteTokens!==Number(pack.tokens)||remoteUsd!==Number(pack.usd)){
+        mismatch('PAYMENT_NOT_FOUND_UNRECOVERABLE',{paymentId,userId:user.id,remotePackage,remoteTokens,remoteUsd});
+      }
+      const recovered={
+        user_id:user.id,
+        payment_id:paymentId,
+        package_id:remotePackage,
+        amount_pi:amountPi,
+        usd_amount:pack.usd,
+        pi_usd_rate:Number((pack.usd/amountPi).toFixed(8)),
+        ai_tokens:pack.tokens,
+        status:'approved',
+        raw_response:{recovered:true,payment:remote}
+      };
+      const inserted=await supabase.from('payments').insert(recovered).select('*').single();
+      if(inserted.error){
+        // A concurrent callback may have recovered it first.
+        const retry=await supabase.from('payments').select('*').eq('payment_id',paymentId).maybeSingle();
+        if(retry.error||!retry.data)throw appError('DATABASE_ERROR',{},inserted.error);
+        payment=retry.data;
+      }else payment=inserted.data;
+      console.warn('[PAYMENT_RECOVERED]',{paymentId,userId:user.id,packageId:remotePackage});
+    }
     if(norm(payment.user_id)!==norm(user.id))mismatch('PAYMENT_OWNER_DB',{paymentId,storedUserId:payment.user_id,currentUserId:user.id});
     if(payment.status==='completed')return json(res,200,{completed:true,resolved:true,tokens:payment.ai_tokens,alreadyCompleted:true});
 
