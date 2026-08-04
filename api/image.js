@@ -243,9 +243,17 @@ async function getImageModels() {
   }));
 }
 
-async function getImageModel(requestedId = '', preferQuality = false) {
+async function getImageModel(requestedId = '', preferQuality = false, taskId = '') {
   const models = await getImageModels();
   const configured=(await getToolModelSettings()).image;
+  // The dedicated image tool must always use the model chosen by the admin.
+  // Manual image choices inside the all-models chat still honor the user's selection.
+  if (String(taskId || '').toLowerCase() === 'image') {
+    return models.find(model=>model.id===configured)
+      || models.find(model=>model.id===requestedId)
+      || models.find(model => model.id === (preferQuality ? QUALITY_IMAGE_MODEL_ID : FAST_IMAGE_MODEL_ID))
+      || models[0];
+  }
   return models.find(model=>model.id===requestedId)
     || models.find(model=>model.id===configured)
     || models.find(model => model.id === (preferQuality ? QUALITY_IMAGE_MODEL_ID : FAST_IMAGE_MODEL_ID))
@@ -302,7 +310,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
-    let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage));
+    let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage), taskId);
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
     if (purchased && freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
     const supported = model.supported_parameters || {};
@@ -458,6 +466,8 @@ ${JSON.stringify(safeToolConfig)}`; }
       chargedTokens: purchased ? charge.chargedTokens : 1,
       providerUsd: charge.providerUsd,
       selectedModelName: model.name || model.id,
+      modelId: model.id,
+      routedModelId: model.id,
       remainingTokens,
       lowBalance: isLowBalance(remainingTokens, charge.chargedTokens)
     });

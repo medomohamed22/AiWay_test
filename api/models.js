@@ -21,13 +21,17 @@ export default async function handler(req, res) {
       } catch {}
       const models = await getAvailableModels();
       const IMAGE_MODELS=await imageModels();
-      const image = IMAGE_MODELS.find(model => model.id === body.modelId) || (body.taskId === 'image' ? IMAGE_MODELS[0] : null);
+      const settings = await getToolModelSettings();
+      const taskId = String(body.taskId || '').trim().toLowerCase();
+      const configuredImageId = taskId === 'image' ? String(settings.image || '').trim() : '';
+      const image = (configuredImageId && IMAGE_MODELS.find(model => model.id === configuredImageId))
+        || IMAGE_MODELS.find(model => model.id === body.modelId)
+        || null;
       if (image) {
         const providerUsd = Number(image.pricing.request);
         return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, providerUsd:estimatePurchased?providerUsd:0, chargedTokens:estimatePurchased?Math.max(1, Math.ceil(providerUsd / TOKEN_USD)):1, approximate:true, freeTrial:!estimatePurchased });
       }
-      const settings = await getToolModelSettings();
-      const id = settings[String(body.taskId || '')] || body.modelId;
+      const id = settings[taskId] || body.modelId;
       const model = models.find(item => item.id === id) || models[0];
       const estimate = estimateChatCharge(model.pricing, Array.isArray(body.messages) ? body.messages : [], Boolean(body.webSearch), Number(body.outputReserve || 0));
       return json(res, 200, {
