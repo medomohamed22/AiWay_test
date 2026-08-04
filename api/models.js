@@ -47,12 +47,22 @@ export default async function handler(req, res) {
 
     const catalog = await getAvailableModels();
     const freeModels = catalog.filter(model =>
-      model.id === 'openrouter/free' ||
+      (model.id === 'openrouter/free' ||
       model.id.endsWith(':free') ||
-      (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0)
+      (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0)) &&
+      !((model?.architecture?.output_modalities || model?.output_modalities || []).includes?.('image') && !(model?.architecture?.output_modalities || model?.output_modalities || []).includes?.('text'))
     );
+    const isChatOnlyModel = model => {
+      const id = String(model?.id || '').toLowerCase();
+      const name = String(model?.name || '').toLowerCase();
+      const outputModalities = model?.architecture?.output_modalities || model?.output_modalities || [];
+      const outputs = Array.isArray(outputModalities) ? outputModalities.map(value => String(value).toLowerCase()) : [];
+      const imageOnly = outputs.includes('image') && !outputs.includes('text');
+      const knownImageName = /nano[\s-]*banana|image[\s-]*(generation|preview)|gemini.*image|imagen|flash-image/.test(`${id} ${name}`);
+      return !imageOnly && !knownImageName;
+    };
     const latestFive = matcher => catalog
-      .filter(model => matcher(model) && !freeModels.some(free => free.id === model.id))
+      .filter(model => isChatOnlyModel(model) && matcher(model) && !freeModels.some(free => free.id === model.id))
       .sort((a,b) => Number(b.created || 0) - Number(a.created || 0) || String(a.name).localeCompare(String(b.name)))
       .slice(0, 5);
     const featuredPaid = [
