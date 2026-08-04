@@ -529,6 +529,58 @@ body.all-models-active .model-trigger-copy b{white-space:nowrap!important;overfl
  .topbar>.task-context .task-context-copy b,body.all-models-active .model-trigger-copy b{font-size:11px!important}
 }
 </style>
+
+<style id="aiway-final-header-layout-fix">
+/* One consistent three-part header on every screen.
+   Arabic: menu right, context/model center, balance left.
+   English: menu left, context/model center, balance right. */
+.topbar{
+  display:grid!important;
+  align-items:center!important;
+  grid-template-columns:clamp(64px,9vw,96px) minmax(0,1fr) clamp(48px,6vw,60px)!important;
+  grid-template-areas:"credits center menu"!important;
+  gap:clamp(6px,1vw,12px)!important;
+  padding:8px clamp(8px,2vw,18px)!important;
+  min-height:68px!important;
+  direction:ltr!important;
+  overflow:visible!important;
+}
+html[dir="ltr"] .topbar{grid-template-areas:"menu center credits"!important}
+.topbar>.mobile-menu{grid-area:menu!important;display:grid!important;position:static!important;margin:0!important;width:48px!important;min-width:48px!important;height:48px!important;justify-self:end!important;direction:inherit!important}
+html[dir="ltr"] .topbar>.mobile-menu{justify-self:start!important}
+.topbar>.credits{grid-area:credits!important;display:flex!important;position:static!important;margin:0!important;width:auto!important;min-width:64px!important;max-width:96px!important;height:48px!important;padding:7px 10px!important;justify-content:center!important;justify-self:start!important;overflow:hidden!important;direction:ltr!important}
+html[dir="ltr"] .topbar>.credits{justify-self:end!important}
+.topbar>.credits .credit-coin,.topbar>.credits .label,.topbar>.credits .credit-buy-label{display:none!important}
+.topbar>.task-context,.topbar>.model-wrap{grid-area:center!important;position:static!important;transform:none!important;margin:0 auto!important;width:min(100%,560px)!important;max-width:560px!important;min-width:0!important;justify-self:center!important;direction:var(--page-dir,rtl)!important}
+html[dir="rtl"] .topbar>.task-context,html[dir="rtl"] .topbar>.model-wrap{direction:rtl!important}
+html[dir="ltr"] .topbar>.task-context,html[dir="ltr"] .topbar>.model-wrap{direction:ltr!important}
+body.all-models-active .topbar>.task-context{display:none!important}
+body.all-models-active .topbar>.model-wrap{display:block!important}
+body:not(.all-models-active) .topbar>.task-context{display:flex!important}
+body:not(.all-models-active) .topbar>.model-wrap{display:none!important}
+.topbar>.task-context{height:48px!important;align-items:center!important;justify-content:center!important;gap:9px!important}
+.topbar>.task-context-icon{width:42px!important;height:42px!important;flex:0 0 42px!important}
+.topbar>.task-context-copy{display:block!important;min-width:0!important;max-width:70%!important}
+.topbar>.task-context-copy b{display:block!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+.topbar>.task-context-copy small,.topbar>.task-change{display:none!important}
+.topbar>.model-trigger{width:100%!important;min-width:0!important;max-width:560px!important;height:48px!important;padding:6px 12px!important;border-radius:16px!important}
+.topbar>.top-tools-btn,.topbar>.top-login-btn,.topbar>.spacer,.topbar>.export{display:none!important}
+@media(max-width:620px){
+ .topbar{grid-template-columns:64px minmax(0,1fr) 48px!important;gap:7px!important;padding:7px 9px!important;min-height:64px!important}
+ .topbar>.credits{min-width:64px!important;max-width:64px!important;height:48px!important;padding:6px!important;font-size:13px!important}
+ .topbar>.mobile-menu{width:48px!important;min-width:48px!important;height:48px!important}
+ .topbar>.task-context,.topbar>.model-wrap{width:100%!important;max-width:none!important}
+ .topbar>.task-context-icon{width:38px!important;height:38px!important;flex-basis:38px!important}
+ .topbar>.task-context-copy b{font-size:13px!important}
+ .topbar>.model-trigger-copy b{font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+ .topbar>.model-trigger-icon{display:none!important}
+}
+@media(max-width:350px){
+ .topbar{grid-template-columns:56px minmax(0,1fr) 44px!important;gap:5px!important;padding-inline:6px!important}
+ .topbar>.credits{min-width:56px!important;max-width:56px!important;font-size:12px!important}
+ .topbar>.mobile-menu{width:44px!important;min-width:44px!important}
+}
+</style>
 </head>
 <body>
 
