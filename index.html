@@ -775,8 +775,7 @@ function showPiBridgeCompleted(username=''){
   document.body.innerHTML=`<main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:system-ui;background:#faf7fc;color:#211729;text-align:center"><section style="width:min(460px,100%);background:#fff;border:1px solid #eadff0;border-radius:28px;padding:34px;box-shadow:0 20px 60px #4d1d7020"><img src="/aiway-logo.png" alt="AiWay" style="width:76px;height:76px;border-radius:22px"><h1 style="font-size:26px;margin:18px 0 10px">${esc(title)}</h1><p style="line-height:1.8;color:#6f6475;margin:0">${esc(message)}</p><div style="margin-top:18px;font-size:42px">✓</div></section></main>`;
 }
 async function startExternalPiSignIn(){
-  const button=$('continuePiSignin');
-  if(button)button.disabled=true;
+  setLoginBusy(true);
   try{
     const bridge=await api('/api/pi-login',{method:'POST',body:JSON.stringify({action:'bridge-start'})});
     savePiBridge({requestId:bridge.requestId,pollToken:bridge.pollToken,expiresAt:bridge.expiresAt});
@@ -795,7 +794,7 @@ async function startExternalPiSignIn(){
     location.assign(url.toString());
   }catch(error){
     console.error(error);toast(friendlyClientError(error,lang==='ar'?'تعذر بدء تسجيل الدخول بحساب Pi. حاول مرة أخرى.':'Could not start Pi sign-in. Try again.').message);
-  }finally{if(button)button.disabled=false}
+  }finally{setLoginBusy(false)}
 }
 async function finishExternalPiSignIn(){
   const params=new URLSearchParams(location.hash.slice(1));
@@ -1061,7 +1060,8 @@ const TASKS={
  writing:{ar:['الكتابة وصناعة المحتوى','اكتب مقالات ورسائل ووصف منتجات بأسلوب احترافي.','كتابة احترافية'],en:['Writing & content','Create articles, messages, and product descriptions.','Professional writing']},
  translate:{ar:['الترجمة','ترجم النصوص مع الحفاظ على المعنى والأسلوب.','ترجمة دقيقة وطبيعية'],en:['Translation','Translate while preserving meaning, tone, and context.','Natural accurate translation']},
  study:{ar:['الدراسة والشرح','اشرح الدروس، جهّز أسئلة وساعدك على الفهم.','مدرس ذكي مبسط'],en:['Study & explain','Explain lessons, create questions, and help you learn.','Clear AI tutor']},
- business:{ar:['الأعمال والأفكار','طوّر أفكار المشاريع والخطط والعروض العملية.','مساعد أعمال وتخطيط'],en:['Business & ideas','Develop business ideas, plans, and practical proposals.','Business planning assistant']}
+ business:{ar:['الأعمال والأفكار','طوّر أفكار المشاريع والخطط والعروض العملية.','مساعد أعمال وتخطيط'],en:['Business & ideas','Develop business ideas, plans, and practical proposals.','Business planning assistant']},
+ 'all-models':{ar:['كل نماذج الذكاء الاصطناعي','اختر نموذج الشات الذي يناسبك.','اختيار مباشر للنموذج'],en:['All AI models','Choose the chat model that suits you.','Direct model selection']}
 };
 let activeTask=storageGet('aiway_active_task','');
 function taskText(id){return TASKS[id]?.[lang]||TASKS[id]?.en||['AiWay','','']}
@@ -1122,7 +1122,26 @@ async function authenticatePiForPayments({refreshSession=true,silentRecovery=tru
   if(requirePendingResolved&&unresolved>0)throw makeUiError(lang==='ar'?'تعذر إنهاء الدفعة السابقة بأمان. أعد فتح Pi Browser ثم حاول مرة أخرى.':'The previous payment could not be safely resolved. Reopen Pi Browser and try again.','PAYMENT_PENDING');
   return {result,recovered:resolved,pendingFound:outcomes.length};
 }
-async function login(){if(auth)return toast(lang==='ar'?'أنت مسجل بالفعل':'You are already signed in');if(!isPiBrowser()){openPiSigninModal();return false}const btn=$('loginBtn');btn.disabled=true;btn.querySelector('span:last-child').textContent=lang==='ar'?'جارٍ الدخول':'Signing in…';$('profileState').innerHTML='<span class="loading-dot"></span> <span class="loading-dot"></span> <span class="loading-dot"></span>';try{await authenticatePiForPayments({refreshSession:true,silentRecovery:true});await Promise.all([refreshMe(),loadModels(),loadChats()]);dismissSigninGuide();toast(userProfile?.has_purchased?(lang==='ar'?'تم تسجيل الدخول بنجاح':'Signed in successfully'):(lang==='ar'?`مرحبًا بك — لديك ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} توكين مجاني`:`Welcome — you have ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} free tokens`))}catch(e){console.error(e);$('profileState').textContent=lang==='ar'?'تعذر تسجيل الدخول':'Could not sign in';toast(friendlyClientError(e,lang==='ar'?'تعذر تسجيل الدخول بحساب Pi. أعد المحاولة داخل Pi Browser.':'Pi sign-in failed. Try again inside Pi Browser.').message)}finally{btn.disabled=false;btn.querySelector('span:last-child').textContent=auth?I18N[lang].connected:I18N[lang].login}}
+function setLoginBusy(busy){
+ const ids=['loginBtn','topLoginBtn','introLoginBtn','introHeroLogin','continuePiSignin','piSignInBtn'];
+ ids.forEach(id=>{const el=$(id);if(!el)return;el.classList.toggle('login-busy',Boolean(busy));el.disabled=Boolean(busy);el.setAttribute('aria-busy',busy?'true':'false')});
+ const labels=['topLoginLabel','introHeroLoginText','continuePiSigninText','piBrowserLoginLabel'];
+ if(busy)labels.forEach(id=>{const el=$(id);if(el){el.dataset.beforeBusy=el.textContent;el.textContent=lang==='ar'?'جارٍ تسجيل الدخول…':'Signing in…'}});
+ else labels.forEach(id=>{const el=$(id);if(el&&el.dataset.beforeBusy){el.textContent=el.dataset.beforeBusy;delete el.dataset.beforeBusy}});
+}
+async function login(){
+ if(auth){toast(lang==='ar'?'أنت مسجل بالفعل':'You are already signed in');return true}
+ setLoginBusy(true);
+ try{
+  if(!isPiBrowser()){openPiSigninModal();return false}
+  $('profileState').innerHTML='<span class="loading-dot"></span> <span class="loading-dot"></span> <span class="loading-dot"></span>';
+  await authenticatePiForPayments({refreshSession:true,silentRecovery:true});
+  await Promise.all([refreshMe(),loadModels(),loadChats()]);dismissSigninGuide();
+  toast(userProfile?.has_purchased?(lang==='ar'?'تم تسجيل الدخول بنجاح':'Signed in successfully'):(lang==='ar'?`مرحبًا بك — لديك ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} توكين مجاني`:`Welcome — you have ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} free tokens`));
+  return true;
+ }catch(e){console.error(e);$('profileState').textContent=lang==='ar'?'تعذر تسجيل الدخول':'Could not sign in';toast(friendlyClientError(e,lang==='ar'?'تعذر تسجيل الدخول بحساب Pi. أعد المحاولة داخل Pi Browser.':'Pi sign-in failed. Try again inside Pi Browser.').message);return false}
+ finally{setLoginBusy(false);renderAccountState()}
+}
 const LOCAL_CACHE_DB='aiway-smart-cache',LOCAL_CACHE_VERSION=1,MAX_LOCAL_IMAGES=80,MAX_LOCAL_IMAGE_BYTES=150*1024*1024,MAX_LOCAL_CONVERSATIONS=40;
 let localCacheDbPromise=null;const localImageObjectUrls=new Set();
 function localCacheUser(){return String(userProfile?.username||'').trim().toLowerCase()||null}
@@ -1621,6 +1640,39 @@ function buildHtmlProject(files,entry){let html=entry.content;for(const f of fil
  body.all-models-active .credits{width:58px!important;max-width:58px!important;font-size:12px!important}
  body.all-models-active .mobile-menu{width:42px!important;min-width:42px!important}
  body.all-models-active .model-trigger-copy b{font-size:11px!important}
+}
+
+/* Final compact mobile headers and visible sign-in progress */
+.login-busy{position:relative!important;pointer-events:none!important;opacity:.78!important}
+.login-busy svg,.login-busy [data-icon]{visibility:hidden!important}
+.login-busy::before{content:"";width:17px;height:17px;flex:0 0 17px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+@media(max-width:620px){
+  body.all-models-active .topbar{display:grid!important;grid-template-columns:64px minmax(0,1fr) 44px!important;grid-template-areas:"credits model menu"!important;padding:7px 8px!important;gap:6px!important;overflow:visible!important}
+  body.all-models-active .topbar>:not(.mobile-menu):not(.model-wrap):not(.credits){display:none!important}
+  body.all-models-active .model-wrap{grid-area:model!important;display:block!important;position:static!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important}
+  body.all-models-active .model-trigger{width:100%!important;min-width:0!important;max-width:none!important;height:48px!important;padding:6px 9px!important}
+  body.all-models-active .model-trigger-copy b{font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  body.all-models-active .mobile-menu{grid-area:menu!important;position:static!important;width:44px!important;min-width:44px!important;height:48px!important}
+  body.all-models-active .credits{grid-area:credits!important;position:static!important;width:64px!important;min-width:64px!important;max-width:64px!important;height:48px!important;margin:0!important;padding:6px!important;justify-content:center!important;overflow:hidden!important}
+  body.all-models-active .credits .credit-coin,body.all-models-active .credits .label,body.all-models-active .credits .credit-buy-label{display:none!important}
+
+  body:not(.all-models-active) .topbar{display:grid!important;grid-template-columns:74px minmax(0,1fr) 44px!important;grid-template-areas:"credits task menu"!important;padding:7px 8px!important;gap:7px!important}
+  body:not(.all-models-active) .mobile-menu{grid-area:menu!important;position:static!important;width:44px!important;min-width:44px!important;height:48px!important}
+  body:not(.all-models-active) .task-context{grid-area:task!important;position:static!important;transform:none!important;display:flex!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;justify-content:center!important;gap:8px!important}
+  body:not(.all-models-active) .task-context-copy{display:block!important;min-width:0!important;max-width:calc(100% - 48px)!important}
+  body:not(.all-models-active) .task-context-copy b{display:block!important;font-size:13px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  body:not(.all-models-active) .task-context-copy small,body:not(.all-models-active) .task-change{display:none!important}
+  body:not(.all-models-active) .task-context-icon{width:40px!important;height:40px!important;flex:0 0 40px!important}
+  body:not(.all-models-active) .credits{grid-area:credits!important;position:static!important;width:74px!important;min-width:74px!important;max-width:74px!important;height:48px!important;margin:0!important;padding:7px 6px!important;justify-content:center!important}
+  body:not(.all-models-active) .credits .credit-coin,body:not(.all-models-active) .credits .label,body:not(.all-models-active) .credits .credit-buy-label{display:none!important}
+  body:not(.all-models-active) .top-tools-btn,body:not(.all-models-active) .top-login-btn,body:not(.all-models-active) .model-wrap,body:not(.all-models-active) .spacer,body:not(.all-models-active) .export{display:none!important}
+}
+@media(max-width:350px){
+ body.all-models-active .topbar{grid-template-columns:56px minmax(0,1fr) 42px!important;padding-inline:5px!important;gap:5px!important}
+ body.all-models-active .credits{width:56px!important;min-width:56px!important;max-width:56px!important;font-size:12px!important}
+ body:not(.all-models-active) .topbar{grid-template-columns:60px minmax(0,1fr) 42px!important;padding-inline:5px!important;gap:5px!important}
+ body:not(.all-models-active) .credits{width:60px!important;min-width:60px!important;max-width:60px!important;font-size:12px!important}
+ body:not(.all-models-active) .task-context-copy b{font-size:12px!important}
 }
 </style>`);if(/\.js$/i.test(f.name))html=html.replace(new RegExp(`<script[^>]+src=["']${f.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}["'][^>]*><\\/script>`,'i'),`<script>${f.content}<\\/script>`)}return html}
 function previewGeneratedFile(messageIndex,fileIndex){const files=extractGeneratedFiles(history[messageIndex]?.content),file=files[fileIndex];if(!file||!/\.html?$/i.test(file.name))return;const html=buildHtmlProject(files,file);$('previewTitle').textContent=file.name;$('previewFrame').srcdoc=html;$('previewModal').classList.add('open')}
