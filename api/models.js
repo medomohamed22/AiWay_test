@@ -61,10 +61,26 @@ export default async function handler(req, res) {
       const knownImageName = /nano[\s-]*banana|image[\s-]*(generation|preview)|gemini.*image|imagen|flash-image/.test(`${id} ${name}`);
       return !imageOnly && !knownImageName;
     };
-    const latestFive = matcher => catalog
-      .filter(model => isChatOnlyModel(model) && matcher(model) && !freeModels.some(free => free.id === model.id))
-      .sort((a,b) => Number(b.created || 0) - Number(a.created || 0) || String(a.name).localeCompare(String(b.name)))
-      .slice(0, 5);
+    const normalizedModelName = model => String(model?.name || model?.id || '')
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/(?:free|preview|experimental)/g, ' ')
+      .replace(/[^a-z0-9.]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const latestFive = matcher => {
+      const seen = new Set();
+      return catalog
+        .filter(model => isChatOnlyModel(model) && matcher(model) && !freeModels.some(free => free.id === model.id))
+        .sort((a,b) => Number(b.created || 0) - Number(a.created || 0) || String(a.name).localeCompare(String(b.name)))
+        .filter(model => {
+          const key = normalizedModelName(model);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 5);
+    };
     const featuredPaid = [
       ...latestFive(model => /^openai\/(?:gpt|chatgpt)/i.test(model.id) || /\bGPT\b/i.test(model.name)),
       ...latestFive(model => /^google\/gemini/i.test(model.id) || /\bGemini\b/i.test(model.name)),
