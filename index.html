@@ -2155,4 +2155,92 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
 })();
 </script>
 
+<style id="aiway-mobile-header-layout-final">
+/* Authoritative mobile tool header: one identity only, centered. */
+@media (max-width:760px){
+  body:not(.all-models-active) .topbar{
+    direction:ltr!important;
+    display:grid!important;
+    grid-template-columns:minmax(62px,92px) minmax(0,1fr) 46px!important;
+    grid-template-areas:"credits identity menu"!important;
+    align-items:center!important;
+    gap:8px!important;
+    min-height:64px!important;
+    height:64px!important;
+    padding:7px 9px!important;
+    overflow:hidden!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-menu{
+    grid-area:menu!important;
+    grid-column:3!important;
+    display:grid!important;
+    position:static!important;
+    justify-self:end!important;
+    width:46px!important;
+    min-width:46px!important;
+    height:46px!important;
+    margin:0!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-task-identity{
+    grid-area:identity!important;
+    grid-column:2!important;
+    display:flex!important;
+    direction:var(--page-dir,rtl)!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:9px!important;
+    width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+  }
+  html[dir="rtl"] body:not(.all-models-active) .topbar>.mobile-task-identity{direction:rtl!important}
+  html[dir="ltr"] body:not(.all-models-active) .topbar>.mobile-task-identity{direction:ltr!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity>span{
+    width:42px!important;height:42px!important;min-width:42px!important;flex:0 0 42px!important;
+    border-radius:13px!important;display:grid!important;place-items:center!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-task-identity b{
+    display:block!important;min-width:0!important;max-width:150px!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    font-size:14px!important;line-height:1.2!important;
+  }
+  body:not(.all-models-active) .topbar>.credits{
+    grid-area:credits!important;
+    grid-column:1!important;
+    position:static!important;
+    justify-self:start!important;
+    width:auto!important;
+    min-width:62px!important;
+    max-width:92px!important;
+    height:46px!important;
+    margin:0!important;
+    padding:7px 8px!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    direction:ltr!important;
+  }
+  body:not(.all-models-active) .topbar>.credits #credits{
+    display:block!important;font-size:11px!important;line-height:1!important;
+    min-width:0!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  /* Remove every old/duplicated tool identity from the side. */
+  body:not(.all-models-active) .topbar>.task-context,
+  body:not(.all-models-active) .topbar>.model-wrap,
+  body:not(.all-models-active) .topbar>.top-tools-btn,
+  body:not(.all-models-active) .topbar>.top-login-btn,
+  body:not(.all-models-active) .topbar>.spacer,
+  body:not(.all-models-active) .topbar>.export{
+    display:none!important;visibility:hidden!important;position:static!important;
+  }
+}
+@media (max-width:390px){
+ body:not(.all-models-active) .topbar{grid-template-columns:58px minmax(0,1fr) 43px!important;gap:6px!important;padding-inline:6px!important}
+ body:not(.all-models-active) .topbar>.credits{min-width:58px!important;max-width:58px!important;padding-inline:5px!important}
+ body:not(.all-models-active) .topbar>.mobile-menu{width:43px!important;min-width:43px!important;height:44px!important}
+ body:not(.all-models-active) .topbar>.mobile-task-identity>span{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
+ body:not(.all-models-active) .topbar>.mobile-task-identity b{font-size:12px!important;max-width:105px!important}
+}
+</style>
+
 </body></html>
