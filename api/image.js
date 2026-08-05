@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints } from './_lib.js';
 
 
 function isStorageCapacityError(error) {
@@ -196,34 +196,31 @@ async function persistImage(req, res) {
 }
 
 
-function estimateImageCharge(model, resolution = '', hasReferenceImage = false) {
-  const pricing = model?.pricing || {};
-  const numeric = key => {
-    const value = Number(pricing?.[key]);
-    return Number.isFinite(value) && value > 0 ? value : 0;
-  };
-
-  // Prefer the fixed per-request price exposed by OpenRouter. Some image-model
-  // records expose a per-image value instead, so use it as a secondary signal.
-  let providerUsd = numeric('request') || numeric('image') || numeric('image_output');
-
-  // Safe fallback when the catalog does not expose a fixed image price.
-  // Higher resolutions are intentionally estimated more conservatively so an
-  // expensive request is rejected before the provider is called.
-  if (!providerUsd) {
-    const normalized = String(resolution || '').toUpperCase();
-    providerUsd = normalized === '4K' ? 0.16 : normalized === '2K' ? 0.08 : 0.04;
-  }
-
-  // Reference-image jobs can cost more on some providers. Keep a small buffer,
-  // and also add a general 15% guard against routing/provider price variation.
-  if (hasReferenceImage) providerUsd *= 1.15;
-  providerUsd *= 1.15;
-
-  return {
-    providerUsd,
-    chargedTokens: Math.max(1, Math.ceil(providerUsd / 0.00001))
-  };
+function parseAspectRatio(value='1:1'){
+  const match=String(value||'1:1').match(/(\d+(?:\.\d+)?)\s*[:xX/]\s*(\d+(?:\.\d+)?)/);
+  const w=Number(match?.[1]||1),h=Number(match?.[2]||1);return w>0&&h>0?{w,h}:{w:1,h:1};
+}
+function imageMegapixels(resolution='',aspectRatio='1:1'){
+  const text=String(resolution||'1K').trim().toUpperCase();const explicit=text.match(/(\d+)\s*[X×]\s*(\d+)/i);
+  if(explicit)return Math.max(.01,(Number(explicit[1])*Number(explicit[2]))/1e6);
+  const side=text==='4K'?4096:text==='2K'?2048:text==='512'?512:1024;const {w,h}=parseAspectRatio(aspectRatio);
+  const width=w>=h?side:Math.max(1,Math.round(side*w/h));const height=h>=w?side:Math.max(1,Math.round(side*h/w));
+  return Math.max(.01,(width*height)/1e6);
+}
+function estimateFromImagePricing(pricing={},resolution='',aspectRatio='1:1',hasReferenceImage=false){
+  const num=key=>{const value=Number(pricing?.[key]);return Number.isFinite(value)&&value>0?value:0};
+  const megapixels=imageMegapixels(resolution,aspectRatio);
+  const fixed=num('request')||num('image')||num('image_output')||num('output_image');
+  const perMegapixel=num('megapixel')||num('image_megapixel')||num('output_image_megapixel');
+  let providerUsd=fixed||(perMegapixel?perMegapixel*megapixels:0);
+  if(!providerUsd)providerUsd=.04*Math.max(1,megapixels);
+  if(hasReferenceImage)providerUsd*=1.08;providerUsd*=1.05;
+  return {providerUsd,chargedTokens:Math.max(1,Math.ceil(providerUsd/0.00001)),megapixels,pricingBasis:fixed?'per_image':perMegapixel?'per_megapixel':'fallback',unitPrice:fixed||perMegapixel||0};
+}
+async function estimateImageCharge(model,resolution='',aspectRatio='1:1',hasReferenceImage=false){
+  const endpoints=await getOpenRouterImageModelEndpoints(model?.id);
+  const candidates=[model,...endpoints].map(item=>estimateFromImagePricing(item?.pricing||{},resolution,aspectRatio,hasReferenceImage));
+  return candidates.filter(x=>x.unitPrice>0).sort((a,b)=>a.providerUsd-b.providerUsd)[0]||candidates[0];
 }
 
 const FAST_IMAGE_MODEL_ID = 'black-forest-labs/flux.2-klein-4b';
@@ -361,7 +358,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     };
 
     let { requestBody: body, chosenResolution: selectedResolution, chosenAspectRatio: selectedAspectRatio } = buildImageRequest(model);
-    let estimatedCharge = estimateImageCharge(model, selectedResolution, hasReferenceImage);
+    let estimatedCharge = await estimateImageCharge(model, selectedResolution, selectedAspectRatio, hasReferenceImage);
     if (purchased && availableTokens < estimatedCharge.chargedTokens) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,

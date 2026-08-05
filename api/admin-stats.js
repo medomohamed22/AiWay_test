@@ -26,16 +26,26 @@ function latency(u){return u&&typeof u==='object'?Math.max(0,num(u.latency_ms||u
 function tokens(u){if(!u||typeof u!=='object')return 0;return num(u.total_tokens||u.totalTokens)+num(u.prompt_tokens||u.promptTokens)+num(u.completion_tokens||u.completionTokens)}
 function groupDaily(rows,dateKey,days=30){const out=[];for(let i=days-1;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);out.push({date:d,value:0})}const map=new Map(out.map(x=>[x.date,x]));for(const r of rows){const raw=r[dateKey];if(!raw)continue;const x=map.get(isoDay(raw));if(x)x.value++}return out}
 async function gemini(){
-  const configured=Boolean(String(process.env.OPENROUTER_API_KEY||'').trim());
-  const manualBalance=process.env.OPENROUTER_ACCOUNT_BALANCE_USD;
-  const credits=manualBalance!==undefined&&manualBalance!==''?{remaining:Math.max(0,num(manualBalance)),source:'manual-env'}:null;
-  if(!configured)return {configured:false,status:'missing',credits,key:{label:'OpenRouter API'},modelsApi:false,billingNote:'أضف OPENROUTER_API_KEY في متغيرات البيئة.'};
-  try{
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models',{headers:{Accept:'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`}},10000);
-    const body=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(body?.error?.message||`OpenRouter ${response.status}`);
-    return {configured:true,status:'ok',credits,key:{label:'OpenRouter API'},modelsApi:true,availableModels:Array.isArray(body.data)?body.data.length:0,billingNote:credits?'الرصيد معروض من OPENROUTER_ACCOUNT_BALANCE_USD.':'الاستهلاك محسوب من طلبات الموقع؛ يمكن ضبط الرصيد يدويًا بمتغير OPENROUTER_ACCOUNT_BALANCE_USD.'};
-  }catch(error){return {configured:true,status:'error',credits,key:{label:'OpenRouter API'},modelsApi:false,error:String(error?.message||error),billingNote:'تعذر قراءة كتالوج OpenRouter.'};}
+  const apiKey=String(process.env.OPENROUTER_API_KEY||'').trim();
+  const managementKey=String(process.env.OPENROUTER_MANAGEMENT_API_KEY||apiKey).trim();
+  if(!apiKey)return {configured:false,status:'missing',credits:null,key:{label:'OpenRouter API'},modelsApi:false,billingNote:'أضف OPENROUTER_API_KEY في متغيرات البيئة.'};
+  const headers={Accept:'application/json','Authorization':`Bearer ${apiKey}`};
+  const managementHeaders={Accept:'application/json','Authorization':`Bearer ${managementKey}`};
+  const fetchJson=async(url,h)=>{const r=await fetchWithTimeout(url,{headers:h},10000);const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.error?.message||`OpenRouter ${r.status}`);return body};
+  const [modelsResult,keyResult,creditsResult]=await Promise.allSettled([
+    fetchJson('https://openrouter.ai/api/v1/models',headers),
+    fetchJson('https://openrouter.ai/api/v1/key',headers),
+    fetchJson('https://openrouter.ai/api/v1/credits',managementHeaders)
+  ]);
+  const modelsBody=modelsResult.status==='fulfilled'?modelsResult.value:null;
+  const keyData=keyResult.status==='fulfilled'?(keyResult.value?.data||{}):{};
+  const creditsData=creditsResult.status==='fulfilled'?(creditsResult.value?.data||{}):null;
+  const totalCredits=creditsData?Math.max(0,num(creditsData.total_credits)):null;
+  const totalUsage=creditsData?Math.max(0,num(creditsData.total_usage)):Math.max(0,num(keyData.usage));
+  const remaining=totalCredits==null?(keyData.limit_remaining==null?null:Math.max(0,num(keyData.limit_remaining))):Math.max(0,totalCredits-totalUsage);
+  const credits=remaining==null?null:{remaining,totalCredits,totalUsage,source:creditsData?'openrouter-credits-api':'openrouter-key-api'};
+  const errors=[modelsResult,keyResult,creditsResult].filter(x=>x.status==='rejected').map(x=>String(x.reason?.message||x.reason));
+  return {configured:true,status:(modelsBody||Object.keys(keyData).length||creditsData)?'ok':'error',credits,key:{label:keyData.label||'OpenRouter API',limit:keyData.limit??null,limitRemaining:keyData.limit_remaining??null,limitReset:keyData.limit_reset??null,isFreeTier:Boolean(keyData.is_free_tier),usage:Math.max(0,num(keyData.usage)),usageDaily:Math.max(0,num(keyData.usage_daily)),usageWeekly:Math.max(0,num(keyData.usage_weekly)),usageMonthly:Math.max(0,num(keyData.usage_monthly)),byokUsage:Math.max(0,num(keyData.byok_usage))},modelsApi:Boolean(modelsBody),availableModels:Array.isArray(modelsBody?.data)?modelsBody.data.length:0,creditsApi:Boolean(creditsData),accountType:'admin',errors,error:errors[0]||'',billingNote:creditsData?'الرصيد والشحن والاستخدام مقروءة مباشرة من OpenRouter بعملة الدولار.':'أضف OPENROUTER_MANAGEMENT_API_KEY لقراءة إجمالي الشحن والرصيد؛ تم عرض بيانات مفتاح API المتاحة.'};
 }
 
 export default async function handler(req,res){

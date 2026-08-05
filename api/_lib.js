@@ -612,8 +612,34 @@ export async function getOpenRouterImageModels(){
   }catch(error){console.warn('[OPENROUTER_IMAGE_CATALOG_FALLBACK]',error?.message||error);return GEMINI_IMAGE_MODELS.map(x=>({...x,pricing:{...x.pricing}}));}
 }
 
+const imageEndpointCache=new Map();
+export async function getOpenRouterImageModelEndpoints(modelId){
+  const id=String(modelId||'').trim();
+  if(!id)return [];
+  const cached=imageEndpointCache.get(id);
+  if(cached&&Date.now()<cached.expires)return cached.data.map(item=>({...item,pricing:{...(item.pricing||{})}}));
+  try{
+    const response=await fetchWithTimeout(`https://openrouter.ai/api/v1/images/models/${encodeURIComponent(id).replace(/%2F/g,'/')}/endpoints`,{headers:{Accept:'application/json'}},12000);
+    if(!response.ok)throw new Error(`OpenRouter image endpoints ${response.status}`);
+    const payload=await response.json();
+    const raw=Array.isArray(payload?.data)?payload.data:(Array.isArray(payload?.endpoints)?payload.endpoints:[]);
+    const data=raw.map((endpoint,index)=>{
+      const normalized=normalizeOpenRouterModel({
+        id:endpoint?.id||`${id}#${index}`,
+        name:endpoint?.name||endpoint?.provider_name||id,
+        architecture:endpoint?.architecture||{},
+        pricing:endpoint?.pricing||{},
+        supported_parameters:endpoint?.supported_parameters||endpoint?.capabilities||{}
+      });
+      return {...endpoint,...normalized,modelId:id,providerName:endpoint?.provider_name||endpoint?.provider||normalized.provider};
+    });
+    imageEndpointCache.set(id,{expires:Date.now()+10*60*1000,data});
+    return data.map(item=>({...item,pricing:{...(item.pricing||{})}}));
+  }catch(error){console.warn('[OPENROUTER_IMAGE_ENDPOINTS_FALLBACK]',id,error?.message||error);return [];}
+}
+
 export const GEMINI_IMAGE_MODELS = [
-  {id:'black-forest-labs/flux.2-klein-4b',name:'FLUX.2 Klein 4B',description:'أرخص نموذج FLUX وسريع لتوليد الصور.',pricing:{request:0.014,image:0.014},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['512','1K','2K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'},
+  {id:'black-forest-labs/flux.2-klein-4b',name:'FLUX.2 Klein 4B',description:'أرخص نموذج FLUX وسريع لتوليد الصور.',pricing:{megapixel:0.014},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['512','1K','2K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'},
   {id:'black-forest-labs/flux.2-pro',name:'FLUX.2 Pro',description:'جودة أعلى للصور والتعديل متعدد المراجع.',pricing:{request:0.03,image:0.03},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['1K','2K','4K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'}
 ];
 

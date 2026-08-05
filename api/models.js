@@ -1,21 +1,41 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints
 } from './_lib.js';
 
 
-function imageEstimate(model, resolution = '', hasReferenceImage = false) {
-  const pricing=model?.pricing||{};
-  const values=['request','image','image_output','output_image'].map(k=>Number(pricing[k])).filter(n=>Number.isFinite(n)&&n>0);
-  let usd=values.length?Math.min(...values):0;
-  const tier=String(resolution||'1K').toUpperCase();
-  const multiplier=tier==='4K'?4:tier==='2K'?2:tier==='512'?0.5:1;
-  if(!usd){const mp=Number(pricing.megapixel||0);usd=mp>0?mp*multiplier:0.04*multiplier;}
-  else if(!Number(pricing.request||0)&&tier!=='1K')usd*=multiplier;
-  if(hasReferenceImage)usd*=1.12;
-  usd*=1.08;
-  return {providerUsd:usd,chargedTokens:Math.max(1,Math.ceil(usd/TOKEN_USD))};
+function parseAspectRatio(value='1:1') {
+  const match=String(value||'1:1').match(/(\d+(?:\.\d+)?)\s*[:xX/]\s*(\d+(?:\.\d+)?)/);
+  const w=Number(match?.[1]||1),h=Number(match?.[2]||1);
+  return w>0&&h>0?{w,h}:{w:1,h:1};
+}
+function imageMegapixels(resolution='',aspectRatio='1:1'){
+  const text=String(resolution||'1K').trim().toUpperCase();
+  const explicit=text.match(/(\d+)\s*[X×]\s*(\d+)/i);
+  if(explicit)return Math.max(.01,(Number(explicit[1])*Number(explicit[2]))/1e6);
+  const side=text==='4K'?4096:text==='2K'?2048:text==='512'?512:1024;
+  const {w,h}=parseAspectRatio(aspectRatio);
+  const width=w>=h?side:Math.max(1,Math.round(side*w/h));
+  const height=h>=w?side:Math.max(1,Math.round(side*h/w));
+  return Math.max(.01,(width*height)/1e6);
+}
+function pricingNumber(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:0}
+function imageEstimateFromPricing(pricing={},resolution='',aspectRatio='1:1',hasReferenceImage=false){
+  const megapixels=imageMegapixels(resolution,aspectRatio);
+  const fixed=pricingNumber(pricing.request)||pricingNumber(pricing.image)||pricingNumber(pricing.image_output)||pricingNumber(pricing.output_image);
+  const perMegapixel=pricingNumber(pricing.megapixel)||pricingNumber(pricing.image_megapixel)||pricingNumber(pricing.output_image_megapixel);
+  let usd=fixed||(perMegapixel?perMegapixel*megapixels:0);
+  if(!usd)usd=.04*Math.max(1,megapixels);
+  if(hasReferenceImage)usd*=1.08;
+  usd*=1.05;
+  return {providerUsd:usd,chargedTokens:Math.max(1,Math.ceil(usd/TOKEN_USD)),megapixels,pricingBasis:fixed?'per_image':perMegapixel?'per_megapixel':'fallback',unitPrice:fixed||perMegapixel||0};
+}
+async function imageEstimate(model,resolution='',aspectRatio='1:1',hasReferenceImage=false){
+  const endpoints=await getOpenRouterImageModelEndpoints(model?.id);
+  const candidates=[model,...endpoints].map(item=>({item,estimate:imageEstimateFromPricing(item?.pricing||{},resolution,aspectRatio,hasReferenceImage)}));
+  const priced=candidates.filter(x=>x.estimate.unitPrice>0).sort((a,b)=>a.estimate.providerUsd-b.estimate.providerUsd);
+  return (priced[0]||candidates[0]).estimate;
 }
 
 const enumValues=(descriptor,fallback=[])=>Array.isArray(descriptor)?descriptor.map(String):(Array.isArray(descriptor?.values)?descriptor.values.map(String):fallback);
@@ -43,8 +63,8 @@ export default async function handler(req, res) {
         || IMAGE_MODELS.find(model => model.id === body.modelId)
         || null;
       if (image) {
-        const estimate=imageEstimate(image,body.resolution,Boolean(body.hasReferenceImage));
-        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, ...(estimatePurchased?estimate:{providerUsd:0,chargedTokens:1}), approximate:true, freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial', resolution:String(body.resolution||''), aspectRatio:String(body.aspectRatio||'') });
+        const estimate=await imageEstimate(image,body.resolution,body.aspectRatio,Boolean(body.hasReferenceImage));
+        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, ...(estimatePurchased?estimate:{providerUsd:0,chargedTokens:1}), approximate:true, freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial', resolution:String(body.resolution||''), aspectRatio:String(body.aspectRatio||''), megapixels:estimate.megapixels, pricingBasis:estimate.pricingBasis, unitPrice:estimate.unitPrice });
       }
       const id = settings[taskId] || body.modelId;
       const model = models.find(item => item.id === id) || models[0];
