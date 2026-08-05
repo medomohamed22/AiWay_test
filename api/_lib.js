@@ -10,6 +10,7 @@ const APP_TOKEN_AUDIENCE = 'aiway-api';
 const ADMIN_TOKEN_AUDIENCE = 'aiway-admin';
 const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
 const APP_SESSION_TTL = '24h';
+const APP_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 export function requireEnv() {
   const missing = [];
@@ -175,12 +176,19 @@ export async function requireUser(req) {
   const token = headerToken || bodyToken;
   if (!token) throw appError('UNAUTHORIZED');
   try {
+    // The browser persists the token in localStorage, so refreshes and browser
+    // restarts keep the user signed in. The signed session itself remains valid
+    // for exactly 24 hours and is then rejected by JWT expiration checks.
     const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret), {
       algorithms: ['HS256'],
       issuer: JWT_ISSUER,
       audience: APP_TOKEN_AUDIENCE
     });
-    if (!payload.sub) throw appError('UNAUTHORIZED');
+    const issuedAt = Number(payload.iat || 0);
+    const tokenAge = Math.floor(Date.now() / 1000) - issuedAt;
+    if (!payload.sub || !issuedAt || tokenAge < -300 || tokenAge > APP_SESSION_MAX_AGE_SECONDS) {
+      throw appError('UNAUTHORIZED');
+    }
 
     // Never trust authorization-relevant claims from a stale token. Confirm that the
     // account still exists and read the current role from the database on every request.
