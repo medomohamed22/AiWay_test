@@ -10,43 +10,6 @@ const APP_TOKEN_AUDIENCE = 'aiway-api';
 const ADMIN_TOKEN_AUDIENCE = 'aiway-admin';
 const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
 const APP_SESSION_TTL = '24h';
-const APP_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
-
-const APP_SESSION_COOKIE = 'aiway_session';
-
-function parseCookies(req) {
-  const raw = String(req?.headers?.cookie || '');
-  const out = {};
-  for (const part of raw.split(';')) {
-    const index = part.indexOf('=');
-    if (index < 0) continue;
-    const key = part.slice(0, index).trim();
-    if (!key) continue;
-    try { out[key] = decodeURIComponent(part.slice(index + 1).trim()); }
-    catch { out[key] = part.slice(index + 1).trim(); }
-  }
-  return out;
-}
-
-export function setAppSessionCookie(res, token) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `${APP_SESSION_COOKIE}=${encodeURIComponent(String(token))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${APP_SESSION_MAX_AGE_SECONDS}${secure}`);
-}
-
-export function clearAppSessionCookie(res) {
-  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-  res.setHeader('Set-Cookie', `${APP_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
-}
-
-export function appSessionToken(req) {
-  const authorization = String(req?.headers?.authorization || '');
-  const headerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  const bodyToken = req?.method === 'POST' && String(req?.body?.action || '').startsWith('download-')
-    ? String(req?.body?.authToken || '').trim()
-    : '';
-  const cookieToken = String(parseCookies(req)[APP_SESSION_COOKIE] || '').trim();
-  return headerToken || bodyToken || cookieToken;
-}
 
 export function requireEnv() {
   const missing = [];
@@ -202,24 +165,22 @@ export async function verifyDownloadTicket(token) {
 
 export async function requireUser(req) {
   requireEnv();
-  // Prefer the Authorization header, while keeping an HttpOnly same-origin cookie
-  // as a durable fallback for Pi Browser/WebView storage restoration.
-  const token = appSessionToken(req);
+  const authorization = req.headers.authorization || '';
+  const headerToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  // Native browser downloads cannot attach an Authorization header. For the two
+  // attachment-only POST routes, the signed app token is sent in the HTTPS form body.
+  const bodyToken = req.method === 'POST' && String(req.body?.action || '').startsWith('download-')
+    ? String(req.body?.authToken || '')
+    : '';
+  const token = headerToken || bodyToken;
   if (!token) throw appError('UNAUTHORIZED');
   try {
-    // The browser persists the token in localStorage, so refreshes and browser
-    // restarts keep the user signed in. The signed session itself remains valid
-    // for exactly 24 hours and is then rejected by JWT expiration checks.
     const { payload } = await jwtVerify(token, new TextEncoder().encode(jwtSecret), {
       algorithms: ['HS256'],
       issuer: JWT_ISSUER,
       audience: APP_TOKEN_AUDIENCE
     });
-    const issuedAt = Number(payload.iat || 0);
-    const tokenAge = Math.floor(Date.now() / 1000) - issuedAt;
-    if (!payload.sub || !issuedAt || tokenAge < -300 || tokenAge > APP_SESSION_MAX_AGE_SECONDS) {
-      throw appError('UNAUTHORIZED');
-    }
+    if (!payload.sub) throw appError('UNAUTHORIZED');
 
     // Never trust authorization-relevant claims from a stale token. Confirm that the
     // account still exists and read the current role from the database on every request.
@@ -1116,7 +1077,7 @@ export async function resolveOpenRouterCharge({ usage = {}, generationId = '', p
   return chargeTokens(price, normalizedUsage, webSearch);
 }
 
-export function affordableOutputLimit(price, availableTokens, estimate, cap = 16384) {
+export function affordableOutputLimit(price, availableTokens, estimate, cap = 8192) {
   const completionPrice = Number(price?.completion || 0);
   if (!(completionPrice > 0)) return Math.max(128, cap);
   const availableUsd = Math.max(0, Number(availableTokens || 0) * TOKEN_USD * 0.9);

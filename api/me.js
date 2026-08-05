@@ -1,11 +1,7 @@
-import { allowMethods, appError, appSessionToken, clearAppSessionCookie, db, handleError, json, localize, requestLocale, requireUser } from './_lib.js';
+import { allowMethods, appError, db, handleError, json, localize, requestLocale, requireUser } from './_lib.js';
 
 export default async function handler(req, res) {
-  if (!allowMethods(req, res, ['GET', 'DELETE'])) return;
-  if (req.method === 'DELETE') {
-    clearAppSessionCookie(res);
-    return json(res, 200, { signedOut: true });
-  }
+  if (!allowMethods(req, res, ['GET'])) return;
   const locale = requestLocale(req);
   try {
     const user = await requireUser(req);
@@ -16,8 +12,7 @@ export default async function handler(req, res) {
       .select('id,username,role,ai_tokens,paid_ai_tokens,paid_tokens_expires_at,trial_messages_remaining,free_trial_tokens,has_purchased,created_at')
       .eq('id', user.id).single();
     if (error || !data) throw appError('DATABASE_ERROR', {}, error);
-    const restoreToken = String(req.query?.restore || '') === '1' ? appSessionToken(req) : '';
-    return json(res, 200, { user: data, ...(restoreToken ? { token: restoreToken } : {}) });
+    return json(res, 200, { user: data });
   } catch (error) {
     return handleError(error, res, localize(locale, 'تعذر تحميل بيانات الحساب.', 'Could not load the account details.'), locale);
   }

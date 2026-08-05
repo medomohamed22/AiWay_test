@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { allowMethods, appError, db, handleError, json, localize, piApiError, requestLocale, setAppSessionCookie, signAppToken, requestIp, enforceRateLimit } from './_lib.js';
+import { allowMethods, appError, db, handleError, json, localize, piApiError, requestLocale, signAppToken, requestIp, enforceRateLimit } from './_lib.js';
 
 const BRIDGE_TTL_MS = 10 * 60 * 1000;
 
@@ -190,7 +190,6 @@ export default async function handler(req, res) {
         .single();
       if (userError || !user) throw appError('DATABASE_ERROR', {}, userError);
       const token = await signAppToken(user);
-      setAppSessionCookie(res, token);
       return json(res, 200, { token, user });
     }
 
@@ -203,7 +202,6 @@ export default async function handler(req, res) {
     const { piUid, username } = await verifyPiAccessToken(accessToken);
     const user = await upsertPiUser(supabase, piUid, username);
     const token = await signAppToken(user);
-    setAppSessionCookie(res, token);
     return json(res, 200, { token, user });
   } catch (error) {
     if (error?.name === 'AbortError') return handleError(appError('REQUEST_TIMEOUT', {}, error), res, localize(locale, 'انتهت مهلة تسجيل الدخول. حاول مرة أخرى.', 'Sign-in timed out. Try again.'), locale);
