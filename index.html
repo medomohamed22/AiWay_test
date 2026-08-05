@@ -1171,6 +1171,29 @@ function ensureRichTextLibraries(){if(window.marked&&window.DOMPurify)return Pro
 async function initPi(){
   try{await ensurePiReady({attempts:2});if(!auth)$('profileState').textContent=lang==='ar'?'جاهز لتسجيل الدخول':'Ready to sign in'}catch(e){console.warn('Pi SDK:',e);if(!auth)$('profileState').textContent=I18N[lang].signPi}
 }
+let piSessionRestorePromise=null;
+async function restorePiBrowserSession({showErrors=false}={}){
+  if(auth?.token)return true;
+  if(!isPiBrowser())return false;
+  if(piSessionRestorePromise)return piSessionRestorePromise;
+  piSessionRestorePromise=(async()=>{
+    try{
+      await ensurePiReady({attempts:3});
+      const result=await Pi.authenticate(['username'],()=>{});
+      if(!result?.accessToken)return false;
+      const data=await api('/api/pi-login',{method:'POST',body:JSON.stringify({accessToken:result.accessToken,user:result.user||null})});
+      auth=data;storageSet('pi_ai_auth',JSON.stringify(auth));
+      await refreshMe();
+      dismissSigninGuide();startSupportPolling();render();
+      return true;
+    }catch(error){
+      console.warn('Pi session restore:',error);
+      if(showErrors)toast(friendlyClientError(error,lang==='ar'?'تعذر استعادة جلسة Pi الحالية. اضغط تسجيل الدخول للمحاولة مرة أخرى.':'Could not restore the current Pi session. Tap sign in to try again.').message);
+      return false;
+    }finally{piSessionRestorePromise=null}
+  })();
+  return piSessionRestorePromise;
+}
 function modelProviderKey(m){return String(m?.provider||m?.family||m?.id?.split('/')[0]||'ai').toLowerCase()}
 function modelLogo(m){const key=modelProviderKey(m),label={aiway:'AW',openai:'◎',google:'G',anthropic:'A','deepseek':'DS',meta:'∞',xai:'𝕏',grok:'𝕏',kimi:'K',moonshotai:'K',mistralai:'M','black-forest-labs':'BFL','bytedance-seed':'BD',recraft:'R',ideogram:'ID'}[key]||key.slice(0,2).toUpperCase();const safeKey=key.replace(/[^a-z0-9-]/g,'');return `<span class="model-brand-logo provider-${safeKey}" aria-hidden="true" title="${esc(m.providerLabel||m.familyLabel||key)}">${esc(label)}</span>`}
 function pricingNumber(value){const n=Number(value);return Number.isFinite(n)&&n>=0?n:null}
@@ -1419,9 +1442,17 @@ async function init(){
   const modelsTask=loadModels().catch(e=>toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل النماذج الآن. حاول مرة أخرى.':'Models could not be loaded right now. Please try again.').message));
   if(auth){
     $('signinGuide')?.classList.remove('show');$('menuBtn')?.classList.remove('signin-pulse');
-    const accountTask=refreshMe().catch(e=>{throw e});
-    const chatsTask=new Promise(resolve=>setTimeout(resolve,0)).then(()=>loadChats());
-    try{await Promise.all([accountTask,chatsTask]);startSupportPolling()}catch(e){toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل بيانات حسابك. تحقق من الاتصال ثم أعد المحاولة.':'Your account data could not be loaded. Check your connection and try again.').message)}
+    try{
+      await refreshMe();
+      await loadChats();
+      startSupportPolling();
+    }catch(e){
+      if(e?.status!==401)toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل بيانات حسابك. تحقق من الاتصال ثم أعد المحاولة.':'Your account data could not be loaded. Check your connection and try again.').message);
+    }
+  }
+  if(!auth&&isPiBrowser()){
+    const restored=await restorePiBrowserSession();
+    if(restored)await loadChats().catch(e=>console.warn('Chats after Pi restore:',e));
   }
   await modelsTask;
 }
