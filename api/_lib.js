@@ -12,6 +12,42 @@ const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
 const APP_SESSION_TTL = '24h';
 const APP_SESSION_MAX_AGE_SECONDS = 24 * 60 * 60;
 
+const APP_SESSION_COOKIE = 'aiway_session';
+
+function parseCookies(req) {
+  const raw = String(req?.headers?.cookie || '');
+  const out = {};
+  for (const part of raw.split(';')) {
+    const index = part.indexOf('=');
+    if (index < 0) continue;
+    const key = part.slice(0, index).trim();
+    if (!key) continue;
+    try { out[key] = decodeURIComponent(part.slice(index + 1).trim()); }
+    catch { out[key] = part.slice(index + 1).trim(); }
+  }
+  return out;
+}
+
+export function setAppSessionCookie(res, token) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${APP_SESSION_COOKIE}=${encodeURIComponent(String(token))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${APP_SESSION_MAX_AGE_SECONDS}${secure}`);
+}
+
+export function clearAppSessionCookie(res) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `${APP_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`);
+}
+
+export function appSessionToken(req) {
+  const authorization = String(req?.headers?.authorization || '');
+  const headerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const bodyToken = req?.method === 'POST' && String(req?.body?.action || '').startsWith('download-')
+    ? String(req?.body?.authToken || '').trim()
+    : '';
+  const cookieToken = String(parseCookies(req)[APP_SESSION_COOKIE] || '').trim();
+  return headerToken || bodyToken || cookieToken;
+}
+
 export function requireEnv() {
   const missing = [];
   if (!supabaseUrl) missing.push('SUPABASE_URL');
@@ -166,14 +202,9 @@ export async function verifyDownloadTicket(token) {
 
 export async function requireUser(req) {
   requireEnv();
-  const authorization = req.headers.authorization || '';
-  const headerToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  // Native browser downloads cannot attach an Authorization header. For the two
-  // attachment-only POST routes, the signed app token is sent in the HTTPS form body.
-  const bodyToken = req.method === 'POST' && String(req.body?.action || '').startsWith('download-')
-    ? String(req.body?.authToken || '')
-    : '';
-  const token = headerToken || bodyToken;
+  // Prefer the Authorization header, while keeping an HttpOnly same-origin cookie
+  // as a durable fallback for Pi Browser/WebView storage restoration.
+  const token = appSessionToken(req);
   if (!token) throw appError('UNAUTHORIZED');
   try {
     // The browser persists the token in localStorage, so refreshes and browser
