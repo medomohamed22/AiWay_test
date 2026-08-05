@@ -1440,6 +1440,17 @@ async function init(){
   let externalSignedIn=false;
   try{externalSignedIn=await finishExternalPiSignIn();if(externalSignedIn)return}catch(e){console.error(e);toast(friendlyClientError(e,lang==='ar'?'تعذر إكمال تسجيل الدخول بحساب Pi. حاول مرة أخرى.':'Could not complete Pi sign-in. Try again.').message)}
   const modelsTask=loadModels().catch(e=>toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل النماذج الآن. حاول مرة أخرى.':'Models could not be loaded right now. Please try again.').message));
+  // Pi Browser/WebView may restore localStorage late or clear it between processes.
+  // Recover the still-valid 24-hour HttpOnly session cookie before showing a guest state.
+  if(!auth){
+    try{
+      const response=await fetch('/api/me?restore=1',{headers:{'Accept':'application/json','X-UI-Language':lang},credentials:'same-origin',cache:'no-store'});
+      if(response.ok){
+        const restored=await response.json();
+        if(restored?.token&&restored?.user){auth={token:restored.token,user:restored.user};userProfile=restored.user;storageSet('pi_ai_auth',JSON.stringify(auth));renderAccountState()}
+      }
+    }catch(error){console.warn('Stored session restore:',error)}
+  }
   if(auth){
     $('signinGuide')?.classList.remove('show');$('menuBtn')?.classList.remove('signin-pulse');
     try{
@@ -1531,7 +1542,7 @@ async function saveLocalConversation(id,data,images){const key=conversationLocal
 async function readLocalImage(imageId){const key=imageLocalKey(imageId);if(!key)return null;const item=await localCacheGet('images',key);if(item?.blob){item.accessed=Date.now();localCachePut('images',item);return item.blob}return null}
 function saveLocalImage(imageId,blob){const key=imageLocalKey(imageId);if(!key||!blob||!blob.size)return;localCachePut('images',{key,user:localCacheUser(),imageId,blob,size:blob.size,accessed:Date.now(),created:Date.now()}).then(()=>pruneLocalCache())}
 function clearLocalImageUrls(){for(const url of localImageObjectUrls)URL.revokeObjectURL(url);localImageObjectUrls.clear()}
-function logout(show=true){const username=localCacheUser();conversationCoreCache.clear();conversationCoreRequests.clear();clearLocalImageUrls();localCacheDeleteUser(username);auth=null;userProfile=null;current=null;history=[];storageRemove('pi_ai_auth');$('profileName').textContent=I18N[lang].guest;$('profileState').textContent=I18N[lang].signPi;setBalanceDisplay(0);$('chats').innerHTML='';$('loginBtn').querySelector('span:last-child').textContent=I18N[lang].login;render();if(show)toast(lang==='ar'?'تم تسجيل الخروج':'Signed out')}
+function logout(show=true){fetch('/api/me',{method:'DELETE',credentials:'same-origin',keepalive:true}).catch(()=>{});const username=localCacheUser();conversationCoreCache.clear();conversationCoreRequests.clear();clearLocalImageUrls();localCacheDeleteUser(username);auth=null;userProfile=null;current=null;history=[];storageRemove('pi_ai_auth');$('profileName').textContent=I18N[lang].guest;$('profileState').textContent=I18N[lang].signPi;setBalanceDisplay(0);$('chats').innerHTML='';$('loginBtn').querySelector('span:last-child').textContent=I18N[lang].login;render();if(show)toast(lang==='ar'?'تم تسجيل الخروج':'Signed out')}
 async function refreshMe(){const d=await api('/api/me');userProfile=d.user;renderAccountState()}
 const conversationCoreCache=new Map(),conversationCoreRequests=new Map();
 function fetchConversationCore(id,{force=false}={}){
