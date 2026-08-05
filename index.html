@@ -109,7 +109,7 @@ html[dir="rtl"] .mobile-menu{order:-20;margin-inline-end:0}html[dir="rtl"] .cred
 /* AiWay model picker */
 .model-wrap{flex:0 1 360px;position:relative;z-index:20}.model-wrap>svg{display:none}.model-trigger{width:100%;height:52px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.96);display:flex;align-items:center;gap:10px;padding:7px 12px;color:var(--text);cursor:pointer;text-align:right;box-shadow:0 6px 20px rgba(76,35,108,.05);transition:border-color .18s,box-shadow .18s,transform .18s}.model-trigger:hover,.model-trigger.open{border-color:#cdb1e3;box-shadow:0 10px 28px rgba(92,44,132,.12)}.model-trigger-icon{width:34px;height:34px;border-radius:12px;background:var(--pi3);color:var(--pi);display:grid;place-items:center;flex:0 0 auto}.model-trigger-icon svg{position:static;width:18px;height:18px;transform:none;color:inherit;pointer-events:auto}.model-trigger-copy{min-width:0;flex:1}.model-trigger-copy b,.model-trigger-copy small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.model-trigger-copy b{font-size:14px}.model-trigger-copy small{font-size:11px;color:var(--muted);margin-top:2px}.model-chevron{font-size:20px;color:var(--muted);transition:transform .18s}.model-trigger.open .model-chevron{transform:rotate(180deg)}.model-menu{position:absolute;top:calc(100% + 9px);right:0;width:min(420px,calc(100vw - 24px));max-height:min(62vh,520px);overflow:auto;padding:8px;background:rgba(255,255,255,.98);border:1px solid var(--line);border-radius:20px;box-shadow:0 24px 70px rgba(49,22,69,.2);display:none;overscroll-behavior:contain}.model-menu.open{display:block;animation:modelOpen .16s ease}.model-group-title{padding:10px 12px 6px;color:var(--muted);font-size:11px;font-weight:800}.model-option{width:100%;border:0;background:transparent;border-radius:12px;padding:11px;display:flex;align-items:center;gap:11px;text-align:right;color:var(--text);cursor:pointer}.model-option:hover,.model-option.selected{background:var(--pi3)}.model-option.locked{opacity:.62}.model-logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#f7efff,#eee2f8);color:var(--pi);display:grid;place-items:center;font-weight:900;flex:0 0 auto}.model-info{min-width:0;flex:1}.model-info b,.model-info small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.model-info b{font-size:14px}.model-info small{font-size:11px;color:var(--muted);margin-top:4px}.model-state{width:26px;height:26px;border-radius:8px;background:#fff;color:var(--pi);display:grid;place-items:center;flex:0 0 auto}.model-option.selected .model-state:after{content:'✓';font-weight:900}.model-option.locked .model-state:after{content:'🔒';font-size:12px}@keyframes modelOpen{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
 /* Stable streamed answers */
-.bubble-content.streaming{white-space:pre-wrap;unicode-bidi:plaintext;min-height:1.7em}.msg.assistant.streaming-msg .bubble{contain:layout paint;content-visibility:auto}.bubble-content h1,.bubble-content h2,.bubble-content h3{line-height:1.35;margin:1.2em 0 .55em}.bubble-content h1{font-size:1.55em}.bubble-content h2{font-size:1.3em}.bubble-content h3{font-size:1.12em}.bubble-content ul,.bubble-content ol{padding-inline-start:1.5em}.bubble-content li{margin:.35em 0}.bubble-content pre{margin:14px 0 8px;padding:48px 14px 14px;position:relative;border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px rgba(255,255,255,.06)}.code-head{position:absolute;top:0;right:0;left:0;height:38px;padding:0 10px;display:flex;direction:ltr;align-items:center;justify-content:space-between;background:rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.08);color:#d9cde2;font-size:12px}.code-copy{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;border-radius:8px;padding:5px 9px;cursor:pointer}.code-copy:hover{background:rgba(255,255,255,.14)}
+.bubble-content.streaming{white-space:pre-wrap;unicode-bidi:plaintext;min-height:1.7em}.msg.assistant.streaming-msg .bubble{contain:layout paint;content-visibility:auto}.bubble-content h1,.bubble-content h2,.bubble-content h3{line-height:1.35;margin:1.2em 0 .55em}.bubble-content h1{font-size:1.55em}.bubble-content h2{font-size:1.3em}.bubble-content h3{font-size:1.12em}.bubble-content ul,.bubble-content ol{padding-inline-start:1.5em}.bubble-content li{margin:.35em 0}.bubble-content pre{margin:14px 0 8px;padding:48px 14px 14px;position:relative;border:1px solid rgba(255,255,255,.08);box-shadow:inset 0 1px rgba(255,255,255,.06)}.code-head{position:absolute;top:0;right:0;left:0;height:38px;padding:0 10px;display:flex;direction:ltr;align-items:center;justify-content:space-between;background:rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.08);color:#d9cde2;font-size:12px}.code-head-actions{display:flex;align-items:center;gap:6px}.code-copy,.code-preview-btn,.file-download{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:#fff;border-radius:8px;padding:5px 9px;cursor:pointer}.code-copy:hover,.code-preview-btn:hover,.file-download:hover{background:rgba(255,255,255,.14)}
 @media(max-width:820px){.model-wrap{flex:1 1 auto}.model-trigger{height:48px;border-radius:16px;padding:6px 9px}.model-trigger-icon{width:31px;height:31px}.model-menu{position:fixed;top:76px;right:10px;left:10px;width:auto;max-height:calc(var(--app-height) - 96px)}.model-trigger-copy small{display:none}}
 @media(max-width:430px){.model-trigger-icon{display:none}.model-trigger{padding-inline:10px}.model-trigger-copy b{font-size:13px}.model-chevron{font-size:17px}}
 
@@ -1040,7 +1040,8 @@ function toggleLanguage(){
 async function deleteChat(id){conversationCoreCache.delete(id);conversationCoreRequests.delete(id);const ok=await aiwayConfirm(lang==='ar'?'سيتم حذف هذه الدردشة ورسائلها نهائيًا، ولا يمكن التراجع عن هذا الإجراء.':'This chat and all of its messages will be permanently deleted. This action cannot be undone.',{title:lang==='ar'?'حذف الدردشة؟':'Delete this chat?',confirmText:lang==='ar'?'حذف نهائي':'Delete permanently',cancelText:lang==='ar'?'احتفاظ بالدردشة':'Keep chat',type:'danger'});if(!ok)return;try{await api('/api/conversations?id='+encodeURIComponent(id),{method:'DELETE'});if(current===id){current=null;history=[];render()}await loadChats();toast(lang==='ar'?'تم حذف الدردشة':'Chat deleted')}catch(e){toast(friendlyClientError(e,lang==='ar'?'لم نتمكن من حذف الدردشة. حاول مرة أخرى.':'We could not delete the chat. Please try again.').message)}}
 function isPiBrowser(){
   const ua=String(navigator.userAgent||'');
-  return /(?:PiBrowser|Pi Browser)/i.test(ua);
+  const brands=Array.isArray(navigator.userAgentData?.brands)?navigator.userAgentData.brands.map(item=>item?.brand||'').join(' '):'';
+  return Boolean(window.Pi)||/(?:PiBrowser|Pi Browser|PiNetwork)/i.test(`${ua} ${brands}`);
 }
 function requirePiBrowser(){
   if(isPiBrowser())return true;
@@ -1133,10 +1134,65 @@ function loadExternalScript(src,test){
   if(test())return Promise.resolve();
   return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[data-aiway-src="${src}"]`);if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return}const script=document.createElement('script');script.src=src;script.async=true;script.dataset.aiwaySrc=src;script.onload=()=>test()?resolve():reject(Error('Library unavailable'));script.onerror=()=>reject(Error('Library unavailable'));document.head.appendChild(script)});
 }
-function ensurePiSdk(){if(window.Pi)return Promise.resolve();if(!piSdkPromise)piSdkPromise=loadExternalScript('https://sdk.minepi.com/pi-sdk.js',()=>Boolean(window.Pi));return piSdkPromise}
+function ensurePiSdk(){
+  if(window.Pi)return Promise.resolve(window.Pi);
+  if(!piSdkPromise){
+    piSdkPromise=Promise.race([
+      loadExternalScript('https://sdk.minepi.com/pi-sdk.js',()=>Boolean(window.Pi)),
+      new Promise((_,reject)=>setTimeout(()=>reject(Error('Pi SDK load timeout')),12000))
+    ]).then(()=>{
+      if(!window.Pi)throw Error('Pi SDK unavailable');
+      return window.Pi;
+    }).catch(error=>{piSdkPromise=null;throw error});
+  }
+  return piSdkPromise;
+}
+async function ensurePiReady({attempts=2}={}){
+  if(piReady&&window.Pi?.authenticate)return true;
+  let lastError=null;
+  for(let attempt=1;attempt<=attempts;attempt++){
+    try{
+      await ensurePiSdk();
+      if(!window.Pi?.authenticate)throw Error('Pi authenticate unavailable');
+      try{window.Pi.init({version:'2.0',sandbox:false})}catch(error){
+        if(!/already|initializ/i.test(String(error?.message||error)))throw error;
+      }
+      piReady=true;
+      return true;
+    }catch(error){
+      lastError=error;
+      piReady=false;
+      if(attempt<attempts)await new Promise(resolve=>setTimeout(resolve,700*attempt));
+    }
+  }
+  throw lastError||Error('Pi SDK unavailable');
+}
 function ensureRichTextLibraries(){if(window.marked&&window.DOMPurify)return Promise.resolve();if(!richTextPromise)richTextPromise=Promise.all([loadExternalScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js',()=>Boolean(window.marked)),loadExternalScript('https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js',()=>Boolean(window.DOMPurify))]).then(()=>{if(history.some(m=>m.role==='assistant'&&m.content))render()}).catch(e=>console.warn('Rich text libraries:',e));return richTextPromise}
 async function initPi(){
-  try{await ensurePiSdk();Pi.init({version:'2.0',sandbox:false});piReady=true;if(!auth)$('profileState').textContent=isPiBrowser()?(lang==='ar'?'جاهز لتسجيل الدخول':'Ready to sign in'):I18N[lang].signPi}catch(e){console.warn('Pi SDK:',e);if(!auth)$('profileState').textContent=I18N[lang].signPi}
+  try{await ensurePiReady({attempts:2});if(!auth)$('profileState').textContent=lang==='ar'?'جاهز لتسجيل الدخول':'Ready to sign in'}catch(e){console.warn('Pi SDK:',e);if(!auth)$('profileState').textContent=I18N[lang].signPi}
+}
+let piSessionRestorePromise=null;
+async function restorePiBrowserSession({showErrors=false}={}){
+  if(auth?.token)return true;
+  if(!isPiBrowser())return false;
+  if(piSessionRestorePromise)return piSessionRestorePromise;
+  piSessionRestorePromise=(async()=>{
+    try{
+      await ensurePiReady({attempts:3});
+      const result=await Pi.authenticate(['username'],()=>{});
+      if(!result?.accessToken)return false;
+      const data=await api('/api/pi-login',{method:'POST',body:JSON.stringify({accessToken:result.accessToken,user:result.user||null})});
+      auth=data;storageSet('pi_ai_auth',JSON.stringify(auth));
+      await refreshMe();
+      dismissSigninGuide();startSupportPolling();render();
+      return true;
+    }catch(error){
+      console.warn('Pi session restore:',error);
+      if(showErrors)toast(friendlyClientError(error,lang==='ar'?'تعذر استعادة جلسة Pi الحالية. اضغط تسجيل الدخول للمحاولة مرة أخرى.':'Could not restore the current Pi session. Tap sign in to try again.').message);
+      return false;
+    }finally{piSessionRestorePromise=null}
+  })();
+  return piSessionRestorePromise;
 }
 function modelProviderKey(m){return String(m?.provider||m?.family||m?.id?.split('/')[0]||'ai').toLowerCase()}
 function modelLogo(m){const key=modelProviderKey(m),label={aiway:'AW',openai:'◎',google:'G',anthropic:'A','deepseek':'DS',meta:'∞',xai:'𝕏',grok:'𝕏',kimi:'K',moonshotai:'K',mistralai:'M','black-forest-labs':'BFL','bytedance-seed':'BD',recraft:'R',ideogram:'ID'}[key]||key.slice(0,2).toUpperCase();const safeKey=key.replace(/[^a-z0-9-]/g,'');return `<span class="model-brand-logo provider-${safeKey}" aria-hidden="true" title="${esc(m.providerLabel||m.familyLabel||key)}">${esc(label)}</span>`}
@@ -1386,9 +1442,17 @@ async function init(){
   const modelsTask=loadModels().catch(e=>toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل النماذج الآن. حاول مرة أخرى.':'Models could not be loaded right now. Please try again.').message));
   if(auth){
     $('signinGuide')?.classList.remove('show');$('menuBtn')?.classList.remove('signin-pulse');
-    const accountTask=refreshMe().catch(e=>{throw e});
-    const chatsTask=new Promise(resolve=>setTimeout(resolve,0)).then(()=>loadChats());
-    try{await Promise.all([accountTask,chatsTask]);startSupportPolling()}catch(e){toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل بيانات حسابك. تحقق من الاتصال ثم أعد المحاولة.':'Your account data could not be loaded. Check your connection and try again.').message)}
+    try{
+      await refreshMe();
+      await loadChats();
+      startSupportPolling();
+    }catch(e){
+      if(e?.status!==401)toast(friendlyClientError(e,lang==='ar'?'تعذر تحميل بيانات حسابك. تحقق من الاتصال ثم أعد المحاولة.':'Your account data could not be loaded. Check your connection and try again.').message);
+    }
+  }
+  if(!auth&&isPiBrowser()){
+    const restored=await restorePiBrowserSession();
+    if(restored)await loadChats().catch(e=>console.warn('Chats after Pi restore:',e));
   }
   await modelsTask;
 }
@@ -1409,7 +1473,10 @@ async function recoverIncompletePayment(payment,{silent=false}={}){
   }
 }
 async function authenticatePiForPayments({refreshSession=true,silentRecovery=true,requirePendingResolved=false}={}){
-  if(!piReady||!window.Pi?.authenticate)throw makeUiError(lang==='ar'?'افتح الموقع من Pi Browser وانتظر اكتمال تحميل خدمة Pi.':'Open the site in Pi Browser and wait for the Pi service to finish loading.','PI_BROWSER_REQUIRED');
+  try{await ensurePiReady({attempts:3})}catch(error){
+    console.warn('Pi readiness:',error);
+    throw makeUiError(lang==='ar'?'تعذر تحميل خدمة Pi داخل المتصفح. أغلق الصفحة وافتح التطبيق من Pi Browser ثم حاول مرة أخرى.':'The Pi service could not load in this browser. Close the page, open the app from Pi Browser, and try again.','PI_BROWSER_REQUIRED');
+  }
   const pendingPayments=[];
   const result=await Pi.authenticate(['username','payments'],payment=>{if(payment)pendingPayments.push(payment)});
   if(!result?.accessToken)throw makeUiError(lang==='ar'?'لم تُرجع Pi بيانات تسجيل الدخول. أعد فتح الموقع داخل Pi Browser وحاول مرة أخرى.':'Pi did not return sign-in data. Reopen the site in Pi Browser and try again.','PI_LOGIN_FAILED');
@@ -1435,7 +1502,7 @@ async function login(){
  if(auth){toast(lang==='ar'?'أنت مسجل بالفعل':'You are already signed in');return true}
  setLoginBusy(true);
  try{
-  if(!isPiBrowser()){openPiSigninModal();return false}
+  if(!isPiBrowser()&&!window.Pi){openPiSigninModal();return false}
   $('profileState').innerHTML='<span class="loading-dot"></span> <span class="loading-dot"></span> <span class="loading-dot"></span>';
   await authenticatePiForPayments({refreshSession:true,silentRecovery:true});
   await Promise.all([refreshMe(),loadModels(),loadChats()]);dismissSigninGuide();
@@ -1534,31 +1601,36 @@ function taskSuggestions(){return TASK_SUGGESTIONS[activeTask]?.[lang]||TASK_SUG
 function welcome(){const en=lang==='en',t=taskText(activeTask),suggestions=taskSuggestions();return `<div class="welcome"><div class="hero-icon">${activeTask?(TASK_ICONS[activeTask]||ICONS.sparkles):'<img src="/aiway-logo.png" alt="AiWay">'}</div>${activeTask?`<span class="welcome-task-label">${esc(t[0])}</span>`:''}<h1>${activeTask?(en?`What would you like to do with ${esc(t[0])}?`:`كيف أساعدك في ${esc(t[0])}؟`):(en?'How can I help you today?':'كيف أقدر أساعدك اليوم؟')}</h1><p>${activeTask?esc(t[1]):(en?'Choose a task and AiWay will select a suitable paid model automatically.':'اختر مهمة وسيختار AiWay تلقائيًا نموذجًا مدفوعًا مناسبًا بأقل تكلفة ممكنة.')}</p><div class="suggestions">${suggestions.map((x,i)=>`<button class="suggestion" data-prompt="${esc(x[1])}"><span class="sicon">${TASK_ICONS[activeTask]||ICONS.sparkles}</span><span><b>${esc(x[0])}</b><small>${esc(x[1])}</small></span></button>`).join('')}</div></div>`}
 
 
+function extensionFromLanguage(language){
+  const value=String(language||'').toLowerCase().trim();
+  const map={javascript:'js',js:'js',typescript:'ts',ts:'ts',html:'html',css:'css',python:'py',py:'py',php:'php',java:'java',kotlin:'kt',swift:'swift',c:'c',cpp:'cpp','c++':'cpp',csharp:'cs','c#':'cs',go:'go',rust:'rs',ruby:'rb',bash:'sh',shell:'sh',sql:'sql',json:'json',yaml:'yml',yml:'yml',xml:'xml',markdown:'md',md:'md'};
+  return map[value]||'txt';
+}
+let activePreviewCode='',activePreviewFilename='',activePreviewLanguage='';
+function openCodePreview({code,language='',filename=''}){
+  activePreviewCode=String(code||'');activePreviewLanguage=String(language||'code');
+  activePreviewFilename=filename||`code.${extensionFromLanguage(language)}`;
+  $('codeModalTitle').textContent=filename||(lang==='ar'?'عرض الكود':'Code preview');
+  $('codeModalLanguage').textContent=activePreviewLanguage;
+  $('codeModalContent').textContent=activePreviewCode;
+  $('codeModal').classList.add('open');$('codeModal').setAttribute('aria-hidden','false');document.body.classList.add('modal-open');
+}
+function closeCodePreview(){$('codeModal')?.classList.remove('open');$('codeModal')?.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open')}
 function enhanceCodeBlocks(root=$('messages')){
   root.querySelectorAll('pre').forEach(pre=>{
-    if(pre.dataset.enhanced)return;
-    pre.dataset.enhanced='1';
-    const code=pre.querySelector('code');
-    const match=(code?.className||'').match(/language-([^\s]+)/);
-    const rawLanguage=match?.[1]||'code';const fileMatch=rawLanguage.match(/^file-(.+)$/);const isPptx=rawLanguage==='pptx-json';
+    if(pre.dataset.enhanced)return;pre.dataset.enhanced='1';
+    const code=pre.querySelector('code');const match=(code?.className||'').match(/language-([^\s]+)/);
+    const rawLanguage=match?.[1]||'code',fileMatch=rawLanguage.match(/^file-(.+)$/),isPptx=rawLanguage==='pptx-json';
     const language=pre.dataset.codeLabel||(fileMatch?'code':(isPptx?'PowerPoint':rawLanguage));
-    const head=document.createElement('div');
-    head.className='code-head';
-    const label=document.createElement('span');
-    label.textContent=language;
-    const button=document.createElement('button');
-    button.type='button';
-    button.className='code-copy';
-    button.textContent=lang==='ar'?'نسخ':'Copy';
-    button.onclick=async()=>{
-      try{
-        await navigator.clipboard.writeText(code?.textContent||pre.textContent||'');
-        button.textContent=lang==='ar'?'تم النسخ':'Copied';
-        setTimeout(()=>button.textContent=lang==='ar'?'نسخ':'Copy',1300);
-      }catch{toast(lang==='ar'?'تعذر نسخ الكود':'Could not copy code')}
-    };
-    head.append(label,button);if(fileMatch||isPptx){const download=document.createElement('button');download.type='button';download.className='file-download';download.textContent=I18N[lang].downloadFile;download.onclick=()=>isPptx?downloadPptx(code?.textContent||''):downloadTextFile(fileMatch[1],code?.textContent||'');head.append(download)}
-    pre.prepend(head);
+    const filename=fileMatch?.[1]||'';const source=()=>code?.textContent||pre.textContent||'';
+    const head=document.createElement('div');head.className='code-head';
+    const label=document.createElement('span');label.textContent=filename||language;
+    const actions=document.createElement('div');actions.className='code-head-actions';
+    const preview=document.createElement('button');preview.type='button';preview.className='code-preview-btn';preview.textContent=lang==='ar'?'عرض':'View';preview.onclick=()=>openCodePreview({code:source(),language,filename});
+    const copy=document.createElement('button');copy.type='button';copy.className='code-copy';copy.textContent=lang==='ar'?'نسخ':'Copy';copy.onclick=async()=>{try{await navigator.clipboard.writeText(source());copy.textContent=lang==='ar'?'تم النسخ':'Copied';setTimeout(()=>copy.textContent=lang==='ar'?'نسخ':'Copy',1300)}catch{toast(lang==='ar'?'تعذر نسخ الكود':'Could not copy code')}};
+    actions.append(preview,copy);
+    if(fileMatch||isPptx){const download=document.createElement('button');download.type='button';download.className='file-download';download.textContent=I18N[lang].downloadFile;download.onclick=()=>isPptx?downloadPptx(source()):downloadTextFile(filename,source());actions.append(download)}
+    head.append(label,actions);pre.prepend(head);
   });
 }
 function bindMessageActions(){
@@ -1704,14 +1776,16 @@ function render(){
 let streamFrame=0,streamQueue='',streamTimer=0,streamDrainResolve=null;
 function scheduleStreamPaint(){
   if(streamTimer)return;
-  const tick=()=>{
+  streamTimer=requestAnimationFrame(()=>{
     streamTimer=0;
-    if(!streamQueue){if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}return}
-    const match=streamQueue.match(/^[\s\S]{1,18}?(?=\s|$)/);const take=match?.[0]?.length||Math.min(10,streamQueue.length);
-    history[history.length-1].content+=streamQueue.slice(0,take);streamQueue=streamQueue.slice(take);updateStreamingBubble();
-    streamTimer=setTimeout(tick,24);
-  };
-  streamTimer=setTimeout(tick,0);
+    if(streamQueue){
+      const message=history[history.length-1];
+      if(message)message.content+=streamQueue;
+      streamQueue='';
+      updateStreamingBubble();
+    }
+    if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}
+  });
 }
 function enqueueStreamText(text){if(!text)return;streamQueue+=text;scheduleStreamPaint()}
 function drainStreamQueue(){if(!streamQueue&&!streamTimer)return Promise.resolve();return new Promise(resolve=>{streamDrainResolve=resolve;scheduleStreamPaint()})}
@@ -1842,7 +1916,7 @@ async function sendMessage(){
       current=d.conversation.id;
     }
     const sentAttachments=pendingAttachments.map(({name,type,size,dataUrl})=>({name,type,size,dataUrl}));
-    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
+    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
     history.push({role:'user',content:text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files'),attachments:sentAttachments});
     $('prompt').value='';autoSize();render();$('status').textContent='';$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
     if(selectedModel()?.type==='image'){await generateImageMessage(text,sentAttachments);return}
@@ -1853,9 +1927,9 @@ async function sendMessage(){
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null;
     while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta'){const m=history[history.length-1];if(m)m.streamStage='writing';enqueueStreamText(d.text)}if(d.type==='done'){completed=true;lowBalanceInfo=d.lowBalance?d:null;const m=history[history.length-1];m.streamComplete=true;m.routedModelId=d.routedModelId;m.requestedModelId=d.requestedModelId;m.fallbackUsed=Boolean(d.fallbackUsed);m.generationId=d.generationId;m.id=d.messageId||m.id;m.chargedTokens=Number(d.chargedTokens||0);m.selectedModelName=d.selectedModelName||'';m.providerUsd=Number(d.providerUsd||0);m.autoSelected=Boolean(d.autoSelected);m.finishReason=d.finishReason||'stop';m.truncated=Boolean(d.truncated);m.token_usage={...(m.token_usage||{}),...(d.usage||{}),webSearch:Boolean(m.usedWebSearch),chargedTokens:Number(d.chargedTokens||0),remainingTokens:Number(d.remainingTokens||0),fallbackUsed:Boolean(d.fallbackUsed),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId,selectedModelName:d.selectedModelName||'',providerUsd:Number(d.providerUsd||0),autoSelected:Boolean(d.autoSelected),finishReason:d.finishReason||'stop',truncated:Boolean(d.truncated)}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الإجابة. أعد المحاولة؛ لن يُخصم رصيد عن رد غير مكتمل.':'The connection ended before the answer was complete. Try again; an incomplete response will not be charged.','STREAM_INTERRUPTED');
-    clearTimeout(stageTimer);await drainStreamQueue();streaming=false;render();if(history[history.length-1]?.truncated)toast(lang==='ar'?'وصل الرد إلى حد الطول. استخدم زر «استكمال الرد» لإكمال الكود.':'The response reached its length limit. Use Continue response to finish the code.');await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
+    clearTimeout(stageTimer);await drainStreamQueue();streaming=false;render();const latest=history[history.length-1];const continuationCount=Number(latest?.token_usage?.continuations||0);if(latest?.truncated&&continuationCount<MAX_AUTO_CONTINUATIONS){toast(lang==='ar'?'يتم استكمال الرد الطويل تلقائيًا…':'Continuing the long response automatically…');await continueResponse(history.length-1,{automatic:true});return}if(latest?.truncated)toast(lang==='ar'?'الرد أطول من الحد التلقائي. يمكنك استخدام زر استكمال الرد.':'The response exceeded the automatic continuation limit. You can use Continue response.');await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
   }catch(e){
-    if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
+    if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError'){if(!history[history.length-1]?.content)history.pop();toast(lang==='ar'?'تم إيقاف الإجابة':'Response stopped')}
     else{if(e?.code==='FREE_DAILY_LIMIT'){const requestLanguage=history[history.length-1]?.requestLanguage||lang;history[history.length-1]={role:'assistant',content:'',generatedImage:null,uiCard:'free-daily-limit',requestLanguage};const t=I18N[requestLanguage]||I18N[lang];toast(t.freeLimitTitle)}else{const friendly=friendlyClientError(e,lang==='ar'?'حدث عطل مؤقت. حاول مرة أخرى؛ لم يتم خصم رصيدك.':'A temporary error occurred. Try again; your balance was not charged.');if(history[history.length-1]?.role==='assistant'&&!history[history.length-1]?.content)history[history.length-1].content=friendly.message;toast(friendly.message);handleActionableError(friendly)}}
     render();
@@ -1863,19 +1937,21 @@ async function sendMessage(){
     if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('sendBtn').classList.remove('sending');$('sendBtn').innerHTML=ICONS.send;
   }
 }
-async function continueResponse(index){
+const MAX_AUTO_CONTINUATIONS=2;
+async function continueResponse(index,options={}){
+  const automatic=Boolean(options.automatic);
   if(streaming)return;
   const target=history[index];
   if(!target||target.role!=='assistant'||!target.content||target.generatedImage)return;
   if(index!==history.length-1){toast(lang==='ar'?'يمكن استكمال آخر رد فقط':'Only the latest response can be continued');return}
-  if(!await aiwayConfirm(I18N[lang].continueConfirm,{title:lang==='ar'?'استكمال الرد؟':'Continue the response?',confirmText:lang==='ar'?'أكمل الرد':'Continue response',cancelText:lang==='ar'?'إلغاء':'Cancel',note:lang==='ar'?'سيُحسب الاستكمال كطلب جديد، وتُخصم التكلفة الفعلية فقط حسب النموذج والاستخدام.':'Continuation is a new request. Only its actual model usage will be charged.'}))return;
+  if(!automatic&&!await aiwayConfirm(I18N[lang].continueConfirm,{title:lang==='ar'?'استكمال الرد؟':'Continue the response?',confirmText:lang==='ar'?'أكمل الرد':'Continue response',cancelText:lang==='ar'?'إلغاء':'Cancel',note:lang==='ar'?'سيُحسب الاستكمال كطلب جديد، وتُخصم التكلفة الفعلية فقط حسب النموذج والاستخدام.':'Continuation is a new request. Only its actual model usage will be charged.'}))return;
   let stageTimer=0;
   try{
     if(!auth){await login();return}
     if(userProfile&&Number(userProfile.has_purchased?userProfile.ai_tokens:(userProfile.free_trial_tokens??userProfile.trial_messages_remaining??0))<=0)throw makeUiError(lang==='ar'?'رصيدك انتهى. اشحن رصيدًا جديدًا ثم حاول مرة أخرى.':'Your balance has run out. Add more balance, then try again.','INSUFFICIENT_TOKENS',{availableTokens:0});
     if(!current||!target.id){toast(lang==='ar'?'احفظ المحادثة أولًا ثم حاول مرة أخرى':'Save the conversation first, then try again');return}
     const modelId=activeTask?'aiway/auto':(target.model_id||target.routedModelId||target.token_usage?.activeModelId||$('model').value);
-    streamQueue='';if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
+    streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
     target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
     let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
@@ -1883,9 +1959,9 @@ async function continueResponse(index){
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null;
     while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta')enqueueStreamText(d.text);if(d.type==='done'){completed=true;lowBalanceInfo=d.lowBalance?d:null;target.streamComplete=true;target.routedModelId=d.routedModelId;target.requestedModelId=d.requestedModelId;target.fallbackUsed=Boolean(d.fallbackUsed);target.generationId=d.generationId;target.id=d.messageId||target.id;target.chargedTokens=Number(d.totalChargedTokens??d.chargedTokens??target.chargedTokens??0);target.finishReason=d.finishReason||'stop';target.truncated=Boolean(d.truncated);target.token_usage={...(target.token_usage||{}),...(d.usage||{}),chargedTokens:target.chargedTokens,remainingTokens:Number(d.remainingTokens||0),continuations:Number(d.continuations||1),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId,finishReason:d.finishReason||'stop',truncated:Boolean(d.truncated)}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الاستكمال. لم يتم تثبيت خصم للجزء غير المكتمل.':'The connection ended before continuation completed. No charge was finalized for the incomplete part.','STREAM_INTERRUPTED');
-    await drainStreamQueue();streaming=false;render();if(target.truncated)toast(lang==='ar'?'ما زال الرد طويلًا ويمكن استكماله مرة أخرى.':'The response is still long and can be continued again.');await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
+    await drainStreamQueue();streaming=false;render();const continuationCount=Number(target.token_usage?.continuations||0);if(target.truncated&&continuationCount<MAX_AUTO_CONTINUATIONS){toast(lang==='ar'?'يتم استكمال الجزء المتبقي تلقائيًا…':'Continuing the remaining part automatically…');await continueResponse(index,{automatic:true});return}if(target.truncated)toast(lang==='ar'?'ما زال الرد طويلًا ويمكن استكماله يدويًا.':'The response is still long and can be continued manually.');await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
   }catch(e){
-    if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
+    if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError')toast(lang==='ar'?'تم إيقاف الاستكمال':'Continuation stopped');else{const friendly=friendlyClientError(e,lang==='ar'?'تعذر استكمال الرد. حاول مرة أخرى.':'Could not continue the response. Try again.');toast(friendly.message);handleActionableError(friendly)}render();
   }finally{if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('sendBtn').classList.remove('sending');$('sendBtn').innerHTML=ICONS.send}
 }
@@ -2022,6 +2098,7 @@ syncViewportHeight();
 window.addEventListener('resize',syncViewportHeight,{passive:true});
 window.addEventListener('orientationchange',function(){setTimeout(syncViewportHeight,150)},{passive:true});
 if(window.visualViewport){window.visualViewport.addEventListener('resize',syncViewportHeight,{passive:true})}
+$('codeModalClose').onclick=closeCodePreview;$('codeModal').onclick=e=>{if(e.target===$('codeModal'))closeCodePreview()};$('codeModalCopy').onclick=async()=>{try{await navigator.clipboard.writeText(activePreviewCode);toast(lang==='ar'?'تم نسخ الكود':'Code copied')}catch{toast(lang==='ar'?'تعذر نسخ الكود':'Could not copy code')}};$('codeModalDownload').onclick=()=>downloadTextFile(activePreviewFilename,activePreviewCode);document.addEventListener('keydown',event=>{if(event.key==='Escape'&&$('codeModal')?.classList.contains('open'))closeCodePreview()});
 let introAutoTimer=null;
 if(document.readyState==='loading'){window.addEventListener('DOMContentLoaded',init)}else{init()}
 </script>
@@ -2439,6 +2516,15 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
   body:not(.all-models-active) .topbar>.mobile-task-identity>span{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
   body:not(.all-models-active) .topbar>.mobile-task-identity b{font-size:12px!important;max-width:100px!important}
 }
+
+.code-modal{position:fixed;inset:0;z-index:3000;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(22,13,29,.74);backdrop-filter:blur(7px)}.code-modal.open{display:flex}.code-modal-panel{width:min(1100px,100%);height:min(84vh,850px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 24px 80px rgba(20,10,30,.35)}.code-modal-header{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 15px;border-bottom:1px solid var(--line)}.code-modal-header b,.code-modal-header small{display:block}.code-modal-header small{margin-top:3px;color:var(--muted)}.code-modal-actions{display:flex;align-items:center;gap:7px}.code-modal-actions button{border:1px solid var(--line);border-radius:9px;padding:7px 11px;background:#fff;color:var(--pi);cursor:pointer;font-weight:700}.code-modal-body{flex:1;min-height:0;overflow:auto;background:#201527}.code-modal-body pre{min-width:max-content;margin:0;padding:20px;color:#f8f3fb;direction:ltr;text-align:left;white-space:pre;tab-size:2}.code-modal-body code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.modal-open{overflow:hidden}@media(max-width:620px){.code-modal{padding:8px}.code-modal-panel{height:92vh;border-radius:14px}.code-modal-header{align-items:flex-start}.code-modal-actions{flex-wrap:wrap;justify-content:flex-end}.code-modal-body pre{padding:14px;font-size:12px}}
 </style>
+
+<div class="code-modal" id="codeModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="codeModalTitle">
+  <div class="code-modal-panel">
+    <header class="code-modal-header"><div><b id="codeModalTitle">عرض الكود</b><small id="codeModalLanguage"></small></div><div class="code-modal-actions"><button type="button" id="codeModalCopy">نسخ</button><button type="button" id="codeModalDownload">تنزيل</button><button type="button" id="codeModalClose" aria-label="إغلاق">×</button></div></header>
+    <div class="code-modal-body"><pre><code id="codeModalContent"></code></pre></div>
+  </div>
+</div>
 
 </body></html>
