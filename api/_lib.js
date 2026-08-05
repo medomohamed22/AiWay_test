@@ -1077,7 +1077,7 @@ export async function resolveOpenRouterCharge({ usage = {}, generationId = '', p
   return chargeTokens(price, normalizedUsage, webSearch);
 }
 
-export function affordableOutputLimit(price, availableTokens, estimate, cap = 16384) {
+export function affordableOutputLimit(price, availableTokens, estimate, cap = 8192) {
   const completionPrice = Number(price?.completion || 0);
   if (!(completionPrice > 0)) return Math.max(128, cap);
   const availableUsd = Math.max(0, Number(availableTokens || 0) * TOKEN_USD * 0.9);
