@@ -2243,4 +2243,99 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
 }
 </style>
 
+
+<style id="aiway-mobile-header-absolute-authoritative">
+/* Authoritative phone header: physical right menu, true page-centered identity, physical left balance. */
+@media (max-width:760px){
+  body:not(.all-models-active) .topbar{
+    position:relative!important;
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    min-height:64px!important;
+    height:64px!important;
+    padding:7px 9px!important;
+    overflow:visible!important;
+    direction:ltr!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-menu{
+    position:absolute!important;
+    inset:auto 9px auto auto!important;
+    top:50%!important;
+    transform:translateY(-50%)!important;
+    display:grid!important;
+    place-items:center!important;
+    width:46px!important;
+    min-width:46px!important;
+    height:46px!important;
+    margin:0!important;
+    z-index:5!important;
+  }
+  body:not(.all-models-active) .topbar>.credits{
+    position:absolute!important;
+    inset:auto auto auto 9px!important;
+    top:50%!important;
+    transform:translateY(-50%)!important;
+    display:flex!important;
+    width:auto!important;
+    min-width:68px!important;
+    max-width:102px!important;
+    height:46px!important;
+    margin:0!important;
+    padding:7px 9px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    overflow:hidden!important;
+    direction:ltr!important;
+    z-index:5!important;
+  }
+  body:not(.all-models-active) .topbar>.credits #credits{
+    font-size:12px!important;
+    line-height:1!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-task-identity{
+    position:absolute!important;
+    left:50%!important;
+    top:50%!important;
+    transform:translate(-50%,-50%)!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:8px!important;
+    width:auto!important;
+    max-width:calc(100% - 220px)!important;
+    min-width:0!important;
+    margin:0!important;
+    overflow:hidden!important;
+    z-index:4!important;
+  }
+  html[dir="rtl"] body:not(.all-models-active) .topbar>.mobile-task-identity{direction:rtl!important}
+  html[dir="ltr"] body:not(.all-models-active) .topbar>.mobile-task-identity{direction:ltr!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity>span{
+    width:42px!important;height:42px!important;min-width:42px!important;flex:0 0 42px!important;
+    display:grid!important;place-items:center!important;border-radius:13px!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-task-identity b{
+    display:block!important;max-width:145px!important;min-width:0!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    font-size:14px!important;line-height:1.2!important;
+  }
+  body:not(.all-models-active) .topbar>.task-context,
+  body:not(.all-models-active) .topbar>.model-wrap,
+  body:not(.all-models-active) .topbar>.top-tools-btn,
+  body:not(.all-models-active) .topbar>.top-login-btn,
+  body:not(.all-models-active) .topbar>.spacer,
+  body:not(.all-models-active) .topbar>.export{display:none!important}
+}
+@media (max-width:390px){
+  body:not(.all-models-active) .topbar>.mobile-menu{right:6px!important;width:44px!important;min-width:44px!important;height:44px!important}
+  body:not(.all-models-active) .topbar>.credits{left:6px!important;min-width:62px!important;max-width:86px!important;padding-inline:6px!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity{max-width:calc(100% - 194px)!important;gap:6px!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity>span{width:38px!important;height:38px!important;min-width:38px!important;flex-basis:38px!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity b{font-size:12px!important;max-width:100px!important}
+}
+</style>
+
 </body></html>
