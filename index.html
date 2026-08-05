@@ -1040,7 +1040,8 @@ function toggleLanguage(){
 async function deleteChat(id){conversationCoreCache.delete(id);conversationCoreRequests.delete(id);const ok=await aiwayConfirm(lang==='ar'?'سيتم حذف هذه الدردشة ورسائلها نهائيًا، ولا يمكن التراجع عن هذا الإجراء.':'This chat and all of its messages will be permanently deleted. This action cannot be undone.',{title:lang==='ar'?'حذف الدردشة؟':'Delete this chat?',confirmText:lang==='ar'?'حذف نهائي':'Delete permanently',cancelText:lang==='ar'?'احتفاظ بالدردشة':'Keep chat',type:'danger'});if(!ok)return;try{await api('/api/conversations?id='+encodeURIComponent(id),{method:'DELETE'});if(current===id){current=null;history=[];render()}await loadChats();toast(lang==='ar'?'تم حذف الدردشة':'Chat deleted')}catch(e){toast(friendlyClientError(e,lang==='ar'?'لم نتمكن من حذف الدردشة. حاول مرة أخرى.':'We could not delete the chat. Please try again.').message)}}
 function isPiBrowser(){
   const ua=String(navigator.userAgent||'');
-  return /(?:PiBrowser|Pi Browser)/i.test(ua);
+  const brands=Array.isArray(navigator.userAgentData?.brands)?navigator.userAgentData.brands.map(item=>item?.brand||'').join(' '):'';
+  return Boolean(window.Pi)||/(?:PiBrowser|Pi Browser|PiNetwork)/i.test(`${ua} ${brands}`);
 }
 function requirePiBrowser(){
   if(isPiBrowser())return true;
@@ -1133,10 +1134,42 @@ function loadExternalScript(src,test){
   if(test())return Promise.resolve();
   return new Promise((resolve,reject)=>{const existing=document.querySelector(`script[data-aiway-src="${src}"]`);if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return}const script=document.createElement('script');script.src=src;script.async=true;script.dataset.aiwaySrc=src;script.onload=()=>test()?resolve():reject(Error('Library unavailable'));script.onerror=()=>reject(Error('Library unavailable'));document.head.appendChild(script)});
 }
-function ensurePiSdk(){if(window.Pi)return Promise.resolve();if(!piSdkPromise)piSdkPromise=loadExternalScript('https://sdk.minepi.com/pi-sdk.js',()=>Boolean(window.Pi));return piSdkPromise}
+function ensurePiSdk(){
+  if(window.Pi)return Promise.resolve(window.Pi);
+  if(!piSdkPromise){
+    piSdkPromise=Promise.race([
+      loadExternalScript('https://sdk.minepi.com/pi-sdk.js',()=>Boolean(window.Pi)),
+      new Promise((_,reject)=>setTimeout(()=>reject(Error('Pi SDK load timeout')),12000))
+    ]).then(()=>{
+      if(!window.Pi)throw Error('Pi SDK unavailable');
+      return window.Pi;
+    }).catch(error=>{piSdkPromise=null;throw error});
+  }
+  return piSdkPromise;
+}
+async function ensurePiReady({attempts=2}={}){
+  if(piReady&&window.Pi?.authenticate)return true;
+  let lastError=null;
+  for(let attempt=1;attempt<=attempts;attempt++){
+    try{
+      await ensurePiSdk();
+      if(!window.Pi?.authenticate)throw Error('Pi authenticate unavailable');
+      try{window.Pi.init({version:'2.0',sandbox:false})}catch(error){
+        if(!/already|initializ/i.test(String(error?.message||error)))throw error;
+      }
+      piReady=true;
+      return true;
+    }catch(error){
+      lastError=error;
+      piReady=false;
+      if(attempt<attempts)await new Promise(resolve=>setTimeout(resolve,700*attempt));
+    }
+  }
+  throw lastError||Error('Pi SDK unavailable');
+}
 function ensureRichTextLibraries(){if(window.marked&&window.DOMPurify)return Promise.resolve();if(!richTextPromise)richTextPromise=Promise.all([loadExternalScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js',()=>Boolean(window.marked)),loadExternalScript('https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js',()=>Boolean(window.DOMPurify))]).then(()=>{if(history.some(m=>m.role==='assistant'&&m.content))render()}).catch(e=>console.warn('Rich text libraries:',e));return richTextPromise}
 async function initPi(){
-  try{await ensurePiSdk();Pi.init({version:'2.0',sandbox:false});piReady=true;if(!auth)$('profileState').textContent=isPiBrowser()?(lang==='ar'?'جاهز لتسجيل الدخول':'Ready to sign in'):I18N[lang].signPi}catch(e){console.warn('Pi SDK:',e);if(!auth)$('profileState').textContent=I18N[lang].signPi}
+  try{await ensurePiReady({attempts:2});if(!auth)$('profileState').textContent=lang==='ar'?'جاهز لتسجيل الدخول':'Ready to sign in'}catch(e){console.warn('Pi SDK:',e);if(!auth)$('profileState').textContent=I18N[lang].signPi}
 }
 function modelProviderKey(m){return String(m?.provider||m?.family||m?.id?.split('/')[0]||'ai').toLowerCase()}
 function modelLogo(m){const key=modelProviderKey(m),label={aiway:'AW',openai:'◎',google:'G',anthropic:'A','deepseek':'DS',meta:'∞',xai:'𝕏',grok:'𝕏',kimi:'K',moonshotai:'K',mistralai:'M','black-forest-labs':'BFL','bytedance-seed':'BD',recraft:'R',ideogram:'ID'}[key]||key.slice(0,2).toUpperCase();const safeKey=key.replace(/[^a-z0-9-]/g,'');return `<span class="model-brand-logo provider-${safeKey}" aria-hidden="true" title="${esc(m.providerLabel||m.familyLabel||key)}">${esc(label)}</span>`}
@@ -1409,7 +1442,10 @@ async function recoverIncompletePayment(payment,{silent=false}={}){
   }
 }
 async function authenticatePiForPayments({refreshSession=true,silentRecovery=true,requirePendingResolved=false}={}){
-  if(!piReady||!window.Pi?.authenticate)throw makeUiError(lang==='ar'?'افتح الموقع من Pi Browser وانتظر اكتمال تحميل خدمة Pi.':'Open the site in Pi Browser and wait for the Pi service to finish loading.','PI_BROWSER_REQUIRED');
+  try{await ensurePiReady({attempts:3})}catch(error){
+    console.warn('Pi readiness:',error);
+    throw makeUiError(lang==='ar'?'تعذر تحميل خدمة Pi داخل المتصفح. أغلق الصفحة وافتح التطبيق من Pi Browser ثم حاول مرة أخرى.':'The Pi service could not load in this browser. Close the page, open the app from Pi Browser, and try again.','PI_BROWSER_REQUIRED');
+  }
   const pendingPayments=[];
   const result=await Pi.authenticate(['username','payments'],payment=>{if(payment)pendingPayments.push(payment)});
   if(!result?.accessToken)throw makeUiError(lang==='ar'?'لم تُرجع Pi بيانات تسجيل الدخول. أعد فتح الموقع داخل Pi Browser وحاول مرة أخرى.':'Pi did not return sign-in data. Reopen the site in Pi Browser and try again.','PI_LOGIN_FAILED');
@@ -1435,7 +1471,7 @@ async function login(){
  if(auth){toast(lang==='ar'?'أنت مسجل بالفعل':'You are already signed in');return true}
  setLoginBusy(true);
  try{
-  if(!isPiBrowser()){openPiSigninModal();return false}
+  if(!isPiBrowser()&&!window.Pi){openPiSigninModal();return false}
   $('profileState').innerHTML='<span class="loading-dot"></span> <span class="loading-dot"></span> <span class="loading-dot"></span>';
   await authenticatePiForPayments({refreshSession:true,silentRecovery:true});
   await Promise.all([refreshMe(),loadModels(),loadChats()]);dismissSigninGuide();
