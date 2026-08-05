@@ -4,7 +4,22 @@ import {
   TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels
 } from './_lib.js';
 
-const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:model.supported_parameters?.aspect_ratio?.values||['1:1','4:3','3:4','16:9','9:16'] }));
+
+function imageEstimate(model, resolution = '', hasReferenceImage = false) {
+  const pricing=model?.pricing||{};
+  const values=['request','image','image_output','output_image'].map(k=>Number(pricing[k])).filter(n=>Number.isFinite(n)&&n>0);
+  let usd=values.length?Math.min(...values):0;
+  const tier=String(resolution||'1K').toUpperCase();
+  const multiplier=tier==='4K'?4:tier==='2K'?2:tier==='512'?0.5:1;
+  if(!usd){const mp=Number(pricing.megapixel||0);usd=mp>0?mp*multiplier:0.04*multiplier;}
+  else if(!Number(pricing.request||0)&&tier!=='1K')usd*=multiplier;
+  if(hasReferenceImage)usd*=1.12;
+  usd*=1.08;
+  return {providerUsd:usd,chargedTokens:Math.max(1,Math.ceil(usd/TOKEN_USD))};
+}
+
+const enumValues=(descriptor,fallback=[])=>Array.isArray(descriptor)?descriptor.map(String):(Array.isArray(descriptor?.values)?descriptor.values.map(String):fallback);
+const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['512','1K','2K','4K']) }));
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
@@ -28,8 +43,8 @@ export default async function handler(req, res) {
         || IMAGE_MODELS.find(model => model.id === body.modelId)
         || null;
       if (image) {
-        const providerUsd = Number(image.pricing.request);
-        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, providerUsd:estimatePurchased?providerUsd:0, chargedTokens:estimatePurchased?Math.max(1, Math.ceil(providerUsd / TOKEN_USD)):1, approximate:true, freeTrial:!estimatePurchased });
+        const estimate=imageEstimate(image,body.resolution,Boolean(body.hasReferenceImage));
+        return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, ...(estimatePurchased?estimate:{providerUsd:0,chargedTokens:1}), approximate:true, freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial', resolution:String(body.resolution||''), aspectRatio:String(body.aspectRatio||'') });
       }
       const id = settings[taskId] || body.modelId;
       const model = models.find(item => item.id === id) || models[0];
@@ -38,7 +53,7 @@ export default async function handler(req, res) {
         type:'chat', modelId:model.id, routedModelId:model.id, modelName:model.name,
         ...(estimatePurchased ? estimate : { ...estimate, providerUsd:0, chargedTokens:1 }),
         approximate:true,
-        freeTrial:!estimatePurchased
+        freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial'
       });
     }
 

@@ -576,7 +576,7 @@ function normalizeOpenRouterModel(model){
   return {
     id:String(model.id), name:String(model.name||model.id), description:String(model.description||''),
     created:Number(model.created||0), contextLength:Number(model.context_length||model.contextLength||0),
-    pricing:{prompt:num(pricing.prompt),completion:num(pricing.completion),request:num(pricing.request),image:num(pricing.image),web_search:num(pricing.web_search)},
+    pricing:{prompt:num(pricing.prompt),completion:num(pricing.completion),request:num(pricing.request),image:num(pricing.image),image_output:num(pricing.image_output),output_image:num(pricing.output_image),megapixel:num(pricing.megapixel),web_search:num(pricing.web_search)},
     inputModalities:Array.isArray(architecture.input_modalities)?architecture.input_modalities:['text'],
     outputModalities:Array.isArray(architecture.output_modalities)?architecture.output_modalities:['text'],
     supported_parameters:model.supported_parameters||{}, provider, providerLabel:provider,

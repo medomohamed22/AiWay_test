@@ -1,4 +1,4 @@
-import { allowMethods, appError, db, errorDetails, json, localize, requestLocale, requireUser, getAiTools } from './_lib.js';
+import { allowMethods, appError, cleanText, db, errorDetails, handleError, json, localize, requestLocale, requireUser, getAiTools } from './_lib.js';
 
 
 const APP_FIELDS = 'id,name,slug,category,network,short_description,website_url,icon_url,screenshot_urls,rating,ratings_count,views_count,get_clicks_count,is_verified,is_featured,featured_until,developer_name,created_at';
@@ -7,6 +7,24 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET','POST'])) return;
   const locale = requestLocale(req);
   try {
+    const route=String(req.query?.route||'');
+    if(route==='me'){
+      if(req.method!=='GET')return json(res,405,{error:localize(locale,'الطريقة غير مسموحة.','Method not allowed.'),code:'METHOD_NOT_ALLOWED'});
+      const user=await requireUser(req),supabase=db();
+      const expired=await supabase.rpc('expire_paid_tokens',{p_user_id:user.id});if(expired.error)throw appError('DATABASE_ERROR',{},expired.error);
+      const {data,error}=await supabase.from('users').select('id,username,role,ai_tokens,paid_ai_tokens,paid_tokens_expires_at,trial_messages_remaining,free_trial_tokens,has_purchased,created_at').eq('id',user.id).single();
+      if(error||!data)throw appError('DATABASE_ERROR',{},error);return json(res,200,{user:data});
+    }
+    if(route==='interactions'){
+      const supabase=db(),appId=String(req.query?.appId||req.body?.appId||'');
+      if(!appId)return json(res,400,{error:localize(locale,'معرّف التطبيق مطلوب.','App id is required.'),code:'INVALID_REQUEST'});
+      if(req.method==='GET'){const user=await requireUser(req);const {data,error}=await supabase.from('app_ratings').select('stars').eq('app_id',appId).eq('user_id',user.id).maybeSingle();if(error)throw error;return json(res,200,{stars:data?.stars||0});}
+      const action=String(req.body?.action||'');const {data:app,error:appError}=await supabase.from('apps').select('id,status').eq('id',appId).maybeSingle();if(appError)throw appError;if(!app||app.status!=='published')return json(res,404,{error:localize(locale,'التطبيق غير موجود أو غير منشور.','The app was not found or is not published.'),code:'FILE_NOT_FOUND'});
+      if(action==='view'||action==='get_click'){const visitorId=cleanText(req.body?.visitorId,100);if(!/^[a-zA-Z0-9_-]{16,100}$/.test(visitorId))return json(res,400,{error:localize(locale,'معرّف الزائر غير صالح.','The visitor id is invalid.'),code:'INVALID_REQUEST'});const {error}=await supabase.from('app_events').insert({app_id:appId,visitor_id:visitorId,event_type:action});if(error&&error.code!=='23505')throw error;const {data:counts}=await supabase.from('apps').select('views_count,get_clicks_count').eq('id',appId).single();return json(res,200,{recorded:!error,counts});}
+      const user=await requireUser(req);if(action==='rate'){const stars=Number(req.body?.stars);if(!Number.isInteger(stars)||stars<1||stars>5)return json(res,400,{error:localize(locale,'اختر تقييمًا من نجمة واحدة إلى خمس نجوم.','Choose a rating from 1 to 5 stars.'),code:'INVALID_REQUEST'});const {error}=await supabase.from('app_ratings').upsert({app_id:appId,user_id:user.id,stars},{onConflict:'app_id,user_id'});if(error)throw error;const {data:rating}=await supabase.from('apps').select('rating,ratings_count').eq('id',appId).single();return json(res,200,{rating,userStars:stars});}
+      if(action==='report'){const allowed=['not_working','scam','wrong_link','impersonation','inappropriate','other'],reason=String(req.body?.reason||'');if(!allowed.includes(reason))return json(res,400,{error:localize(locale,'اختر سببًا صحيحًا للإبلاغ.','Choose a valid report reason.'),code:'INVALID_REQUEST'});const details=cleanText(req.body?.details,500);const {error}=await supabase.from('app_reports').upsert({app_id:appId,reporter_id:user.id,reason,details,status:'open',reviewed_by:null,reviewed_at:null},{onConflict:'app_id,reporter_id'});if(error)throw error;return json(res,200,{reported:true});}
+      return json(res,400,{error:localize(locale,'الإجراء المطلوب غير صالح.','The requested action is invalid.'),code:'INVALID_REQUEST'});
+    }
 
     if (String(req.query?.mode || '') === 'version') {
       const version = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || process.env.APP_VERSION || 'local-development';

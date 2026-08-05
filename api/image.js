@@ -236,10 +236,11 @@ function needsHighQualityImage(prompt = '', resolution = '', hasReferenceImage =
 }
 
 async function getImageModels() {
+  const descriptor=(value,fallback)=>Array.isArray(value)?{type:'enum',values:value.map(String)}:(value?.values?value:{type:'enum',values:fallback});
   return (await getOpenRouterImageModels()).map(model=>({
     ...model,
-    supported_parameters:{aspect_ratio:{type:'enum',values:['1:1','4:3','3:4','16:9','9:16']},resolution:{type:'enum',values:model.supportedResolutions||['1K']}},
-    architecture:{input_modalities:model.inputModalities||['text'],output_modalities:model.outputModalities||['image']}
+    supported_parameters:{...(model.supported_parameters||{}),aspect_ratio:descriptor(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']),resolution:descriptor(model.supported_parameters?.resolution,['512','1K','2K','4K'])},
+    architecture:{input_modalities:model.inputModalities||model.architecture?.input_modalities||['text'],output_modalities:model.outputModalities||model.architecture?.output_modalities||['image']}
   }));
 }
 
