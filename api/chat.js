@@ -131,6 +131,60 @@ async function downloadGeneratedFile(req, res) {
 }
 
 
+
+function writeSse(res, payload) {
+  if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+async function readOpenRouterStream(response, onDelta) {
+  if (!response.body || typeof response.body.getReader !== 'function') throw appError('EMPTY_RESPONSE');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let answer = '';
+  let finishReason = null;
+  let usage = {};
+  let generationId = '';
+  let routedModelId = '';
+  let provider = null;
+
+  const consumeLine = line => {
+    const trimmed = String(line || '').trim();
+    if (!trimmed.startsWith('data:')) return;
+    const raw = trimmed.slice(5).trim();
+    if (!raw || raw === '[DONE]') return;
+    let chunk;
+    try { chunk = JSON.parse(raw); } catch { return; }
+    if (chunk?.error) throw openRouterError(Number(chunk.error?.code || 502), chunk);
+    generationId ||= String(chunk?.id || '');
+    routedModelId ||= String(chunk?.model || '');
+    provider ||= chunk?.provider || null;
+    if (chunk?.usage) usage = { ...usage, ...chunk.usage };
+    const choice = chunk?.choices?.[0];
+    if (choice?.finish_reason != null) finishReason = choice.finish_reason;
+    const content = choice?.delta?.content;
+    const text = typeof content === 'string'
+      ? content
+      : (Array.isArray(content) ? content.map(part => part?.text || '').join('') : '');
+    if (text) {
+      answer += text;
+      onDelta(text);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const line of lines) consumeLine(line);
+  }
+  buffer += decoder.decode();
+  if (buffer.trim()) consumeLine(buffer);
+  return { answer, finishReason, usage, generationId, routedModelId, provider };
+}
+
 const detectLanguage = text => /[\u0600-\u06FF]/.test(String(text || '')) ? 'ar' : 'en';
 const formatSystemPrompt = (model, language) => `${language === 'ar' ? `أنت نموذج ${model.name || model.id} داخل منصة AiWay. أجب بالعربية الواضحة ما دام آخر طلب للمستخدم بالعربية، وإذا كتب بالإنجليزية فأجب بالإنجليزية.` : `You are ${model.name || model.id} inside the AiWay platform. Reply in English while the user's latest request is in English, and reply in Arabic when it is Arabic.`}
 Maintain full continuity with all earlier messages in this conversation. Never ignore relevant context already provided.
@@ -283,7 +337,8 @@ The following JSON is a trusted AiWay tool profile. Follow it as system-level sp
 ${JSON.stringify(toolInstructionPayload)}` : '';
     const safeMessages = [{ role: 'system', content: formatSystemPrompt(model, language) + taskPrompt }, ...cleaned.filter(message => message.role !== 'system')];
 
-    const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, 512);
+    const expectedOutputTokens = continuationTarget ? 2048 : (taskId === 'coding' ? 2048 : 768);
+    const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, expectedOutputTokens);
     const reservedTokenAmount = purchased ? reservationTokens(initialEstimate.chargedTokens, 'chat') : 0;
     if (purchased && availableTokens < reservedTokenAmount) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
@@ -295,7 +350,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
 
     // The provider output cap is calculated from the reserved amount, not the user's
     // whole wallet, so one request cannot consume more than the protected reservation.
-    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, reservedTokenAmount, initialEstimate) : 2048;
+    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, reservedTokenAmount, initialEstimate) : (taskId === 'coding' || continuationTarget ? 4096 : 3072);
     if (purchased && initialMaxTokens < 128) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
@@ -330,18 +385,43 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,
       'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'
     };
-    const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),provider:{sort:'price',allow_fallbacks:true}};
+    const requestBody={
+      model:activeModelId,
+      messages:safeMessages,
+      temperature:Number(temperature),
+      max_tokens:Math.max(128,Math.floor(initialMaxTokens)),
+      user:String(user.id),
+      stream:true,
+      stream_options:{include_usage:true},
+      provider:{sort:taskId==='coding'?'throughput':'price',allow_fallbacks:true}
+    };
     if(webSearch)requestBody.plugins=[{id:'web',max_results:5}];
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},90000);
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw openRouterError(response.status,payload,{webSearch});
-    const message=payload?.choices?.[0]?.message||{};
-    const answer=typeof message.content==='string'?message.content:(Array.isArray(message.content)?message.content.map(x=>x?.text||'').join(''):'');
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},120000);
+    if(!response.ok){
+      const payload=await response.json().catch(()=>({}));
+      throw openRouterError(response.status,payload,{webSearch});
+    }
+    res.statusCode=200;
+    res.setHeader('Content-Type','text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control','no-cache, no-transform');
+    res.setHeader('Connection','keep-alive');
+    res.setHeader('X-Accel-Buffering','no');
+    res.flushHeaders?.();
+    writeSse(res,{type:'ready',activeModelId});
+    const streamed=await readOpenRouterStream(response,text=>writeSse(res,{type:'delta',text}));
+    const answer=streamed.answer;
     if(!answer.trim())throw appError('EMPTY_RESPONSE');
-    const usage={prompt_tokens:Number(payload.usage?.prompt_tokens||0),completion_tokens:Number(payload.usage?.completion_tokens||0),total_tokens:Number(payload.usage?.total_tokens||0),cost:Number(payload.usage?.cost||0)};
-    const generationId=payload.id||''; const routedModelId=payload.model||activeModelId; const routerMetadata={provider:payload.provider||null,routing:'lowest-price',allowFallbacks:true};
-    res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');
-    for(let i=0;i<answer.length;i+=180)res.write(`data: ${JSON.stringify({type:'delta',text:answer.slice(i,i+180)})}\n\n`);
+    const usage={
+      prompt_tokens:Number(streamed.usage?.prompt_tokens||0),
+      completion_tokens:Number(streamed.usage?.completion_tokens||0),
+      total_tokens:Number(streamed.usage?.total_tokens||0),
+      cost:Number(streamed.usage?.cost||0)
+    };
+    const finishReason=streamed.finishReason||'stop';
+    const truncated=finishReason==='length' || finishReason==='max_tokens';
+    const generationId=streamed.generationId||'';
+    const routedModelId=streamed.routedModelId||activeModelId;
+    const routerMetadata={provider:streamed.provider||null,routing:taskId==='coding'?'throughput':'lowest-price',allowFallbacks:true,finishReason,truncated};
     const charge = await resolveOpenRouterCharge({ usage, generationId, price: activeModel.pricing, webSearch });
 
     const previousUsage = continuationTarget?.token_usage && typeof continuationTarget.token_usage === 'object' ? continuationTarget.token_usage : {};
@@ -362,7 +442,9 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       generationId: generationId || null,
       routerMetadata: routerMetadata || {},
       webSearch: Boolean(webSearch),
-      taskId: taskId || previousUsage.taskId || null
+      taskId: taskId || previousUsage.taskId || null,
+      finishReason,
+      truncated
     };
     let savedAssistant;
     let saveAssistantError;
@@ -402,7 +484,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       .eq('user_id', user.id);
     if (conversationUpdate.error) console.warn('Conversation timestamp update failed:', conversationUpdate.error.message);
 
-    res.write(`data: ${JSON.stringify({
+    writeSse(res,{
       type: 'done',
       usage,
       chargedTokens: purchased ? charge.chargedTokens : 1,
@@ -417,8 +499,10 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       messageId: savedAssistant.id,
       continuation: Boolean(continuationTarget),
       continuations: continuationCount,
-      totalChargedTokens: previousChargedTokens + (purchased ? charge.chargedTokens : 1)
-    })}\n\n`);
+      totalChargedTokens: previousChargedTokens + (purchased ? charge.chargedTokens : 1),
+      finishReason,
+      truncated
+    });
     return res.end();
   } catch (error) {
     if (reservationActive && reservationSupabase && reservationUserId && reservationRequestId) {
@@ -431,12 +515,12 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     }
     if (res.headersSent) {
       const details = errorDetails(error, uiLocale);
-      res.write(`data: ${JSON.stringify({
+      writeSse(res,{
         type: 'error',
         error: details?.message || localize(uiLocale, 'حدث عطل مؤقت. حاول مرة أخرى؛ لم يتم خصم رصيدك.', 'A temporary error occurred. Try again; your balance was not charged.'),
         code: details?.code || 'SERVER_ERROR',
         ...(details?.meta || {})
-      })}\n\n`);
+      });
       return res.end();
     }
     return handleError(
