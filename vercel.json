@@ -100,5 +100,15 @@
       "path": "/api/image?action=cleanup-expired",
       "schedule": "15 3 * * *"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/me",
+      "destination": "/api/apps?route=me"
+    },
+    {
+      "source": "/api/app-interactions",
+      "destination": "/api/apps?route=interactions"
+    }
   ]
 }
