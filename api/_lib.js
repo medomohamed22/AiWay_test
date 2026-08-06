@@ -833,6 +833,9 @@ export async function chooseAutoModel(text = '', { webSearch = false, hasAttachm
   const score = m => {
     const p = Number(m.pricing?.prompt || 0), c = Number(m.pricing?.completion || 0);
     let value = (p + c * 2) * 1e6;
+    // Auto mode now prioritizes models known for fast inference before using price as a tie-breaker.
+    if (/flash|mini|nano|fast|turbo|instant|haiku/i.test(`${m.id} ${m.name}`)) value -= 120;
+    if (/opus|pro|max|reason|r1|large|405b/i.test(`${m.id} ${m.name}`) && !complex) value += 45;
     if (coding && /qwen|deepseek|coder|gemma/i.test(`${m.id} ${m.name}`)) value -= 50;
     if (complex && /reason|r1|pro|large|70b|31b|27b/i.test(`${m.id} ${m.name}`)) value -= 20;
     return value;
@@ -1077,7 +1080,7 @@ export async function resolveOpenRouterCharge({ usage = {}, generationId = '', p
   return chargeTokens(price, normalizedUsage, webSearch);
 }
 
-export function affordableOutputLimit(price, availableTokens, estimate, cap = 8192) {
+export function affordableOutputLimit(price, availableTokens, estimate, cap = 16384) {
   const completionPrice = Number(price?.completion || 0);
   if (!(completionPrice > 0)) return Math.max(128, cap);
   const availableUsd = Math.max(0, Number(availableTokens || 0) * TOKEN_USD * 0.9);

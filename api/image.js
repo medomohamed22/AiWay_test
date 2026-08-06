@@ -344,7 +344,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         }
         return values[0];
       };
-      const requestBody = { model: selectedModel.id, prompt: imagePrompt, provider:{sort:'price',allow_fallbacks:true} };
+      const requestBody = { model: selectedModel.id, prompt: imagePrompt, provider:{sort:'throughput',allow_fallbacks:true} };
       const chosenResolution = selectedChooseEnum('resolution', resolution, ['1K', '1024x1024']);
       const chosenAspectRatio = selectedChooseEnum('aspect_ratio', requestedAspectRatio, ['1:1']);
       if (chosenResolution) requestBody.resolution = chosenResolution;
@@ -415,7 +415,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         role: 'assistant',
         content: localize(uiLocale, 'تم إنشاء الصورة المطلوبة.', 'The requested image has been generated.'),
         model_id: model.id,
-        token_usage: { ...imageUsage, ...charge, type: 'image', taskId: taskId || 'image', provider:'openrouter', providerRouting:'lowest-price' }
+        token_usage: { ...imageUsage, ...charge, type: 'image', taskId: taskId || 'image', provider:'openrouter', providerRouting:'highest-throughput' }
       }).select('id').single();
       if (assistantInsert.error || !assistantInsert.data) throw appError('DATABASE_ERROR', {}, assistantInsert.error);
       savedAssistant = assistantInsert.data;

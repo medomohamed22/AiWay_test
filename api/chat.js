@@ -283,7 +283,8 @@ The following JSON is a trusted AiWay tool profile. Follow it as system-level sp
 ${JSON.stringify(toolInstructionPayload)}` : '';
     const safeMessages = [{ role: 'system', content: formatSystemPrompt(model, language) + taskPrompt }, ...cleaned.filter(message => message.role !== 'system')];
 
-    const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, 512);
+    const desiredOutputTokens = purchased ? 16384 : 8192;
+    const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, desiredOutputTokens);
     const reservedTokenAmount = purchased ? reservationTokens(initialEstimate.chargedTokens, 'chat') : 0;
     if (purchased && availableTokens < reservedTokenAmount) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
@@ -295,7 +296,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
 
     // The provider output cap is calculated from the reserved amount, not the user's
     // whole wallet, so one request cannot consume more than the protected reservation.
-    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, reservedTokenAmount, initialEstimate) : 2048;
+    const initialMaxTokens = purchased ? affordableOutputLimit(model.pricing, reservedTokenAmount, initialEstimate, desiredOutputTokens) : desiredOutputTokens;
     if (purchased && initialMaxTokens < 128) {
       throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
         availableTokens,
@@ -330,18 +331,33 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,
       'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'
     };
-    const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),provider:{sort:'price',allow_fallbacks:true}};
+    const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),stream:true,stream_options:{include_usage:true},provider:{sort:'throughput',allow_fallbacks:true}};
     if(webSearch)requestBody.plugins=[{id:'web',max_results:5}];
     const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},90000);
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw openRouterError(response.status,payload,{webSearch});
-    const message=payload?.choices?.[0]?.message||{};
-    const answer=typeof message.content==='string'?message.content:(Array.isArray(message.content)?message.content.map(x=>x?.text||'').join(''):'');
+    if(!response.ok){const payload=await response.json().catch(()=>({}));throw openRouterError(response.status,payload,{webSearch});}
+    if(!response.body)throw appError('EMPTY_RESPONSE');
+
+    res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.();
+    const reader=response.body.getReader();const decoder=new TextDecoder();let upstreamBuffer='',answer='',generationId='',routedModelId=activeModelId,providerName=null;
+    let usage={prompt_tokens:0,completion_tokens:0,total_tokens:0,cost:0};
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      upstreamBuffer+=decoder.decode(value,{stream:true});
+      const lines=upstreamBuffer.split('\n');upstreamBuffer=lines.pop()||'';
+      for(const rawLine of lines){
+        const line=rawLine.trim();if(!line.startsWith('data:'))continue;
+        const data=line.slice(5).trim();if(!data||data==='[DONE]')continue;
+        let chunk;try{chunk=JSON.parse(data)}catch{continue}
+        if(chunk?.error)throw openRouterError(Number(chunk.error?.code||500),chunk,{webSearch});
+        generationId=chunk.id||generationId;routedModelId=chunk.model||routedModelId;providerName=chunk.provider||providerName;
+        if(chunk.usage)usage={prompt_tokens:Number(chunk.usage.prompt_tokens||usage.prompt_tokens||0),completion_tokens:Number(chunk.usage.completion_tokens||usage.completion_tokens||0),total_tokens:Number(chunk.usage.total_tokens||usage.total_tokens||0),cost:Number(chunk.usage.cost||usage.cost||0)};
+        const delta=chunk?.choices?.[0]?.delta?.content;
+        const text=typeof delta==='string'?delta:(Array.isArray(delta)?delta.map(part=>part?.text||part?.content||'').join(''):'');
+        if(text){answer+=text;res.write(`data: ${JSON.stringify({type:'delta',text})}\n\n`);}
+      }
+    }
     if(!answer.trim())throw appError('EMPTY_RESPONSE');
-    const usage={prompt_tokens:Number(payload.usage?.prompt_tokens||0),completion_tokens:Number(payload.usage?.completion_tokens||0),total_tokens:Number(payload.usage?.total_tokens||0),cost:Number(payload.usage?.cost||0)};
-    const generationId=payload.id||''; const routedModelId=payload.model||activeModelId; const routerMetadata={provider:payload.provider||null,routing:'lowest-price',allowFallbacks:true};
-    res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('X-Accel-Buffering','no');
-    for(let i=0;i<answer.length;i+=180)res.write(`data: ${JSON.stringify({type:'delta',text:answer.slice(i,i+180)})}\n\n`);
+    const routerMetadata={provider:providerName,routing:'highest-throughput',allowFallbacks:true};
     const charge = await resolveOpenRouterCharge({ usage, generationId, price: activeModel.pricing, webSearch });
 
     const previousUsage = continuationTarget?.token_usage && typeof continuationTarget.token_usage === 'object' ? continuationTarget.token_usage : {};
