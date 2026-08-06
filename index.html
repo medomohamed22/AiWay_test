@@ -145,7 +145,7 @@ html,body{min-height:480px}
 .model-execution{margin-top:8px;font-size:11px;opacity:.65;direction:ltr;text-align:left}.model-execution b{font-weight:700}
 
 /* ChatGPT-style progressive streaming and scroll navigation */
-.messages{overflow-anchor:auto;scrollbar-gutter:stable}.msg{animation:none}.msg.assistant.streaming-msg .bubble{contain:none;content-visibility:visible}.bubble-content{line-height:1.85}.bubble-content.streaming{white-space:normal;min-height:1.7em}.bubble-content.streaming:after{content:"";display:inline-block;width:2px;height:1.05em;margin-inline-start:3px;vertical-align:-.12em;background:currentColor;border-radius:2px;opacity:.55;animation:streamCaret .85s steps(1,end) infinite}.bubble-content p{margin:.72em 0}.bubble-content ul,.bubble-content ol{margin:.72em 0;padding-inline-start:1.55em}.bubble-content blockquote{margin:.85em 0;padding:.15em 1em;border-inline-start:4px solid var(--pi2);color:var(--muted);background:var(--surface2);border-radius:10px}.bubble-content table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;margin:1em 0}.bubble-content th,.bubble-content td{border:1px solid var(--line);padding:8px 10px;text-align:start}.bubble-content hr{border:0;border-top:1px solid var(--line);margin:1.2em 0}.scroll-latest{position:absolute;z-index:18;left:50%;bottom:150px;transform:translate(-50%,12px);width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:rgba(255,255,255,.96);color:var(--pi);box-shadow:0 10px 28px rgba(58,27,80,.18);display:grid;place-items:center;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,transform .18s,visibility .18s}.scroll-latest.show{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0)}.scroll-latest svg{width:21px;height:21px}.scroll-latest:hover{border-color:#cdb1e3;background:var(--pi3)}@keyframes streamCaret{0%,48%{opacity:.55}49%,100%{opacity:0}}@media(max-width:620px){
+.messages{overflow-anchor:auto;scrollbar-gutter:stable}.msg{animation:none}.msg.assistant.streaming-msg .bubble{contain:none;content-visibility:visible}.bubble-content{line-height:1.85}.bubble-content.streaming{white-space:pre-wrap;word-break:normal;overflow-wrap:anywhere;min-height:1.7em}.bubble-content.streaming:after{content:"";display:inline-block;width:2px;height:1.05em;margin-inline-start:3px;vertical-align:-.12em;background:currentColor;border-radius:2px;opacity:.55;animation:streamCaret .85s steps(1,end) infinite}.bubble-content p{margin:.72em 0}.bubble-content ul,.bubble-content ol{margin:.72em 0;padding-inline-start:1.55em}.bubble-content blockquote{margin:.85em 0;padding:.15em 1em;border-inline-start:4px solid var(--pi2);color:var(--muted);background:var(--surface2);border-radius:10px}.bubble-content table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;margin:1em 0}.bubble-content th,.bubble-content td{border:1px solid var(--line);padding:8px 10px;text-align:start}.bubble-content hr{border:0;border-top:1px solid var(--line);margin:1.2em 0}.scroll-latest{position:absolute;z-index:18;left:50%;bottom:150px;transform:translate(-50%,12px);width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:rgba(255,255,255,.96);color:var(--pi);box-shadow:0 10px 28px rgba(58,27,80,.18);display:grid;place-items:center;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,transform .18s,visibility .18s}.scroll-latest.show{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0)}.scroll-latest svg{width:21px;height:21px}.scroll-latest:hover{border-color:#cdb1e3;background:var(--pi3)}@keyframes streamCaret{0%,48%{opacity:.55}49%,100%{opacity:0}}@media(max-width:620px){
 .intro-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:5px;padding:7px 8px;border-radius:17px;min-height:54px}
 .intro-brand{gap:0}.intro-brand img{width:36px;height:36px;border-radius:11px}
 .intro-links{display:flex!important;min-width:0;justify-content:center;gap:0}
@@ -1594,28 +1594,35 @@ let userPinnedToBottom=true;
 function render(){
   const box=$('messages'),stick=userPinnedToBottom||isNearBottom();
   if(!history.length){box.innerHTML=welcome();box.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{$('prompt').value=b.dataset.prompt;$('prompt').focus();autoSize()});updateScrollLatestButton();return}
-  box.innerHTML=history.map((m,i)=>{const isLive=streaming&&m.role==='assistant'&&i===history.length-1&&!m.generatedImage;return `<article class="msg ${m.role}${isLive?' streaming-msg':''}" data-message-index="${i}"><span class="avatar">${m.role==='user'?ICONS.user:ICONS.bot}</span><div class="bubble">${attachmentMarkup(m)}<div class="bubble-content${isLive&&m.content&&!m.streamComplete?' streaming':''}">${m.role==='assistant'?(m.uiCard?specialUiCardMarkup(m):(m.content?renderMarkdown(m.content):(m.imageGenerating?imageProgressMarkup(m):(isLive?progressMarkup(m):'')))):esc(m.content||'').replace(/\n/g,'<br>')}</div>${generatedFilesMarkup(m,i)}${imageMarkup(m,i)}${modelExecutionMarkup(m)}<div class="msg-actions" dir="${lang==='ar'?'rtl':'ltr'}"><button class="mini-btn" data-copy="${i}">${ICONS.copy} ${I18N[lang].copy}</button>${m.role==='assistant'?`<button class="mini-btn" data-redo="1">${ICONS.redo} ${I18N[lang].redo}</button>${i===history.length-1&&m.content&&!m.generatedImage?`<button class="mini-btn" data-continue="${i}">${ICONS.continue} ${I18N[lang].continueResponse}</button>`:''}`:''}</div></div></article>`}).join('');
+  box.innerHTML=history.map((m,i)=>{const isLive=streaming&&m.role==='assistant'&&i===history.length-1&&!m.generatedImage;return `<article class="msg ${m.role}${isLive?' streaming-msg':''}" data-message-index="${i}"><span class="avatar">${m.role==='user'?ICONS.user:ICONS.bot}</span><div class="bubble">${attachmentMarkup(m)}<div class="bubble-content${isLive&&m.content&&!m.streamComplete?' streaming':''}">${m.role==='assistant'?(m.uiCard?specialUiCardMarkup(m):(m.content?(isLive&&!m.streamComplete?esc(m.content):renderMarkdown(m.content)):(m.imageGenerating?imageProgressMarkup(m):(isLive?progressMarkup(m):'')))):esc(m.content||'').replace(/\n/g,'<br>')}</div>${generatedFilesMarkup(m,i)}${imageMarkup(m,i)}${modelExecutionMarkup(m)}<div class="msg-actions" dir="${lang==='ar'?'rtl':'ltr'}"><button class="mini-btn" data-copy="${i}">${ICONS.copy} ${I18N[lang].copy}</button>${m.role==='assistant'?`<button class="mini-btn" data-redo="1">${ICONS.redo} ${I18N[lang].redo}</button>${i===history.length-1&&m.content&&!m.generatedImage?`<button class="mini-btn" data-continue="${i}">${ICONS.continue} ${I18N[lang].continueResponse}</button>`:''}`:''}</div></div></article>`}).join('');
   bindMessageActions();cacheRenderedGeneratedImages();box.querySelectorAll('[data-download-image]').forEach(b=>b.onclick=()=>downloadGeneratedImage(Number(b.dataset.downloadImage)));box.querySelectorAll('[data-preview-image]').forEach(img=>{const open=()=>openImagePreview(Number(img.dataset.previewImage));img.onclick=open;img.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});box.querySelectorAll('[data-download-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.downloadAiFile.split(':').map(Number);downloadGeneratedFile(mi,fi)});box.querySelectorAll('[data-preview-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.previewAiFile.split(':').map(Number);previewGeneratedFile(mi,fi)});box.querySelectorAll('[data-download-project]').forEach(b=>b.onclick=()=>downloadGeneratedProject(Number(b.dataset.downloadProject)));
   requestAnimationFrame(()=>{if(stick)scrollToLatest('auto');else updateScrollLatestButton()});
 }
-let streamFrame=0,streamQueue='',streamTimer=0,streamDrainResolve=null;
+let streamQueue='',streamTimer=0,streamDrainResolve=null;
 function scheduleStreamPaint(){
   if(streamTimer)return;
   streamTimer=requestAnimationFrame(()=>{
     streamTimer=0;
-    if(streamQueue){history[history.length-1].content+=streamQueue;streamQueue='';updateStreamingBubble()}
+    if(streamQueue){
+      const message=history[history.length-1];
+      if(message)message.content=(message.content||'')+streamQueue;
+      streamQueue='';
+      updateStreamingBubble();
+    }
     if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}
   });
 }
 function enqueueStreamText(text){if(!text)return;streamQueue+=text;scheduleStreamPaint()}
 function drainStreamQueue(){if(!streamQueue&&!streamTimer)return Promise.resolve();return new Promise(resolve=>{streamDrainResolve=resolve;scheduleStreamPaint()})}
 function updateStreamingBubble(){
-  if(streamFrame)return;
-  streamFrame=requestAnimationFrame(()=>{
-    streamFrame=0;const box=$('messages'),article=box.querySelector('.msg.assistant:last-of-type'),content=article?.querySelector('.bubble-content');if(!content)return;
-    const text=history.at(-1)?.content||'';content.classList.toggle('streaming',Boolean(text)&&!history.at(-1)?.streamComplete);content.innerHTML=text?renderMarkdown(text):progressMarkup(history.at(-1));
-    enhanceCodeBlocks(article);if(userPinnedToBottom&&isNearBottom(180))scrollToLatest('smooth');else{userPinnedToBottom=false;updateScrollLatestButton();}
-  });
+  const box=$('messages'),article=box.querySelector('.msg.assistant:last-of-type'),content=article?.querySelector('.bubble-content');
+  if(!content)return;
+  const message=history.at(-1),text=message?.content||'',stick=userPinnedToBottom||isNearBottom(180);
+  content.classList.toggle('streaming',Boolean(text)&&!message?.streamComplete);
+  if(text)content.textContent=text;
+  else content.innerHTML=progressMarkup(message);
+  if(stick){box.scrollTo({top:box.scrollHeight,behavior:'auto'});userPinnedToBottom=true}
+  else{userPinnedToBottom=false;updateScrollLatestButton()}
 }
 
 let pendingAttachments=[];
