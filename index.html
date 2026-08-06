@@ -389,6 +389,8 @@ body.all-models-active .model-trigger{width:100%!important;max-width:none!import
 .pack-validity-simple{display:block;margin:12px 0;color:var(--muted);font-size:13px;font-weight:700}
 @media(max-width:820px){body.all-models-active .model-wrap{width:min(330px,calc(100vw - 210px))!important}}
 @media(max-width:620px){body.all-models-active .topbar{padding-inline:62px!important}body.all-models-active .model-wrap{position:static!important;transform:none!important;width:100%!important;max-width:none!important;margin:auto!important;display:block!important}body.all-models-active .task-context{display:none!important}body.all-models-active .model-trigger{height:46px!important;padding-inline:8px!important}.model-trigger-copy b{font-size:12px!important}.pack .pi-estimate{font-size:24px}.packs{grid-template-columns:1fr!important}.modal{padding:16px!important;border-radius:22px!important}}
+
+.code-card{direction:ltr;text-align:left;margin:16px 0;border:1px solid #3b2b45;border-radius:15px;overflow:hidden;background:#24182d;color:#f8f3fb;contain:layout paint}.code-card-toolbar{min-height:44px;display:flex;align-items:center;gap:7px;padding:7px 9px;background:#1d1325;border-bottom:1px solid rgba(255,255,255,.1)}.code-card-language{margin-right:auto;color:#d9cbe2;font:700 12px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;text-transform:lowercase}.code-action{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#fff;border-radius:9px;min-height:30px;padding:5px 9px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:700}.code-action:hover{background:rgba(255,255,255,.13)}.code-action svg{width:14px;height:14px}.code-card pre{margin:0!important;border-radius:0!important;padding:14px 16px!important;background:#24182d!important;max-height:520px;overflow:auto;white-space:pre;tab-size:2}.code-card code{display:block;min-width:max-content}.bubble-content.streaming .code-card{animation:none}.bubble-content.streaming pre{transition:none}.raw-stream-code{direction:ltr;text-align:left;background:#24182d;color:#f8f3fb;border-radius:14px;padding:14px;overflow:auto}.code-preview-note{padding:10px 14px;color:var(--muted);font-size:13px;background:var(--surface2);border-bottom:1px solid var(--line)}@media(max-width:560px){.code-card-toolbar{flex-wrap:wrap}.code-card-language{width:100%;margin:0 0 2px}.code-action{flex:1;justify-content:center;padding-inline:7px}.code-card pre{max-height:430px;font-size:13px}}
 </style>
 <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
 <script defer src="/_vercel/insights/script.js"></script>
@@ -1516,6 +1518,20 @@ function cacheRenderedGeneratedImages(){
     image.complete?cache():image.addEventListener('load',cache,{once:true});
   }
 }
+function codePreviewDocument(language,source){
+  if(/^(html?|svg)$/.test(language))return source;
+  if(language==='css')return `<!doctype html><html><head><meta charset="utf-8"><style>${source}</style></head><body><main><h1>CSS Preview</h1><p>معاينة تنسيق CSS داخل صفحة تجريبية.</p><button>Button</button></main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:system-ui;padding:20px}pre{white-space:pre-wrap;background:#f4f4f5;padding:12px;border-radius:10px}</style></head><body><pre id="out">Running…</pre><script>const out=document.getElementById('out');const logs=[];['log','warn','error'].forEach(k=>{const old=console[k];console[k]=(...a)=>{logs.push(a.map(v=>typeof v==='string'?v:JSON.stringify(v,null,2)).join(' '));out.textContent=logs.join('\\n')||'تم التشغيل بدون مخرجات';old(...a)}});window.onerror=(m)=>{out.textContent='Error: '+m};try{${source}\nsetTimeout(()=>{if(!logs.length)out.textContent='تم التشغيل بدون مخرجات'},0)}catch(e){out.textContent=e.stack||e.message}<\/script></body></html>`;
+}
+function codeExtension(language){return ({html:'html',htm:'html',css:'css',javascript:'js',js:'js',typescript:'ts',ts:'ts',json:'json',python:'py',py:'py',java:'java',c:'c',cpp:'cpp',csharp:'cs',cs:'cs',php:'php',ruby:'rb',go:'go',rust:'rs',sql:'sql',bash:'sh',shell:'sh',xml:'xml',svg:'svg',markdown:'md',md:'md'})[language]||'txt'}
+function codeCardSource(button){const card=button.closest('.code-card');return {card,language:card?.dataset.codeLanguage||'text',source:card?.querySelector('pre code')?.textContent||card?.querySelector('pre')?.textContent||''}}
+async function handleCodeAction(button){
+  const {language,source}=codeCardSource(button);if(!source)return;
+  const action=button.dataset.codeAction;
+  if(action==='copy'){try{await navigator.clipboard.writeText(source);const old=button.textContent;button.textContent=lang==='ar'?'تم النسخ':'Copied';setTimeout(()=>button.textContent=old,1100)}catch{toast(lang==='ar'?'تعذر نسخ الكود':'Could not copy code')}return}
+  if(action==='download'){const blob=new Blob([source],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`aiway-code.${codeExtension(language)}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);return}
+  if(action==='preview'&&codeCanPreview(language)){$('previewTitle').textContent=lang==='ar'?'معاينة وتشغيل الكود':'Code preview & run';$('previewFrame').srcdoc=codePreviewDocument(language,source);$('previewModal').classList.add('open')}
+}
 function extractGeneratedFiles(text){
   const files=[];const re=/```file-([^\n`]+)\n([\s\S]*?)```/g;let match;
   while((match=re.exec(String(text||'')))&&files.length<8){files.push({name:match[1].trim(),content:match[2].replace(/\n$/,'')})}
@@ -1583,11 +1599,33 @@ function enhancePromptSections(html){
   }
   return host.innerHTML;
 }
+function codeLanguageFromNode(code){
+  const match=String(code?.className||'').match(/language-([\w.+-]+)/i);
+  return (match?.[1]||'text').toLowerCase();
+}
+function codeCanPreview(language){return /^(html?|svg|css|javascript|js)$/.test(language)}
+function enhanceCodeBlocks(html,completedFencePairs=Infinity){
+  const host=document.createElement('div');host.innerHTML=html;let index=0;
+  [...host.querySelectorAll('pre')].forEach(pre=>{
+    if(index>=completedFencePairs){pre.classList.add('raw-stream-code');index++;return}
+    const code=pre.querySelector(':scope > code')||pre.querySelector('code');
+    if(!code||code.classList.contains('language-prompt')){index++;return}
+    const language=codeLanguageFromNode(code),card=document.createElement('div');card.className='code-card';card.dataset.codeLanguage=language;
+    const toolbar=document.createElement('div');toolbar.className='code-card-toolbar';
+    const label=document.createElement('span');label.className='code-card-language';label.textContent=language==='text'?'code':language;
+    toolbar.appendChild(label);
+    const actions=[['copy',lang==='ar'?'نسخ':'Copy'],...(codeCanPreview(language)?[['preview',lang==='ar'?'عرض وتشغيل':'Preview & run']]:[]),['download',lang==='ar'?'تنزيل':'Download']];
+    actions.forEach(([action,title])=>{const b=document.createElement('button');b.type='button';b.className='code-action';b.dataset.codeAction=action;b.textContent=title;toolbar.appendChild(b)});
+    pre.replaceWith(card);card.append(toolbar,pre);index++;
+  });
+  return host.innerHTML;
+}
+function completedFencePairs(text){return Math.floor(((String(text||'').match(/```/g)||[]).length)/2)}
 function renderMarkdown(text){
   if(!window.marked||!window.DOMPurify){ensureRichTextLibraries();return esc(text||'').replace(/\n/g,'<br>')}
   const raw=window.marked.parse(text||'',{gfm:true,breaks:true});
   const safe=window.DOMPurify.sanitize(raw,{ADD_ATTR:['target','rel']});
-  return enhancePromptSections(safe);
+  return enhanceCodeBlocks(enhancePromptSections(safe));
 }
 function balanceStreamingMarkdown(text){
   let value=String(text||'');
@@ -1617,7 +1655,8 @@ function renderStreamingMarkdown(text){
       .replace(/\n/g,'<br>');
   }
   const raw=window.marked.parse(value,{gfm:true,breaks:true});
-  return window.DOMPurify.sanitize(raw,{ADD_ATTR:['target','rel']});
+  const safe=window.DOMPurify.sanitize(raw,{ADD_ATTR:['target','rel']});
+  return enhanceCodeBlocks(safe,completedFencePairs(text));
 }
 function isNearBottom(threshold=96){const box=$('messages');return box.scrollHeight-box.scrollTop-box.clientHeight<=threshold}
 function scrollToLatest(behavior='smooth'){const box=$('messages');box.scrollTo({top:box.scrollHeight,behavior});userPinnedToBottom=true;updateScrollLatestButton()}
@@ -1693,6 +1732,7 @@ async function downloadGeneratedImage(i){const img=history[i]?.generatedImage;if
 let imagePreviewScale=1,imagePreviewX=0,imagePreviewY=0,imagePreviewDragging=false,imagePreviewStartX=0,imagePreviewStartY=0,imagePreviewBaseX=0,imagePreviewBaseY=0,imagePreviewPinchDistance=0,imagePreviewPinchScale=1;
 function applyImagePreviewTransform(){const img=$('imagePreviewImg');if(!img)return;img.style.transform=`translate(${imagePreviewX}px,${imagePreviewY}px) scale(${imagePreviewScale})`;$('imageZoomLabel').textContent=Math.round(imagePreviewScale*100)+'%'}
 function setImagePreviewScale(next){imagePreviewScale=Math.min(5,Math.max(1,Number(next)||1));if(imagePreviewScale===1){imagePreviewX=0;imagePreviewY=0}applyImagePreviewTransform()}
+document.addEventListener('click',e=>{const button=e.target.closest?.('[data-code-action]');if(button){e.preventDefault();handleCodeAction(button)}});
 document.addEventListener('click',async e=>{const btn=e.target.closest?.('[data-copy-prompt]');if(!btn)return;const body=btn.closest('.prompt-copy-block')?.querySelector('.prompt-copy-body');const text=(body?.innerText||body?.textContent||'').trim();if(!text)return;try{await navigator.clipboard.writeText(text);const label=btn.querySelector('span');const old=label?.textContent;if(label)label.textContent=lang==='ar'?'تم النسخ':'Copied';setTimeout(()=>{if(label)label.textContent=old||I18N[lang].copy},1200)}catch{toast(lang==='ar'?'تعذر نسخ البرومبت':'Could not copy the prompt')}});
 document.addEventListener('click',e=>{const btn=e.target.closest?.('[data-open-models]');if(!btn)return;const trigger=document.querySelector('.model-trigger,[data-model-trigger],#modelButton');if(trigger)trigger.click();else document.getElementById('model')?.focus();});
 function openImagePreview(i){const image=history[i]?.generatedImage,src=image?.display_url||image?.thumbnail_data;if(!src)return;imagePreviewScale=1;imagePreviewX=0;imagePreviewY=0;$('imagePreviewImg').src=src;$('imagePreviewImg').alt=lang==='ar'?'معاينة الصورة المولدة':'Generated image preview';$('imagePreviewHint').textContent=lang==='ar'?'قرّب بإصبعين أو استخدم أزرار التكبير':'Pinch or use the zoom controls';applyImagePreviewTransform();$('imagePreviewModal').classList.add('open');$('imagePreviewModal').setAttribute('aria-hidden','false')}
