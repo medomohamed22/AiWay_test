@@ -538,7 +538,7 @@ export function handleError(error, res, fallback = 'Server error', locale = 'ar'
 // Each AiWay token represents $0.00001 of the actual provider cost through OpenRouter.
 // Purchases keep the original 50/50 split: $1 buys $0.50 of provider capacity.
 export const TOKEN_USD = 0.00001;
-export const PROVIDER_BUDGET_SHARE = 0.44;
+export const PROVIDER_BUDGET_SHARE = 0.50;
 export const MARKUP = 1 / PROVIDER_BUDGET_SHARE;
 export const TRIAL_MESSAGE_LIMIT = 10;
 export const TRIAL_TOKENS = 10;
