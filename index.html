@@ -1585,6 +1585,36 @@ function renderMarkdown(text){
   const safe=window.DOMPurify.sanitize(raw,{ADD_ATTR:['target','rel']});
   return enhancePromptSections(safe);
 }
+function balanceStreamingMarkdown(text){
+  let value=String(text||'');
+  // Close constructs that are commonly split between stream chunks.
+  // These temporary markers are rendered only and are never stored.
+  const fences=(value.match(/```/g)||[]).length;
+  if(fences%2)value+='\n```';
+  const withoutFences=value.replace(/```[\s\S]*?```/g,'');
+  const bold=(withoutFences.match(/(?<!\*)\*\*(?!\*)/g)||[]).length;
+  if(bold%2)value+='**';
+  const inline=(withoutFences.match(/(?<!`)`(?!`)/g)||[]).length;
+  if(inline%2)value+='`';
+  return value;
+}
+function renderStreamingMarkdown(text){
+  const value=balanceStreamingMarkdown(text);
+  if(!window.marked||!window.DOMPurify){
+    ensureRichTextLibraries();
+    return esc(value)
+      .replace(/^######\s+(.+)$/gm,'<h6>$1</h6>')
+      .replace(/^#####\s+(.+)$/gm,'<h5>$1</h5>')
+      .replace(/^####\s+(.+)$/gm,'<h4>$1</h4>')
+      .replace(/^###\s+(.+)$/gm,'<h3>$1</h3>')
+      .replace(/^##\s+(.+)$/gm,'<h2>$1</h2>')
+      .replace(/^#\s+(.+)$/gm,'<h1>$1</h1>')
+      .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n/g,'<br>');
+  }
+  const raw=window.marked.parse(value,{gfm:true,breaks:true});
+  return window.DOMPurify.sanitize(raw,{ADD_ATTR:['target','rel']});
+}
 function isNearBottom(threshold=96){const box=$('messages');return box.scrollHeight-box.scrollTop-box.clientHeight<=threshold}
 function scrollToLatest(behavior='smooth'){const box=$('messages');box.scrollTo({top:box.scrollHeight,behavior});userPinnedToBottom=true;updateScrollLatestButton()}
 let scrollLatestHideTimer=null;
@@ -1594,7 +1624,7 @@ let userPinnedToBottom=true;
 function render(){
   const box=$('messages'),stick=userPinnedToBottom||isNearBottom();
   if(!history.length){box.innerHTML=welcome();box.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{$('prompt').value=b.dataset.prompt;$('prompt').focus();autoSize()});updateScrollLatestButton();return}
-  box.innerHTML=history.map((m,i)=>{const isLive=streaming&&m.role==='assistant'&&i===history.length-1&&!m.generatedImage;return `<article class="msg ${m.role}${isLive?' streaming-msg':''}" data-message-index="${i}"><span class="avatar">${m.role==='user'?ICONS.user:ICONS.bot}</span><div class="bubble">${attachmentMarkup(m)}<div class="bubble-content${isLive&&m.content&&!m.streamComplete?' streaming':''}">${m.role==='assistant'?(m.uiCard?specialUiCardMarkup(m):(m.content?(isLive&&!m.streamComplete?esc(m.content):renderMarkdown(m.content)):(m.imageGenerating?imageProgressMarkup(m):(isLive?progressMarkup(m):'')))):esc(m.content||'').replace(/\n/g,'<br>')}</div>${generatedFilesMarkup(m,i)}${imageMarkup(m,i)}${modelExecutionMarkup(m)}<div class="msg-actions" dir="${lang==='ar'?'rtl':'ltr'}"><button class="mini-btn" data-copy="${i}">${ICONS.copy} ${I18N[lang].copy}</button>${m.role==='assistant'?`<button class="mini-btn" data-redo="1">${ICONS.redo} ${I18N[lang].redo}</button>${i===history.length-1&&m.content&&!m.generatedImage?`<button class="mini-btn" data-continue="${i}">${ICONS.continue} ${I18N[lang].continueResponse}</button>`:''}`:''}</div></div></article>`}).join('');
+  box.innerHTML=history.map((m,i)=>{const isLive=streaming&&m.role==='assistant'&&i===history.length-1&&!m.generatedImage;return `<article class="msg ${m.role}${isLive?' streaming-msg':''}" data-message-index="${i}"><span class="avatar">${m.role==='user'?ICONS.user:ICONS.bot}</span><div class="bubble">${attachmentMarkup(m)}<div class="bubble-content${isLive&&m.content&&!m.streamComplete?' streaming':''}">${m.role==='assistant'?(m.uiCard?specialUiCardMarkup(m):(m.content?(isLive&&!m.streamComplete?renderStreamingMarkdown(m.content):renderMarkdown(m.content)):(m.imageGenerating?imageProgressMarkup(m):(isLive?progressMarkup(m):'')))):esc(m.content||'').replace(/\n/g,'<br>')}</div>${generatedFilesMarkup(m,i)}${imageMarkup(m,i)}${modelExecutionMarkup(m)}<div class="msg-actions" dir="${lang==='ar'?'rtl':'ltr'}"><button class="mini-btn" data-copy="${i}">${ICONS.copy} ${I18N[lang].copy}</button>${m.role==='assistant'?`<button class="mini-btn" data-redo="1">${ICONS.redo} ${I18N[lang].redo}</button>${i===history.length-1&&m.content&&!m.generatedImage?`<button class="mini-btn" data-continue="${i}">${ICONS.continue} ${I18N[lang].continueResponse}</button>`:''}`:''}</div></div></article>`}).join('');
   bindMessageActions();cacheRenderedGeneratedImages();box.querySelectorAll('[data-download-image]').forEach(b=>b.onclick=()=>downloadGeneratedImage(Number(b.dataset.downloadImage)));box.querySelectorAll('[data-preview-image]').forEach(img=>{const open=()=>openImagePreview(Number(img.dataset.previewImage));img.onclick=open;img.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});box.querySelectorAll('[data-download-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.downloadAiFile.split(':').map(Number);downloadGeneratedFile(mi,fi)});box.querySelectorAll('[data-preview-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.previewAiFile.split(':').map(Number);previewGeneratedFile(mi,fi)});box.querySelectorAll('[data-download-project]').forEach(b=>b.onclick=()=>downloadGeneratedProject(Number(b.dataset.downloadProject)));
   requestAnimationFrame(()=>{if(stick)scrollToLatest('auto');else updateScrollLatestButton()});
 }
@@ -1619,8 +1649,10 @@ function updateStreamingBubble(){
   if(!content)return;
   const message=history.at(-1),text=message?.content||'',stick=userPinnedToBottom||isNearBottom(180);
   content.classList.toggle('streaming',Boolean(text)&&!message?.streamComplete);
-  if(text)content.textContent=text;
-  else content.innerHTML=progressMarkup(message);
+  if(text){
+    const html=renderStreamingMarkdown(text);
+    if(content.dataset.streamHtml!==html){content.innerHTML=html;content.dataset.streamHtml=html}
+  }else content.innerHTML=progressMarkup(message);
   if(stick){box.scrollTo({top:box.scrollHeight,behavior:'auto'});userPinnedToBottom=true}
   else{userPinnedToBottom=false;updateScrollLatestButton()}
 }
