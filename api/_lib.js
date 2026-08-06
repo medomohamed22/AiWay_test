@@ -544,7 +544,7 @@ export const TRIAL_MESSAGE_LIMIT = 10;
 export const TRIAL_TOKENS = 10;
 export const PI_PRICE_BUFFER = 0.05;
 export const TRIAL_MODEL_FALLBACK = 'openrouter/free';
-const tokensForUsd = usd => Math.floor(Number(usd) * PROVIDER_BUDGET_SHARE / TOKEN_USD);
+const tokensForUsd = usd => Math.round(Number(usd) * PROVIDER_BUDGET_SHARE / TOKEN_USD);
 export const PACKAGES = {
   lite: { name_ar:'لايت', name_en:'Lite', usd:2, tokens:tokensForUsd(2), recommendedFor:'light' },
   starter: { name_ar:'ستارتر', name_en:'Starter', usd:5, tokens:tokensForUsd(5), recommendedFor:'regular' },
