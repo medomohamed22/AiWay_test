@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
 
 function extractDownloadableFiles(text) {
@@ -283,7 +285,7 @@ The following JSON is a trusted AiWay tool profile. Follow it as system-level sp
 ${JSON.stringify(toolInstructionPayload)}` : '';
     const safeMessages = [{ role: 'system', content: formatSystemPrompt(model, language) + taskPrompt }, ...cleaned.filter(message => message.role !== 'system')];
 
-    const desiredOutputTokens = purchased ? 16384 : 8192;
+    const desiredOutputTokens = purchased ? 32768 : 16384;
     const initialEstimate = estimateChatCharge(model.pricing, safeMessages, webSearch, desiredOutputTokens);
     const reservedTokenAmount = purchased ? reservationTokens(initialEstimate.chargedTokens, 'chat') : 0;
     if (purchased && availableTokens < reservedTokenAmount) {
@@ -333,7 +335,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     };
     const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),stream:true,stream_options:{include_usage:true},provider:{sort:'throughput',allow_fallbacks:true}};
     if(webSearch)requestBody.plugins=[{id:'web',max_results:5}];
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},90000);
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},240000);
     if(!response.ok){const payload=await response.json().catch(()=>({}));throw openRouterError(response.status,payload,{webSearch});}
     if(!response.body)throw appError('EMPTY_RESPONSE');
 

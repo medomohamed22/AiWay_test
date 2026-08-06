@@ -999,7 +999,7 @@ function expectedOutputTokens(text, inputTokens, attachmentCount, imageCount, we
   let ratio = asksForCode ? 1.35 : asksForLong ? 1.05 : asksForShort ? 0.30 : 0.72;
   let predicted = 48 + latestTokens * ratio + Math.sqrt(Math.max(1, inputTokens)) * 5.5;
   predicted += attachmentCount * 45 + imageCount * 75 + (webSearch ? 120 : 0);
-  return Math.max(64, Math.min(4096, Math.ceil(predicted)));
+  return Math.max(64, Math.min(32768, Math.ceil(predicted)));
 }
 
 export function estimateChatCharge(price, messages = [], webSearch = false, outputReserve = 0) {
@@ -1011,7 +1011,7 @@ export function estimateChatCharge(price, messages = [], webSearch = false, outp
   const imageCount = safeMessages.reduce((sum, message) => sum + (Array.isArray(message?.attachments) ? message.attachments.filter(item => String(item?.type || '').startsWith('image/')).length : 0), 0);
   const automaticOutput = expectedOutputTokens(latestUserText(safeMessages), inputTokens, attachmentCount, imageCount, webSearch);
   const requestedReserve = Number(outputReserve || 0);
-  const reservedOutputTokens = Math.max(64, Math.min(4096, Math.ceil(requestedReserve > 0 ? requestedReserve : automaticOutput)));
+  const reservedOutputTokens = Math.max(64, Math.min(32768, Math.ceil(requestedReserve > 0 ? requestedReserve : automaticOutput)));
   const promptRate = Math.max(0, Number(price?.prompt || 0));
   const completionRate = Math.max(0, Number(price?.completion || 0));
   const requestUsd = Math.max(0, Number(price?.request || 0));
