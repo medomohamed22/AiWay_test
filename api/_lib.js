@@ -9,6 +9,7 @@ const JWT_ISSUER = 'aiway';
 const APP_TOKEN_AUDIENCE = 'aiway-api';
 const ADMIN_TOKEN_AUDIENCE = 'aiway-admin';
 const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
+const PAYMENT_QUOTE_AUDIENCE = 'aiway-payment-quote';
 const APP_SESSION_TTL = '24h';
 
 export function requireEnv() {
@@ -1161,13 +1162,53 @@ export async function getPiUsd() {
   return quote.price;
 }
 
+async function signPaymentQuote(payload) {
+  requireEnv();
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg:'HS256', typ:'JWT' })
+    .setIssuer(JWT_ISSUER)
+    .setAudience(PAYMENT_QUOTE_AUDIENCE)
+    .setJti(randomBytes(12).toString('hex'))
+    .setIssuedAt()
+    .setExpirationTime('5m')
+    .sign(new TextEncoder().encode(jwtSecret));
+}
+
+export async function verifyPaymentQuote(token) {
+  requireEnv();
+  const value = String(token || '').trim();
+  if (!value) throw appError('PAYMENT_INVALID');
+  try {
+    const { payload } = await jwtVerify(value, new TextEncoder().encode(jwtSecret), {
+      issuer: JWT_ISSUER,
+      audience: PAYMENT_QUOTE_AUDIENCE,
+      algorithms: ['HS256']
+    });
+    const packageId = String(payload.packageId || '');
+    const pack = PACKAGES[packageId];
+    const amountPi = Number(payload.amountPi);
+    const usd = Number(payload.usd);
+    const tokens = Number(payload.tokens);
+    if (!pack || !Number.isFinite(amountPi) || amountPi <= 0 || usd !== Number(pack.usd) || tokens !== Number(pack.tokens)) {
+      throw appError('PAYMENT_MISMATCH');
+    }
+    return { packageId, amountPi, usd, tokens, piUsd:Number(payload.piUsd || 0), jti:String(payload.jti || '') };
+  } catch (error) {
+    if (error?.code === 'PAYMENT_MISMATCH') throw error;
+    throw appError('PAYMENT_INVALID');
+  }
+}
+
 export async function packageQuote(id) {
   const pack = PACKAGES[id];
   if (!pack) return null;
   const piUsd = await getPiUsd();
   const baseAmountPi=pack.usd/piUsd;
   const amountPi=Number((baseAmountPi*(1+PI_PRICE_BUFFER)).toFixed(7));
-  return { ...pack, piUsd, baseAmountPi:Number(baseAmountPi.toFixed(7)), priceBufferPercent:PI_PRICE_BUFFER*100, amountPi, quotedAt:new Date().toISOString(), quoteExpiresAt:new Date(Date.now()+5*60_000).toISOString(), pricingSource:piPriceCache.source||'Pi spot market fallback' };
+  const quotedAt=new Date().toISOString();
+  const quoteExpiresAt=new Date(Date.now()+5*60_000).toISOString();
+  const quoteToken=await signPaymentQuote({ packageId:id, amountPi, usd:pack.usd, tokens:pack.tokens, piUsd:Number(piUsd.toFixed(8)) });
+  return { ...pack, piUsd, baseAmountPi:Number(baseAmountPi.toFixed(7)), priceBufferPercent:PI_PRICE_BUFFER*100, amountPi, quotedAt, quoteExpiresAt, quoteToken, pricingSource:piPriceCache.source||'Pi spot market fallback' };
 }
 
 
@@ -1237,7 +1278,7 @@ export async function releaseFreeTrialToken(supabase, userId, requestId) {
 
 
 export function requestIp(req) {
-  return String(req?.headers?.['x-forwarded-for'] || req?.headers?.['x-real-ip'] || 'unknown').split(',')[0].trim().slice(0,80);
+  return String(req?.headers?.['x-real-ip'] || req?.headers?.['x-vercel-forwarded-for'] || req?.headers?.['x-forwarded-for'] || 'unknown').split(',')[0].trim().slice(0,80);
 }
 export async function enforceRateLimit(supabase,bucket,limit,windowSeconds) {
   const {data,error}=await supabase.rpc('check_api_rate_limit',{p_bucket:String(bucket).slice(0,180),p_limit:limit,p_window_seconds:windowSeconds});

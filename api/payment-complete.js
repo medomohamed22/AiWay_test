@@ -1,4 +1,4 @@
-import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, PACKAGES, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, sendTelegramNotification, telegramHtml, formatCairoDateTime } from './_lib.js';
+import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, PACKAGES, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, sendTelegramNotification, telegramHtml, formatCairoDateTime, verifyPaymentQuote } from './_lib.js';
 
 const piHeaders=()=>({Authorization:`Key ${process.env.PI_SECRET_KEY}`,'Content-Type':'application/json'});
 async function piRequest(paymentId,action='',body){
@@ -10,7 +10,7 @@ async function piRequest(paymentId,action='',body){
   if(!response.ok)throw piApiError(response.status,data,{operation:'payment'});
   return data;
 }
-function owner(r){return String(r?.user_uid||r?.user?.uid||r?.metadata?.pi_uid||'').trim();}
+function owner(r){return String(r?.user_uid||r?.user?.uid||'').trim();}
 function pkg(r){return String(r?.metadata?.packageId||r?.metadata?.package_id||'').trim();}
 function closeEnough(a,b){
   const x=Number(a),y=Number(b);
@@ -86,8 +86,18 @@ export default async function handler(req,res){
       const remoteTokens=Number(remote?.metadata?.tokens);
       const remoteUsd=Number(remote?.metadata?.usd);
       const amountPi=Number(remote?.amount);
+      const remoteQuoteToken=norm(remote?.metadata?.quoteToken||remote?.metadata?.quote_token);
       if(!pack||!Number.isFinite(amountPi)||amountPi<=0||remoteTokens!==Number(pack.tokens)||remoteUsd!==Number(pack.usd)){
         mismatch('PAYMENT_NOT_FOUND_UNRECOVERABLE',{paymentId,userId:user.id,remotePackage,remoteTokens,remoteUsd});
+      }
+      // New payments carry a short-lived server-signed quote. Verify it when present.
+      // Payments created before this hardening can still be recovered using the legacy
+      // package/token/USD checks above, so legitimate pending Pi payments are not stranded.
+      if(remoteQuoteToken){
+        const quote=await verifyPaymentQuote(remoteQuoteToken);
+        if(quote.packageId!==remotePackage||quote.tokens!==remoteTokens||quote.usd!==remoteUsd||!closeEnough(quote.amountPi,amountPi)){
+          mismatch('QUOTE',{paymentId,remotePackage});
+        }
       }
       const recovered={
         user_id:user.id,
@@ -115,8 +125,15 @@ export default async function handler(req,res){
     const remotePackage=pkg(remote);
     if(remotePackage!==norm(payment.package_id)||!PACKAGES[remotePackage])mismatch('PACKAGE',{paymentId,remotePackage,storedPackage:payment.package_id});
     if(!closeEnough(remote.amount,payment.amount_pi))mismatch('AMOUNT',{paymentId,remoteAmount:remote.amount,storedAmount:payment.amount_pi});
-    const remoteTokens=Number(remote?.metadata?.tokens||payment.ai_tokens);
+    const remoteTokens=Number(remote?.metadata?.tokens);
+    const remoteUsd=Number(remote?.metadata?.usd);
     if(remoteTokens!==Number(payment.ai_tokens))mismatch('TOKENS',{paymentId,remoteTokens,storedTokens:payment.ai_tokens});
+    if(remoteUsd!==Number(payment.usd_amount))mismatch('USD',{paymentId,remoteUsd,storedUsd:payment.usd_amount});
+    const completionQuoteToken=norm(remote?.metadata?.quoteToken||remote?.metadata?.quote_token);
+    if(completionQuoteToken){
+      const quote=await verifyPaymentQuote(completionQuoteToken);
+      if(quote.packageId!==remotePackage||quote.tokens!==remoteTokens||quote.usd!==remoteUsd||!closeEnough(quote.amountPi,remote.amount))mismatch('QUOTE',{paymentId,remotePackage});
+    }
 
     const remoteTx=verifiedTransaction(remote);
     if(!remoteTx)throw appError('PAYMENT_PENDING');

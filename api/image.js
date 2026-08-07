@@ -1,6 +1,16 @@
 import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints } from './_lib.js';
 
 
+const SAFE_IMAGE_TYPES = new Set(['image/png','image/jpeg','image/webp']);
+function detectSafeImageType(file) {
+  if (!Buffer.isBuffer(file) || !file.length) return '';
+  if (file.length >= 8 && file.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  if (file.length >= 3 && file[0] === 0xff && file[1] === 0xd8 && file[2] === 0xff) return 'image/jpeg';
+  if (file.length >= 12 && file.toString('ascii',0,4) === 'RIFF' && file.toString('ascii',8,12) === 'WEBP') return 'image/webp';
+  return '';
+}
+function imageExtension(mediaType) { return mediaType === 'image/png' ? 'png' : mediaType === 'image/webp' ? 'webp' : 'jpg'; }
+
 function isStorageCapacityError(error) {
   const text = String(error?.message || error?.error || error || '').toLowerCase();
   const status = Number(error?.statusCode || error?.status || 0);
@@ -121,7 +131,10 @@ async function downloadImage(req, res, ticketed = false, inline = false) {
     }
   }
   if (!file?.length) throw new Error('IMAGE_NOT_FOUND');
-  const extension = mediaType.includes('png') ? 'png' : mediaType.includes('webp') ? 'webp' : 'jpg';
+  const detectedType = detectSafeImageType(file);
+  if (!detectedType) throw new Error('IMAGE_NOT_FOUND');
+  mediaType = detectedType;
+  const extension = imageExtension(mediaType);
   const filename = safeFilename(`AiWay-${image.id}`, extension);
 
   res.status(200);
@@ -143,10 +156,13 @@ async function persistImage(req, res) {
 
   const match = imageData.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=\r\n]+)$/);
   if (!match) throw appError('INVALID_IMAGE_REQUEST');
-  const mediaType = String(match[1] || 'image/jpeg').toLowerCase();
-  const extension = mediaType.includes('png') ? 'png' : mediaType.includes('webp') ? 'webp' : 'jpg';
+  const declaredType = String(match[1] || '').trim().toLowerCase();
+  if (!SAFE_IMAGE_TYPES.has(declaredType)) throw appError('INVALID_IMAGE_REQUEST');
   const file = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
   if (!file.length || file.length > 25 * 1024 * 1024) throw appError('ATTACHMENT_TOO_LARGE');
+  const mediaType = detectSafeImageType(file);
+  if (!mediaType || mediaType !== declaredType) throw appError('INVALID_IMAGE_REQUEST');
+  const extension = imageExtension(mediaType);
 
   const supabase = db();
   const { data: image, error } = await supabase.from('generated_images')
