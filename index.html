@@ -907,12 +907,14 @@ function setBalanceDisplay(value){
     button.title=(lang==='ar'?'الرصيد المتاح: ':'Available balance: ')+formatted;
   }
 }
-function routedTaskId(){return activeTask==='all-models'?null:activeTask}
+function routedTaskId(){return activeTask||null}
 function taskRoutedModelId(){
   if(userProfile && !userProfile.has_purchased && activeTask!=='image') return 'openrouter/free';
   const selected=selectedModel();
-  return routedTaskId()&&selected?.type!=='image'?'aiway/auto':($('model').value||'openrouter/auto');
+  const shouldAutoRoute=activeTask&&activeTask!=='all-models'&&selected?.type!=='image';
+  return shouldAutoRoute?'aiway/auto':($('model').value||'openrouter/auto');
 }
+
 function renderAccountState(){
   if(auth&&userProfile){
     $('profileName').textContent='@'+(userProfile.username||'Pi');
@@ -1877,7 +1879,7 @@ async function continueResponse(index){
     if(!auth){await login();return}
     if(userProfile&&Number(userProfile.has_purchased?userProfile.ai_tokens:(userProfile.free_trial_tokens??userProfile.trial_messages_remaining??0))<=0)throw makeUiError(lang==='ar'?'رصيدك انتهى. اشحن رصيدًا جديدًا ثم حاول مرة أخرى.':'Your balance has run out. Add more balance, then try again.','INSUFFICIENT_TOKENS',{availableTokens:0});
     if(!current||!target.id){toast(lang==='ar'?'احفظ المحادثة أولًا ثم حاول مرة أخرى':'Save the conversation first, then try again');return}
-    const modelId=activeTask?'aiway/auto':(target.model_id||target.routedModelId||target.token_usage?.activeModelId||$('model').value);
+    const modelId=activeTask&&activeTask!=='all-models'?'aiway/auto':($('model').value||target.model_id||target.routedModelId||target.token_usage?.activeModelId||'openrouter/auto');
     streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
     target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
     let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
