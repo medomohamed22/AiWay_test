@@ -58,7 +58,10 @@ export default async function handler(req, res) {
       const IMAGE_MODELS=await imageModels();
       const settings = await getToolModelSettings();
       const taskId = String(body.taskId || '').trim().toLowerCase();
-      const configuredImageId = taskId === 'image' ? String(settings.image || '').trim() : '';
+      // Keep estimate routing identical to /api/chat: the 'all-models' workspace
+      // must honor the exact model explicitly selected by the user.
+      const routingTaskId = taskId === 'all-models' ? '' : taskId;
+      const configuredImageId = routingTaskId === 'image' ? String(settings.image || '').trim() : '';
       const image = (configuredImageId && IMAGE_MODELS.find(model => model.id === configuredImageId))
         || IMAGE_MODELS.find(model => model.id === body.modelId)
         || null;
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
         const estimate=await imageEstimate(image,body.resolution,body.aspectRatio,Boolean(body.hasReferenceImage));
         return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, ...(estimatePurchased?estimate:{providerUsd:0,chargedTokens:1}), approximate:true, freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial', resolution:String(body.resolution||''), aspectRatio:String(body.aspectRatio||''), megapixels:estimate.megapixels, pricingBasis:estimate.pricingBasis, unitPrice:estimate.unitPrice });
       }
-      const id = settings[taskId] || body.modelId;
+      const id = (routingTaskId ? settings[routingTaskId] : '') || body.modelId;
       const model = models.find(item => item.id === id) || models[0];
       const estimate = estimateChatCharge(model.pricing, Array.isArray(body.messages) ? body.messages : [], Boolean(body.webSearch), Number(body.outputReserve || 0));
       return json(res, 200, {

@@ -90,14 +90,15 @@ export default async function handler(req,res){
       if(!pack||!Number.isFinite(amountPi)||amountPi<=0||remoteTokens!==Number(pack.tokens)||remoteUsd!==Number(pack.usd)){
         mismatch('PAYMENT_NOT_FOUND_UNRECOVERABLE',{paymentId,userId:user.id,remotePackage,remoteTokens,remoteUsd});
       }
-      // New payments carry a short-lived server-signed quote. Verify it when present.
-      // Payments created before this hardening can still be recovered using the legacy
-      // package/token/USD checks above, so legitimate pending Pi payments are not stranded.
-      if(remoteQuoteToken){
-        const quote=await verifyPaymentQuote(remoteQuoteToken);
-        if(quote.packageId!==remotePackage||quote.tokens!==remoteTokens||quote.usd!==remoteUsd||!closeEnough(quote.amountPi,amountPi)){
-          mismatch('QUOTE',{paymentId,remotePackage});
-        }
+      // A payment that is missing locally is recoverable only when it carries the
+      // server-signed quote introduced by the hardened checkout. Package/token/USD
+      // metadata alone is client-controlled and must never authorize recovery.
+      if(!remoteQuoteToken){
+        mismatch('PAYMENT_NOT_FOUND_UNRECOVERABLE',{paymentId,userId:user.id,remotePackage,reason:'missing_signed_quote'});
+      }
+      const quote=await verifyPaymentQuote(remoteQuoteToken);
+      if(quote.packageId!==remotePackage||quote.tokens!==remoteTokens||quote.usd!==remoteUsd||!closeEnough(quote.amountPi,amountPi)){
+        mismatch('QUOTE',{paymentId,remotePackage});
       }
       const recovered={
         user_id:user.id,

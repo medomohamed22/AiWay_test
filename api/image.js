@@ -123,13 +123,8 @@ async function downloadImage(req, res, ticketed = false, inline = false) {
       file = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
     }
   }
-  if (!file && image.source_url && /^https:\/\//i.test(String(image.source_url))) {
-    const remote = await fetchWithTimeout(String(image.source_url), {}, 30000);
-    if (remote.ok) {
-      file = Buffer.from(await remote.arrayBuffer());
-      mediaType = String(remote.headers.get('content-type') || mediaType).split(';')[0].trim().toLowerCase();
-    }
-  }
+  // Serve generated images only from our own storage/database copy.
+  // Arbitrary persisted source URLs are never fetched here, preventing SSRF.
   if (!file?.length) throw new Error('IMAGE_NOT_FOUND');
   const detectedType = detectSafeImageType(file);
   if (!detectedType) throw new Error('IMAGE_NOT_FOUND');
