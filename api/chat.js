@@ -163,6 +163,9 @@ export default async function handler(req, res) {
     const user = await requireUser(req);
     const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId } = req.body || {};
     const taskId = cleanText(rawTaskId, 30).toLowerCase();
+    // all-models is a UI workspace identity that must be persisted in chat history,
+    // but it must never trigger task auto-routing or inject a specialist prompt.
+    const routingTaskId = taskId === 'all-models' ? '' : taskId;
     const continueFromMessageId = cleanText(rawContinueFromMessageId, 80);
     const requestId = normalizeRequestId(rawRequestId);
     reservationUserId = user.id; reservationRequestId = requestId;
@@ -240,9 +243,9 @@ export default async function handler(req, res) {
 
     const latestUserText = [...cleaned].reverse().find(m => m.role === 'user')?.content;
     const latestTextValue = typeof latestUserText === 'string' ? latestUserText : latestUserText?.find?.(part => part.type === 'text')?.text || '';
-    const autoSelected = modelId === 'aiway/auto' || Boolean(taskId);
+    const autoSelected = modelId === 'aiway/auto' || Boolean(routingTaskId);
     if (autoSelected) {
-      model = await chooseTaskModel(taskId, latestTextValue, {
+      model = await chooseTaskModel(routingTaskId, latestTextValue, {
         webSearch,
         hasAttachments: safeAttachments.length > 0
       }) || await chooseAutoModel(latestTextValue, {
@@ -258,10 +261,10 @@ export default async function handler(req, res) {
     if (isFreeModel(model) && purchased) await claimFreeDailyUse(supabase, user.id, 'chat');
     const language = detectLanguage(latestTextValue);
     let toolConfig = null;
-    if (taskId) {
+    if (routingTaskId) {
       const { data: configuredTool, error: toolError } = await supabase.from('ai_tools')
         .select('id,name_ar,name_en,description_ar,description_en,tool_type,prompt_config,is_active')
-        .eq('id', taskId).eq('is_active', true).maybeSingle();
+        .eq('id', routingTaskId).eq('is_active', true).maybeSingle();
       if (toolError) throw appError('DATABASE_ERROR', {}, toolError);
       toolConfig = configuredTool || null;
     }
@@ -270,11 +273,11 @@ export default async function handler(req, res) {
       summary: {role:'summarization specialist',objective_ar:'تلخيص المحتوى مع الحفاظ على الأفكار والقرارات والخطوات المهمة.',objective_en:'Summarize content while preserving key ideas, decisions, and action items.',rules:['Do not invent information.']},
       translate: {role:'professional translator',objective_ar:'الترجمة الطبيعية مع الحفاظ على المعنى والسياق والنبرة.',objective_en:'Translate naturally while preserving meaning, context, and tone.',rules:['Avoid unnecessary literal translation.']}
     };
-    const promptConfig = toolConfig?.prompt_config && typeof toolConfig.prompt_config === 'object' ? toolConfig.prompt_config : (legacyInstructions[taskId] || {});
-    const toolInstructionPayload = taskId ? {
+    const promptConfig = toolConfig?.prompt_config && typeof toolConfig.prompt_config === 'object' ? toolConfig.prompt_config : (legacyInstructions[routingTaskId] || {});
+    const toolInstructionPayload = routingTaskId ? {
       instruction_type:'aiway_tool_profile',
-      tool_id:taskId,
-      tool_name:language==='ar'?(toolConfig?.name_ar||taskId):(toolConfig?.name_en||taskId),
+      tool_id:routingTaskId,
+      tool_name:language==='ar'?(toolConfig?.name_ar||routingTaskId):(toolConfig?.name_en||routingTaskId),
       tool_description:language==='ar'?(toolConfig?.description_ar||''):(toolConfig?.description_en||''),
       locale:language,
       ...promptConfig
