@@ -609,7 +609,7 @@ let modelCatalogCache={expires:0,data:null};
 export async function getAvailableModels(){
   if(modelCatalogCache.data&&Date.now()<modelCatalogCache.expires)return modelCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
   try{
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=text',{headers:{Accept:'application/json'}},15000);
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=text',{headers:{Accept:'application/json'}},4500);
     if(!response.ok)throw new Error(`OpenRouter models ${response.status}`);
     const payload=await response.json();
     const all=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.id&&x.outputModalities.includes('text'));
@@ -708,8 +708,8 @@ export async function getOpenRouterVideoModels(){
     // The dedicated endpoint is the source of truth for generation controls and
     // pricing SKUs; the general Models API supplies architecture input/output modalities.
     const [videoResponse,generalResponse]=await Promise.all([
-      fetchWithTimeout('https://openrouter.ai/api/v1/videos/models',{headers},15000),
-      fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=video',{headers:{Accept:'application/json'}},15000)
+      fetchWithTimeout('https://openrouter.ai/api/v1/videos/models',{headers},4500),
+      fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=video',{headers:{Accept:'application/json'}},4500)
     ]);
     if(!videoResponse.ok)throw new Error(`OpenRouter video models ${videoResponse.status}`);
     const videoPayload=await videoResponse.json();
@@ -758,7 +758,7 @@ let imageCatalogCache={expires:0,data:null};
 export async function getOpenRouterImageModels(){
   if(imageCatalogCache.data&&Date.now()<imageCatalogCache.expires)return imageCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
   try{
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images/models',{headers:{Accept:'application/json'}},15000);
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images/models',{headers:{Accept:'application/json'}},4500);
     if(!response.ok)throw new Error(`OpenRouter image models ${response.status}`);
     const payload=await response.json();
     const items=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.outputModalities.includes('image'));

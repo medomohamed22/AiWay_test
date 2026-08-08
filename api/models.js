@@ -42,6 +42,46 @@ const enumValues=(descriptor,fallback=[])=>Array.isArray(descriptor)?descriptor.
 const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['512','1K','2K','4K']) }));
 const videoModels = async () => (await getOpenRouterVideoModels()).map(model=>({ ...model, shortName:model.name, type:'video', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['16:9','9:16','1:1']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['720p','1080p']), supportedDurations:enumValues(model.supported_parameters?.duration,['4','5','6','8','10']), pricePerSecond:videoPricePerSecond(model) })).sort((a,b)=>(a.pricePerSecond||Infinity)-(b.pricePerSecond||Infinity)||a.name.localeCompare(b.name));
 
+async function safeCatalog(load, fallback = []) {
+  try {
+    const value = await load();
+    return Array.isArray(value) && value.length ? value : fallback;
+  } catch (error) {
+    console.warn('[MODELS_OPTIONAL_CATALOG_FALLBACK]', error?.message || error);
+    return fallback;
+  }
+}
+
+async function safeUnlocked(req) {
+  try {
+    const user = await requireUser(req);
+    const { data, error } = await db().from('users').select('has_purchased').eq('id', user.id).single();
+    if (error) throw error;
+    return Boolean(data?.has_purchased);
+  } catch {
+    return false;
+  }
+}
+
+async function loadPackageQuotes() {
+  const packages = {};
+  const ids = Object.keys(PACKAGES);
+  if (!ids.length) return packages;
+  // Refresh the shared Pi/USD cache only once. If all price providers are down,
+  // do not retry the same external lookup once per package.
+  try {
+    const firstId = ids[0];
+    packages[firstId] = await packageQuote(firstId);
+    for (const id of ids.slice(1)) {
+      try { packages[id] = await packageQuote(id); }
+      catch { packages[id] = { ...PACKAGES[id], amountPi:null }; }
+    }
+  } catch {
+    for (const id of ids) packages[id] = { ...PACKAGES[id], amountPi:null };
+  }
+  return packages;
+}
+
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
   const locale = requestLocale(req);
@@ -93,14 +133,21 @@ export default async function handler(req, res) {
       });
     }
 
-    let unlocked = false;
-    try {
-      const user = await requireUser(req);
-      const { data } = await db().from('users').select('has_purchased').eq('id', user.id).single();
-      unlocked = Boolean(data?.has_purchased);
-    } catch {}
-
-    const catalog = await getAvailableModels();
+    // Load independent sources concurrently. Pi/USD quotes are intentionally
+    // excluded from ordinary catalog reads and fetched only when the payment UI asks
+    // for them (?quotes=1), so exchange outages cannot slow or hide model lists.
+    const wantsQuotes = String(req.query?.quotes || '') === '1';
+    const packagePromise = wantsQuotes
+      ? loadPackageQuotes()
+      : Promise.resolve(Object.fromEntries(Object.entries(PACKAGES).map(([id, pack]) => [id, { ...pack, amountPi:null }])));
+    const [unlocked, catalog, IMAGE_MODELS, VIDEO_MODELS, packages, tools] = await Promise.all([
+      safeUnlocked(req),
+      safeCatalog(() => getAvailableModels(), []),
+      safeCatalog(() => imageModels(), []),
+      safeCatalog(() => videoModels(), []),
+      packagePromise,
+      safeCatalog(() => getAiTools(), [])
+    ]);
     const freeModels = catalog.filter(model =>
       (model.id === 'openrouter/free' ||
       model.id.endsWith(':free') ||
@@ -119,7 +166,7 @@ export default async function handler(req, res) {
     const normalizedModelName = model => String(model?.name || model?.id || '')
       .toLowerCase()
       .replace(/\([^)]*\)/g, ' ')
-      .replace(/(?:free|preview|experimental)/g, ' ')
+      .replace(/\b(?:free|preview|experimental)\b/g, ' ')
       .replace(/[^a-z0-9.]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -156,18 +203,13 @@ export default async function handler(req, res) {
         costPerMillion:(Number(model.pricing?.prompt || 0) + Number(model.pricing?.completion || 0)) * 1e6
       };
     }).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
-    const packages = {};
-    for (const id of Object.keys(PACKAGES)) {
-      try { packages[id] = await packageQuote(id); }
-      catch { packages[id] = { ...PACKAGES[id], amountPi:null }; }
-    }
     return json(res, 200, {
       name:'AiWay', models,
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
       trialModelId:'openrouter/free', packages,
-      imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
-      videoModels:(await videoModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
-      tokenUsd:TOKEN_USD, tools:await getAiTools(), providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
+      imageModels:IMAGE_MODELS.map(model => ({ ...model, locked:!unlocked, isFree:false })),
+      videoModels:VIDEO_MODELS.map(model => ({ ...model, locked:!unlocked, isFree:false })),
+      tokenUsd:TOKEN_USD, tools, providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {
     console.error(error);
