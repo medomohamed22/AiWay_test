@@ -23,7 +23,7 @@ async function optional(factory,fallback=[]){try{return await fetchAll(factory)}
 function cost(u){return u&&typeof u==='object'?Math.max(0,num(u.providerUsd||u.cost)):0}
 function charged(u){return u&&typeof u==='object'?Math.max(0,num(u.chargedTokens||u.tokens_charged)):0}
 function latency(u){return u&&typeof u==='object'?Math.max(0,num(u.latency_ms||u.latencyMs||u.generation_time_ms||u.generationTimeMs)):0}
-function tokens(u){if(!u||typeof u!=='object')return 0;return num(u.total_tokens||u.totalTokens)+num(u.prompt_tokens||u.promptTokens)+num(u.completion_tokens||u.completionTokens)}
+function tokens(u){if(!u||typeof u!=='object')return 0;const total=num(u.total_tokens||u.totalTokens);return total>0?total:num(u.prompt_tokens||u.promptTokens)+num(u.completion_tokens||u.completionTokens)}
 function groupDaily(rows,dateKey,days=30){const out=[];for(let i=days-1;i>=0;i--){const d=new Date(Date.now()-i*86400000).toISOString().slice(0,10);out.push({date:d,value:0})}const map=new Map(out.map(x=>[x.date,x]));for(const r of rows){const raw=r[dateKey];if(!raw)continue;const x=map.get(isoDay(raw));if(x)x.value++}return out}
 async function gemini(){
   const apiKey=String(process.env.OPENROUTER_API_KEY||'').trim();

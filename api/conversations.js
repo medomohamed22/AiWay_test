@@ -1,4 +1,4 @@
-import {allowMethods,appError,cleanText,createDownloadTicket,db,handleError,json,localize,requestLocale,requireUser,requireAdmin,sendTelegramNotification,telegramHtml,formatCairoDateTime} from './_lib.js';
+import {allowMethods,appError,cleanText,createDownloadTicket,db,handleError,json,localize,requestLocale,requireUser,requireAdmin,sendTelegramNotification,telegramHtml,formatCairoDateTime,requestIp,enforceRateLimit} from './_lib.js';
 
 async function handleSupport(req,res,user,s,locale){
   const mode=String(req.query?.mode||req.body?.mode||'');
@@ -14,7 +14,6 @@ async function handleSupport(req,res,user,s,locale){
         if(tErr)throw appError('DATABASE_ERROR',{},tErr);
         const {data:messages,error:mErr}=await s.from('support_messages').select('id,sender_role,message,created_at,read_at').eq('thread_id',threadId).order('created_at',{ascending:true});
         if(mErr)throw appError('DATABASE_ERROR',{},mErr);
-        await s.from('support_messages').update({read_at:new Date().toISOString()}).eq('thread_id',threadId).eq('sender_role','user').is('read_at',null);
         return json(res,200,{thread,messages:messages||[]});
       }
       const {data:threads,error}=await s.from('support_threads').select('id,user_id,username,status,created_at,updated_at').order('updated_at',{ascending:false});
@@ -24,17 +23,31 @@ async function handleSupport(req,res,user,s,locale){
       const counts=unread.reduce((a,x)=>(a[x.thread_id]=(a[x.thread_id]||0)+1,a),{});
       return json(res,200,{threads:(threads||[]).map(t=>({...t,unread:counts[t.id]||0}))});
     }
-    let {data:thread,error:tErr}=await s.from('support_threads').select('id,user_id,username,status,created_at,updated_at').eq('user_id',user.id).maybeSingle();
+    const {data:thread,error:tErr}=await s.from('support_threads').select('id,user_id,username,status,created_at,updated_at').eq('user_id',user.id).maybeSingle();
     if(tErr)throw appError('DATABASE_ERROR',{},tErr);
-    if(!thread){const {data,error}=await s.from('support_threads').insert({user_id:user.id,username:user.username||'Pi User'}).select('*').single();if(error)throw appError('DATABASE_ERROR',{},error);thread=data}
+    if(!thread)return json(res,200,{thread:null,messages:[],unread:0});
     const {data:messages,error:mErr}=await s.from('support_messages').select('id,sender_role,message,created_at,read_at').eq('thread_id',thread.id).order('created_at',{ascending:true});
     if(mErr)throw appError('DATABASE_ERROR',{},mErr);
     const unread=(messages||[]).filter(m=>m.sender_role==='admin'&&!m.read_at).length;
-    if(String(req.query?.markRead||'')==='1'&&unread)await s.from('support_messages').update({read_at:new Date().toISOString()}).eq('thread_id',thread.id).eq('sender_role','admin').is('read_at',null);
     return json(res,200,{thread,messages:messages||[],unread});
   }
 
   if(req.method==='POST'){
+    await enforceRateLimit(s,`support:${user.id}:${requestIp(req)}`,30,60);
+    const action=String(req.body?.action||'message');
+    if(action==='mark-read'){
+      if(isAdminMode){
+        const threadId=String(req.body?.threadId||'');
+        if(!threadId)return json(res,400,{error:localize(locale,'محادثة الدعم مطلوبة.','Support thread is required.'),code:'INVALID_REQUEST'});
+        const {error}=await s.from('support_messages').update({read_at:new Date().toISOString()}).eq('thread_id',threadId).eq('sender_role','user').is('read_at',null);
+        if(error)throw appError('DATABASE_ERROR',{},error);
+      }else{
+        const {data:thread,error:tErr}=await s.from('support_threads').select('id').eq('user_id',user.id).maybeSingle();
+        if(tErr)throw appError('DATABASE_ERROR',{},tErr);
+        if(thread){const {error}=await s.from('support_messages').update({read_at:new Date().toISOString()}).eq('thread_id',thread.id).eq('sender_role','admin').is('read_at',null);if(error)throw appError('DATABASE_ERROR',{},error)}
+      }
+      return json(res,200,{marked:true});
+    }
     const message=cleanText(req.body?.message,2000);
     if(!message)return json(res,400,{error:localize(locale,'اكتب رسالة الدعم أولًا.','Write a support message first.'),code:'INVALID_REQUEST'});
     if(isAdminMode){
@@ -73,9 +86,9 @@ async function handleAnnouncements(req,res,user,s,locale){
     const createdAt=userProfile?.created_at?new Date(userProfile.created_at).getTime():0;const data=(raw||[]).filter(item=>{const audience=item.audience||'all';if(audience==='paid')return hasPaid;if(audience==='new'){const days=Math.max(1,Number(item.new_user_days||7));return createdAt&&createdAt>=Date.now()-days*86400000}return true});
     const ids=data.map(x=>x.id);let reads=[];if(ids.length){const r=await s.from('announcement_reads').select('announcement_id,read_at').eq('user_id',user.id).in('announcement_id',ids);if(r.error)throw appError('DATABASE_ERROR',{},r.error);reads=r.data||[]}
     const map=new Map(reads.map(x=>[x.announcement_id,x.read_at]));const announcements=data.map(x=>({...x,read_at:map.get(x.id)||null}));const unread=announcements.filter(x=>!x.read_at).length;
-    if(String(req.query?.markRead||'')==='1'&&ids.length){const rows=ids.map(id=>({announcement_id:id,user_id:user.id,read_at:now}));const r=await s.from('announcement_reads').upsert(rows,{onConflict:'announcement_id,user_id'});if(r.error)throw appError('DATABASE_ERROR',{},r.error);announcements.forEach(x=>x.read_at=now)}
-    return json(res,200,{announcements,unread:String(req.query?.markRead||'')==='1'?0:unread});
+    return json(res,200,{announcements,unread});
   }
+  if(req.method==='POST'&&!admin&&String(req.body?.action||'')==='mark-read'){const ids=Array.isArray(req.body?.ids)?req.body.ids.map(x=>String(x)).filter(Boolean).slice(0,50):[];if(!ids.length)return json(res,200,{marked:0});const now=new Date().toISOString();const rows=ids.map(id=>({announcement_id:id,user_id:user.id,read_at:now}));const r=await s.from('announcement_reads').upsert(rows,{onConflict:'announcement_id,user_id'});if(r.error)throw appError('DATABASE_ERROR',{},r.error);return json(res,200,{marked:ids.length});}
   if(req.method==='POST'&&admin){const b=req.body||{},kind=['system','event','update','news'].includes(String(b.kind))?String(b.kind):'system',audience=['all','paid','new'].includes(String(b.audience))?String(b.audience):'all',durationHours=Math.min(8760,Math.max(1,Number(b.durationHours||24))),publishedAt=b.publishedAt||new Date().toISOString(),expiresAt=b.expiresAt||new Date(new Date(publishedAt).getTime()+durationHours*3600000).toISOString();const row={kind,audience,new_user_days:Math.min(90,Math.max(1,Number(b.newUserDays||7))),title_ar:cleanText(b.titleAr,160),title_en:cleanText(b.titleEn,160),body_ar:cleanText(b.bodyAr,4000),body_en:cleanText(b.bodyEn,4000),is_active:b.isActive!==false,published_at:publishedAt,expires_at:expiresAt,created_by:user.id};if(!row.title_ar&&!row.title_en)return json(res,400,{error:localize(locale,'اكتب عنوان الإعلان.','Enter an announcement title.'),code:'INVALID_REQUEST'});if(!row.body_ar&&!row.body_en)return json(res,400,{error:localize(locale,'اكتب محتوى الإعلان.','Enter announcement content.'),code:'INVALID_REQUEST'});const {data,error}=await s.from('announcements').insert(row).select('*').single();if(error)throw appError('DATABASE_ERROR',{},error);return json(res,201,{announcement:data});}
   if(req.method==='PATCH'&&admin){const id=String(req.body?.id||'');const {data,error}=await s.from('announcements').update({is_active:Boolean(req.body?.isActive)}).eq('id',id).select('*').single();if(error)throw appError('DATABASE_ERROR',{},error);return json(res,200,{announcement:data});}
   return json(res,405,{error:'Method not allowed',code:'METHOD_NOT_ALLOWED'});
