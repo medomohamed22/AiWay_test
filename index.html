@@ -682,12 +682,6 @@ body:not(.all-models-active) .topbar>.model-wrap{display:none!important}
   body.all-models-active .model-trigger-copy b{font-size:11px!important}
 }
 </style>
-
-<style id="aiway-guided-tool-options">
-.tool-options{margin:0 0 10px;padding:12px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,#fff,#fbf8fe);text-align:start}
-.tool-options[hidden]{display:none!important}.tool-mode-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.tool-mode-copy{min-width:0}.tool-mode-copy b{display:block;font-size:13px}.tool-mode-copy small{display:block;color:var(--muted);font-size:11px;margin-top:2px}.tool-mode-switch{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);flex:0 0 auto}.tool-mode-btn{border:0;background:transparent;color:var(--muted);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer}.tool-mode-btn.active{background:#fff;color:var(--pi);box-shadow:0 3px 10px rgba(71,38,94,.09)}.tool-pro-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tool-field{min-width:0}.tool-field.full{grid-column:1/-1}.tool-field label{display:block;color:var(--muted);font-size:11px;font-weight:800;margin:0 2px 5px}.tool-field select,.tool-field input{width:100%;height:39px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--text);padding:0 10px;outline:0}.tool-field select:focus,.tool-field input:focus{border-color:#cdb0e4;box-shadow:0 0 0 3px rgba(111,45,189,.08)}.tool-options-hint{margin-top:9px;color:var(--muted);font-size:11px;line-height:1.55}.tool-options.normal .tool-pro-grid,.tool-options.normal .tool-options-hint{display:none}.tool-options.normal{padding-block:9px}.tool-options.normal .tool-mode-row{margin-bottom:0}
-@media(max-width:620px){.tool-options{padding:10px;margin-bottom:8px}.tool-mode-row{align-items:flex-start;flex-direction:column}.tool-mode-switch{width:100%}.tool-mode-btn{flex:1}.tool-pro-grid{grid-template-columns:1fr}.tool-field.full{grid-column:auto}}
-</style>
 </head>
 <body>
 
@@ -792,7 +786,7 @@ body:not(.all-models-active) .topbar>.model-wrap{display:none!important}
 <div class="desktop-preview-pane" id="desktopPreviewPane"><div class="desktop-preview-head"><b id="desktopPreviewTitle">معاينة</b><button class="icon-btn" id="desktopPreviewClose" type="button">×</button></div><div class="desktop-preview-body" id="desktopPreviewBody"></div></div>
 <button class="scroll-latest" id="scrollLatest" type="button" aria-label="Go to latest message" title="Go to latest message"><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 
-<div class="composer-zone"><div class="composer"><div class="attachment-strip" id="attachmentStrip"></div><div class="tool-options" id="toolOptions" hidden></div><textarea id="prompt" rows="1" placeholder="Ask anything..."></textarea><div class="composer-foot"><button class="estimate-toggle active" id="costEstimateQuickToggle" type="button" aria-pressed="true" title="إظهار الحساب التقريبي قبل الإرسال"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h2m3 0h3M8 16h2m3 0h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="estimate-label">الحساب التقريبي</span></button><button class="pill" id="webPill"><span data-icon="globe"></span><span class="pill-text" data-i18n="webSearch">Web search</span></button><button class="pill attach-pill" id="attachBtn" aria-label="Attach image or file" title="Attach image or file"><span data-icon="camera"></span></button><span class="ratio-wrap" id="ratioWrap"><select class="ratio-select" id="aspectRatio" aria-label="Image aspect ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></span><span class="ratio-wrap" id="resolutionWrap"><select class="ratio-select" id="imageResolution" aria-label="Image resolution"></select></span><input id="fileInput" type="file" hidden multiple accept="*/*"><span class="status" id="status"></span><button class="send" id="sendBtn" type="button" aria-label="Send"><span data-icon="send"></span></button></div></div></div>
+<div class="composer-zone"><div class="composer"><div class="attachment-strip" id="attachmentStrip"></div><textarea id="prompt" rows="1" placeholder="Ask anything..."></textarea><div class="composer-foot"><button class="estimate-toggle active" id="costEstimateQuickToggle" type="button" aria-pressed="true" title="إظهار الحساب التقريبي قبل الإرسال"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h2m3 0h3M8 16h2m3 0h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="estimate-label">الحساب التقريبي</span></button><button class="pill" id="webPill"><span data-icon="globe"></span><span class="pill-text" data-i18n="webSearch">Web search</span></button><button class="pill attach-pill" id="attachBtn" aria-label="Attach image or file" title="Attach image or file"><span data-icon="camera"></span></button><span class="ratio-wrap" id="ratioWrap"><select class="ratio-select" id="aspectRatio" aria-label="Image aspect ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></span><span class="ratio-wrap" id="resolutionWrap"><select class="ratio-select" id="imageResolution" aria-label="Image resolution"></select></span><input id="fileInput" type="file" hidden multiple accept="*/*"><span class="status" id="status"></span><button class="send" id="sendBtn" type="button" aria-label="Send"><span data-icon="send"></span></button></div></div></div>
 </main>
 </div>
 <div class="desktop-drop-zone" id="desktopDropZone"><span id="desktopDropText">اسحب الملفات هنا لإضافتها إلى المحادثة</span></div>
@@ -1270,96 +1264,6 @@ const TASK_ICONS={
  study:`<svg viewBox="0 0 48 48" fill="none"><path d="m5 18 19-10 19 10-19 10L5 18Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M12 23v10c7 6 17 6 24 0V23M43 19v13" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
  business:`<svg viewBox="0 0 48 48" fill="none"><rect x="7" y="14" width="34" height="27" rx="5" stroke="currentColor" stroke-width="3"/><path d="M17 14V9h14v5M7 24h34M20 24v4h8v-4" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
-
-const TOOL_OPTION_CONFIGS={
- coding:{
-  fields:[
-   {id:'action',ar:'المهمة',en:'Task',options:[['write','كتابة كود','Write code'],['fix','إصلاح خطأ','Fix a bug'],['explain','شرح كود','Explain code'],['optimize','تحسين الكود','Optimize code'],['convert','تحويل لغة','Convert language']]},
-   {id:'priority',ar:'الأولوية',en:'Priority',options:[['balanced','متوازن','Balanced'],['simple','البساطة','Simplicity'],['performance','الأداء','Performance'],['security','الأمان','Security'],['best-practices','أفضل الممارسات','Best practices']]},
-   {id:'detail',ar:'مستوى الشرح',en:'Explanation',options:[['normal','متوسط','Standard'],['brief','مختصر','Brief'],['step-by-step','خطوة بخطوة','Step by step']]}
-  ],hint:{ar:'سيتم توجيه المساعد لتنفيذ المهمة البرمجية بهذه الأولويات مع الحفاظ على كود كامل وآمن.',en:'The assistant will follow these coding priorities while keeping the code complete and safe.'}
- },
- summary:{
-  fields:[
-   {id:'length',ar:'طول التلخيص',en:'Summary length',options:[['short','مختصر جدًا','Very short'],['medium','متوسط','Medium'],['detailed','تفصيلي','Detailed'],['executive','تنفيذي','Executive']]},
-   {id:'format',ar:'شكل النتيجة',en:'Output format',options:[['bullets','نقاط','Bullet points'],['paragraphs','فقرات','Paragraphs'],['qa','أسئلة وأجوبة','Q&A'],['structured','منظم بعناوين','Structured sections']]},
-   {id:'focus',ar:'التركيز',en:'Focus',options:[['key-points','الأفكار الرئيسية','Key points'],['decisions','القرارات والإجراءات','Decisions & actions'],['study','للدراسة','Study notes'],['facts','الحقائق والأرقام','Facts & figures']]}
-  ],hint:{ar:'لن يضيف التلخيص معلومات غير موجودة في النص أو الملف.',en:'The summary will not invent information that is not in the text or file.'}
- },
- image:{
-  fields:[
-   {id:'style',ar:'الأسلوب البصري',en:'Visual style',options:[['auto','تلقائي','Auto'],['photorealistic','واقعي','Photorealistic'],['cinematic','سينمائي','Cinematic'],['illustration','رسم توضيحي','Illustration'],['3d','ثلاثي الأبعاد','3D'],['minimal','بسيط','Minimal']]},
-   {id:'lighting',ar:'الإضاءة',en:'Lighting',options:[['auto','تلقائية','Auto'],['natural','طبيعية','Natural'],['studio','استوديو','Studio'],['dramatic','درامية','Dramatic'],['soft','ناعمة','Soft']]},
-   {id:'composition',ar:'التكوين',en:'Composition',options:[['auto','تلقائي','Auto'],['close-up','لقطة قريبة','Close-up'],['wide','لقطة واسعة','Wide shot'],['centered','مركزي','Centered'],['dynamic','ديناميكي','Dynamic']]}
-  ],hint:{ar:'الوضع الاحترافي يضيف توجيهًا بصريًا لوصفك بدون تغيير فكرة الصورة الأساسية.',en:'Professional mode adds visual direction without changing the core image idea.'}
- },
- ads:{
-  fields:[
-   {id:'platform',ar:'المنصة',en:'Platform',options:[['general','عام','General'],['instagram','Instagram','Instagram'],['facebook','Facebook','Facebook'],['tiktok','TikTok','TikTok'],['linkedin','LinkedIn','LinkedIn'],['google','Google Ads','Google Ads']]},
-   {id:'goal',ar:'الهدف',en:'Goal',options:[['sales','مبيعات','Sales'],['leads','عملاء محتملون','Leads'],['traffic','زيارات','Traffic'],['awareness','وعي بالعلامة','Brand awareness'],['engagement','تفاعل','Engagement']]},
-   {id:'tone',ar:'النبرة',en:'Tone',options:[['persuasive','مقنعة','Persuasive'],['professional','احترافية','Professional'],['friendly','ودودة','Friendly'],['bold','جريئة','Bold']]}
-  ],hint:{ar:'سيتم تكييف الصياغة والـCTA حسب المنصة والهدف والنبرة.',en:'Copy and CTA will be adapted to the selected platform, goal, and tone.'}
- },
- writing:{
-  fields:[
-   {id:'type',ar:'نوع المحتوى',en:'Content type',options:[['article','مقال','Article'],['email','إيميل','Email'],['social','منشور سوشيال','Social post'],['product','وصف منتج','Product description'],['letter','خطاب','Letter'],['script','سيناريو','Script']]},
-   {id:'tone',ar:'النبرة',en:'Tone',options:[['professional','احترافية','Professional'],['friendly','ودودة','Friendly'],['persuasive','مقنعة','Persuasive'],['simple','بسيطة','Simple'],['creative','إبداعية','Creative']]},
-   {id:'length',ar:'الطول',en:'Length',options:[['short','قصير','Short'],['medium','متوسط','Medium'],['long','تفصيلي','Detailed']]}
-  ],hint:{ar:'سيحافظ المساعد على هدفك ويضبط الأسلوب والبنية حسب نوع المحتوى.',en:'The assistant will preserve your intent and adapt structure and style to the content type.'}
- },
- translate:{
-  fields:[
-   {id:'target',ar:'الترجمة إلى',en:'Translate to',options:[['auto','حسب طلبك / تلقائي','From request / Auto'],['ar','العربية','Arabic'],['en','الإنجليزية','English'],['fr','الفرنسية','French'],['de','الألمانية','German'],['es','الإسبانية','Spanish']]},
-   {id:'style',ar:'أسلوب الترجمة',en:'Translation style',options:[['natural','طبيعية','Natural'],['professional','احترافية','Professional'],['literal','حرفية','Literal'],['simple','مبسطة','Simple']]},
-   {id:'domain',ar:'نوع المحتوى',en:'Content type',options:[['general','عام','General'],['business','أعمال','Business'],['academic','أكاديمي','Academic'],['technical','تقني','Technical']]}
-  ],hint:{ar:'سيتم الحفاظ على المعنى والسياق، مع مراعاة نوع المحتوى والأسلوب المختار.',en:'Meaning and context will be preserved while respecting the selected domain and style.'}
- },
- study:{
-  fields:[
-   {id:'action',ar:'طريقة المساعدة',en:'Learning task',options:[['explain','اشرح لي','Explain'],['solve','حل سؤال','Solve a question'],['summarize','لخص درسًا','Summarize a lesson'],['quiz','اختبرني','Quiz me'],['plan','خطة مذاكرة','Study plan']]},
-   {id:'level',ar:'المستوى',en:'Level',options:[['beginner','مبتدئ','Beginner'],['intermediate','متوسط','Intermediate'],['advanced','متقدم','Advanced'],['child','مبسط جدًا','Very simple']]},
-   {id:'method',ar:'طريقة الشرح',en:'Method',options:[['clear','واضح ومباشر','Clear & direct'],['examples','بأمثلة','With examples'],['step-by-step','خطوة بخطوة','Step by step'],['practice','مع تدريب','With practice']]}
-  ],hint:{ar:'سيتم ضبط الشرح على مستواك وطريقة التعلم المختارة.',en:'The explanation will adapt to your level and preferred learning method.'}
- },
- business:{
-  fields:[
-   {id:'action',ar:'مهمة الأعمال',en:'Business task',options:[['analyze','تحليل فكرة مشروع','Analyze an idea'],['plan','خطة عمل','Business plan'],['swot','تحليل SWOT','SWOT analysis'],['growth','استراتيجية نمو','Growth strategy'],['pricing','تسعير','Pricing'],['pitch','عرض لمستثمر','Investor pitch']]},
-   {id:'focus',ar:'التركيز',en:'Focus',options:[['balanced','متوازن','Balanced'],['profit','الربحية','Profitability'],['risk','المخاطر','Risks'],['competition','المنافسة','Competition'],['execution','التنفيذ','Execution']]},
-   {id:'depth',ar:'عمق التحليل',en:'Analysis depth',options:[['standard','متوسط','Standard'],['quick','سريع','Quick'],['deep','متعمق','Deep']]}
-  ],hint:{ar:'سيتم تنظيم النتيجة بشكل عملي مع افتراضات واضحة وعدم اختلاق بيانات سوقية.',en:'The result will be practical, with clear assumptions and no invented market data.'}
- }
-};
-let toolOptionState={};
-function toolModeFor(id){return toolOptionState[id]?.mode||'normal'}
-function ensureToolState(id){
- const cfg=TOOL_OPTION_CONFIGS[id];if(!cfg)return null;
- if(!toolOptionState[id]){const values={};for(const f of cfg.fields)values[f.id]=f.options[0][0];toolOptionState[id]={mode:'normal',values}}
- return toolOptionState[id];
-}
-function renderToolOptions(){
- const box=$('toolOptions');if(!box)return;
- const cfg=TOOL_OPTION_CONFIGS[activeTask];
- if(!activeTask||activeTask==='all-models'||!cfg){box.hidden=true;box.innerHTML='';return}
- const state=ensureToolState(activeTask),pro=state.mode==='professional';box.hidden=false;box.classList.toggle('normal',!pro);
- const ar=lang==='ar';
- const fields=cfg.fields.map((f,i)=>`<div class="tool-field ${cfg.fields.length%2&&i===cfg.fields.length-1?'full':''}"><label for="toolOpt_${esc(f.id)}">${esc(ar?f.ar:f.en)}</label><select id="toolOpt_${esc(f.id)}" data-tool-field="${esc(f.id)}">${f.options.map(o=>`<option value="${esc(o[0])}" ${state.values[f.id]===o[0]?'selected':''}>${esc(ar?o[1]:o[2])}</option>`).join('')}</select></div>`).join('');
- box.innerHTML=`<div class="tool-mode-row"><div class="tool-mode-copy"><b>${ar?'طريقة الاستخدام':'Usage mode'}</b><small>${ar?(pro?'تحكم أكبر قبل الإرسال':'إرسال سريع بإعدادات مناسبة تلقائيًا'):(pro?'More control before sending':'Fast sending with sensible defaults')}</small></div><div class="tool-mode-switch"><button type="button" class="tool-mode-btn ${!pro?'active':''}" data-tool-mode="normal">${ar?'عادي':'Normal'}</button><button type="button" class="tool-mode-btn ${pro?'active':''}" data-tool-mode="professional">${ar?'احترافي':'Professional'}</button></div></div><div class="tool-pro-grid">${fields}</div><div class="tool-options-hint">${esc(ar?cfg.hint.ar:cfg.hint.en)}</div>`;
- box.querySelectorAll('[data-tool-mode]').forEach(btn=>btn.addEventListener('click',()=>{state.mode=btn.dataset.toolMode;renderToolOptions()}));
- box.querySelectorAll('[data-tool-field]').forEach(sel=>sel.addEventListener('change',()=>{state.values[sel.dataset.toolField]=sel.value}));
-}
-function currentToolOptions(){
- if(!activeTask||activeTask==='all-models'||!TOOL_OPTION_CONFIGS[activeTask])return null;
- const state=ensureToolState(activeTask);return {mode:state.mode,values:{...state.values}};
-}
-function imagePromptWithToolOptions(text){
- const opt=currentToolOptions();if(activeTask!=='image'||!opt||opt.mode!=='professional')return text;
- const v=opt.values||{},parts=[];
- if(v.style&&v.style!=='auto')parts.push(`visual style: ${v.style}`);
- if(v.lighting&&v.lighting!=='auto')parts.push(`lighting: ${v.lighting}`);
- if(v.composition&&v.composition!=='auto')parts.push(`composition: ${v.composition}`);
- return parts.length?`${text}\n\nProfessional visual direction: ${parts.join(', ')}.`:text;
-}
-
 const TASKS={
  coding:{ar:['البرمجة','اكتب الكود، أصلح الأخطاء واشرح الحلول التقنية.','مساعد برمجة اقتصادي ودقيق'],en:['Coding','Write code, fix bugs, and explain technical solutions.','Cost-efficient coding assistant']},
  summary:{ar:['التلخيص','لخّص الملفات والنصوص إلى نقاط وقرارات واضحة.','تلخيص وتحليل المستندات'],en:['Summarization','Turn files and long text into clear points and decisions.','Document summary and analysis']},
@@ -1378,7 +1282,7 @@ function openTaskScreen(){$('taskScreen')?.classList.add('open');document.body.c
 function closeTaskScreen(){$('taskScreen')?.classList.remove('open');document.body.classList.remove('task-mode');try{$('prompt')?.blur()}catch{}}
 function chooseTaskModel(id){if(userProfile&&!userProfile.has_purchased&&id!=='image')return 'openrouter/free';if(id==='image'){const list=(window.aiwayImageModels||[]).filter(m=>!m.locked&&!m.isFree).sort(compareCostAsc);return list[0]?.id||''}return 'aiway/auto'}
 function selectTask(id){if(!TASKS[id])return;if((!userProfile||!userProfile.has_purchased)&&['coding','image'].includes(id)){toast(lang==='ar'?'هذه الأداة تتفعل بعد أول عملية شراء.':'This tool unlocks after your first purchase.');return;}if(['live_audio','live_translate'].includes(TASKS[id].tool_type)){closeTaskScreen();openLiveTool(id);return}activeTask=id;storageSet('aiway_active_task',id);const modelId=chooseTaskModel(id);if(modelId&&$('model')){$('model').value=modelId;updateModelTrigger();syncModelMode()}current=null;history=[];closeTaskScreen();updateTaskContext();render();setTimeout(()=>{try{$('prompt')?.blur()}catch{}},50)}
-function updateTaskContext(){const t=taskText(activeTask),allModels=activeTask==='all-models',imageTask=activeTask==='image';document.body.classList.toggle('all-models-active',allModels);document.body.classList.toggle('image-task-active',imageTask);if($('taskContext'))$('taskContext').style.setProperty('display',(allModels||imageTask)?'none':'flex','important');if($('modelWrap'))$('modelWrap').style.setProperty('display',(allModels||imageTask)?'block':'none','important');if($('taskContextName'))$('taskContextName').textContent=activeTask?t[0]:'AiWay';if($('taskContextHint'))$('taskContextHint').textContent=activeTask?t[2]:(lang==='ar'?'اختر مهمة للبدء':'Choose a task to start');if($('taskContextIcon'))$('taskContextIcon').innerHTML=TASK_ICONS[activeTask]||ICONS.sparkles;if($('taskChangeBtn'))$('taskChangeBtn').textContent=lang==='ar'?'تغيير المهمة':'Change task';if($('prompt')&&activeTask)$('prompt').placeholder=activeTask==='image'?(lang==='ar'?'صف الصورة التي تريد إنشاءها...':'Describe the image you want to create...'):(lang==='ar'?`اكتب طلبك في ${t[0]}...`:`Enter your ${t[0].toLowerCase()} request...`)};renderToolOptions()
+function updateTaskContext(){const t=taskText(activeTask),allModels=activeTask==='all-models',imageTask=activeTask==='image';document.body.classList.toggle('all-models-active',allModels);document.body.classList.toggle('image-task-active',imageTask);if($('taskContext'))$('taskContext').style.setProperty('display',(allModels||imageTask)?'none':'flex','important');if($('modelWrap'))$('modelWrap').style.setProperty('display',(allModels||imageTask)?'block':'none','important');if($('taskContextName'))$('taskContextName').textContent=activeTask?t[0]:'AiWay';if($('taskContextHint'))$('taskContextHint').textContent=activeTask?t[2]:(lang==='ar'?'اختر مهمة للبدء':'Choose a task to start');if($('taskContextIcon'))$('taskContextIcon').innerHTML=TASK_ICONS[activeTask]||ICONS.sparkles;if($('taskChangeBtn'))$('taskChangeBtn').textContent=lang==='ar'?'تغيير المهمة':'Change task';if($('prompt')&&activeTask)$('prompt').placeholder=activeTask==='image'?(lang==='ar'?'صف الصورة التي تريد إنشاءها...':'Describe the image you want to create...'):(lang==='ar'?`اكتب طلبك في ${t[0]}...`:`Enter your ${t[0].toLowerCase()} request...`)}
 
 function positionSigninGuide(){const guide=$('signinGuide'),menu=$('menuBtn');if(!guide||!menu)return;const r=menu.getBoundingClientRect();guide.style.top=Math.round(r.bottom+12)+'px';const width=guide.offsetWidth||280;let left=Math.min(Math.max(8,r.right-width),window.innerWidth-width-8);guide.style.left=Math.round(left)+'px';const arrow=Math.min(Math.max(18,r.left+r.width/2-left),width-18);guide.style.setProperty('--guide-arrow-left',Math.round(arrow)+'px')}
 function dismissSigninGuide(){clearTimeout(showSigninGuide._timer);$('signinGuide')?.classList.remove('show');$('menuBtn')?.classList.remove('signin-pulse')}
@@ -1922,8 +1826,6 @@ async function sendMessage(){
     if(!auth){await login();return}
     if(userProfile&&Number(userProfile.has_purchased?userProfile.ai_tokens:(userProfile.free_trial_tokens??userProfile.trial_messages_remaining??0))<=0)throw makeUiError(lang==='ar'?'رصيدك انتهى. اشحن رصيدًا جديدًا ثم أعد إرسال الرسالة.':'Your balance has run out. Add more balance, then send the message again.','INSUFFICIENT_TOKENS',{availableTokens:0});
     const text=$('prompt').value.trim();
-    const toolOptions=currentToolOptions();
-    const effectiveImageText=imagePromptWithToolOptions(text);
     if(!text&&!pendingAttachments.length){toast(lang==='ar'?'اكتب رسالة أولًا':'Write a message first');return}
     let modelId=taskRoutedModelId();
     if(!modelId){
@@ -1951,9 +1853,9 @@ async function sendMessage(){
     pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
     history.push({role:'user',content:text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files'),attachments:sentAttachments});
     $('prompt').value='';autoSize();render();$('status').textContent='';$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
-    if(selectedModel()?.type==='image'){await generateImageMessage(effectiveImageText,sentAttachments);return}
+    if(selectedModel()?.type==='image'){await generateImageMessage(text,sentAttachments);return}
     const requestLanguage=/[\u0600-\u06FF]/.test(text)?'ar':'en';history.push({role:'assistant',content:'',requestLanguage,usedWebSearch:webSearch,streamStage:'analyzing'});render();stageTimer=setTimeout(()=>{const m=history.at(-1);if(streaming&&m?.role==='assistant'&&!m.content){m.streamStage=webSearch?'searching':'writing';updateStreamingBubble()}},650);
-    let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history.slice(0,-1),temperature:.7,webSearch,attachments:sentAttachments,requestId:newRequestId(),locale:lang,taskId:routedTaskId(),toolOptions})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
+    let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history.slice(0,-1),temperature:.7,webSearch,attachments:sentAttachments,requestId:newRequestId(),locale:lang,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
     if(!r.body)throw makeUiError(lang==='ar'?'تعذر بدء بث الإجابة في هذا المتصفح. حدّث المتصفح وحاول مرة أخرى.':'Could not start response streaming in this browser. Update the browser and try again.','STREAM_INTERRUPTED');
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null;
@@ -1983,7 +1885,7 @@ async function continueResponse(index){
     const modelId=activeTask&&activeTask!=='all-models'?'aiway/auto':($('model').value||target.model_id||target.routedModelId||target.token_usage?.activeModelId||'openrouter/auto');
     streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
     target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
-    let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId(),toolOptions:currentToolOptions()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
+    let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
     if(!r.body)throw makeUiError(lang==='ar'?'تعذر بدء استكمال الإجابة في هذا المتصفح.':'Could not start continuing the response in this browser.','STREAM_INTERRUPTED');
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null;
