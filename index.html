@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#5d3bdf">
+<meta name="theme-color" content="#6f2dbd">
 <meta name="color-scheme" content="light">
 <script>
 // Keep first paint independent from deployment checks and Service Worker updates.
@@ -735,6 +735,104 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 @media(max-width:620px){.intro-shell{width:min(100% - 14px,1240px)!important}.compact-nav{top:6px!important;min-height:58px!important;border-radius:18px!important}.intro-brand img{width:38px!important;height:38px!important}.compact-hero{padding:48px 5px 26px!important;gap:28px!important}.intro-title{font-size:clamp(39px,12vw,57px)!important;letter-spacing:-2.2px!important}.intro-copy{font-size:15px!important}.intro-actions>*{flex:1 1 140px}.compact-tool-panel{padding:12px!important;border-radius:24px!important}.compact-tool-grid{gap:8px!important}.compact-tool-grid button{min-height:102px!important;padding:12px!important;border-radius:16px!important}.compact-tool-grid button>span{width:34px!important;height:34px!important}.compact-bottom-cta{padding:24px!important;border-radius:24px!important;flex-direction:column!important}.compact-bottom-cta .intro-start{width:100%}.task-card{min-height:180px!important;padding:16px!important}.task-card-icon{width:52px!important;height:52px!important;border-radius:16px!important}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}.compact-tool-panel{transform:none!important}}
 </style>
+
+
+<!-- AIWAY CLASSIC REFINED THEME START -->
+<style id="aiway-classic-refined-theme">
+/* Modernized version of AiWay's original purple identity. Visual-only overrides. */
+:root{
+  --pi:#6f2dbd!important;--pi2:#8f52d6!important;--pi3:#f3eaff!important;
+  --bg:#faf8fd!important;--surface:#fff!important;--surface2:#f6f1fb!important;
+  --text:#21162d!important;--muted:#756b7f!important;--line:#e8ddf0!important;
+  --shadow:0 14px 40px rgba(75,34,112,.10)!important;
+  --violet:#6f2dbd!important;--violet-deep:#572091!important;--cyan:#8f52d6!important;--ink:#21162d!important;
+}
+body{background:linear-gradient(180deg,#fff 0%,#faf8fd 56%,#f7f2fb 100%)!important;color:var(--text)!important}
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid rgba(111,45,189,.22)!important;outline-offset:2px!important}
+
+/* Landing: keep the newer structure, restore the original AiWay palette. */
+.intro-screen{background:radial-gradient(circle at 86% 8%,rgba(143,82,214,.13),transparent 28%),radial-gradient(circle at 8% 88%,rgba(111,45,189,.07),transparent 26%),linear-gradient(145deg,#fff 0%,#fbf8fe 52%,#f7f1fc 100%)!important}
+.intro-screen:before{opacity:.24!important;background-image:linear-gradient(rgba(111,45,189,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(111,45,189,.035) 1px,transparent 1px)!important}
+.compact-nav{background:rgba(255,255,255,.88)!important;border-color:rgba(232,221,240,.9)!important;box-shadow:0 10px 28px rgba(75,34,112,.07)!important}
+.intro-login-btn{background:var(--pi)!important;color:#fff!important;box-shadow:0 8px 18px rgba(111,45,189,.18)!important}
+.intro-eyebrow{color:var(--pi)!important;border-color:#e5d5f1!important;background:#fff!important}
+.intro-title span{background:linear-gradient(115deg,#572091 5%,#6f2dbd 48%,#9a61d8 100%)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
+.intro-start{background:linear-gradient(135deg,#6427ad,#7e3cc7 58%,#9559d7)!important;box-shadow:0 14px 30px rgba(111,45,189,.23)!important}
+.intro-start:hover{box-shadow:0 18px 36px rgba(111,45,189,.27)!important}
+.intro-packages-btn{color:#6f2dbd!important;border-color:#e3d0f0!important;background:#fff!important}
+.compact-tool-panel{background:rgba(255,255,255,.92)!important;border-color:#eadff1!important;box-shadow:0 22px 60px rgba(75,34,112,.12)!important;transform:none!important}
+.compact-tool-panel:before{background:linear-gradient(135deg,rgba(111,45,189,.22),rgba(143,82,214,.08),rgba(255,255,255,.5))!important}
+.compact-tool-grid button{background:#fff!important;border-color:#ece2f3!important;box-shadow:0 5px 16px rgba(75,34,112,.035)!important}
+.compact-tool-grid button:hover{border-color:#d9bee9!important;box-shadow:0 12px 26px rgba(75,34,112,.09)!important}
+.compact-tool-grid button>span,.compact-tool-grid button:nth-child(2n)>span{background:#f3eaff!important;color:#6f2dbd!important;box-shadow:inset 0 0 0 1px #e5d3f1!important}
+.compact-steps span{background:linear-gradient(135deg,#6f2dbd,#8f52d6)!important;box-shadow:0 7px 15px rgba(111,45,189,.18)!important}
+.compact-bottom-cta{background:linear-gradient(120deg,#2a1639 0%,#4c226d 42%,#6f2dbd 76%,#8f52d6 115%)!important;box-shadow:0 20px 52px rgba(75,34,112,.18)!important}
+.compact-bottom-cta .intro-start{color:#6f2dbd!important}
+
+/* Task picker */
+.task-screen{background:radial-gradient(circle at 82% 5%,rgba(143,82,214,.12),transparent 28%),linear-gradient(180deg,#fff,#faf7fc)!important}
+.task-head h1 span{background:linear-gradient(110deg,#572091,#8f52d6)!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important}
+.task-card{border-color:#ebe0f2!important;background:#fff!important;box-shadow:0 10px 26px rgba(75,34,112,.055)!important}
+.task-card:hover{border-color:#d7bce9!important;box-shadow:0 18px 38px rgba(75,34,112,.10)!important}
+.task-card-icon,.task-card:nth-child(3n+2) .task-card-icon,.task-card:nth-child(3n) .task-card-icon{background:linear-gradient(145deg,#6f2dbd,#8f52d6)!important;box-shadow:0 10px 21px rgba(111,45,189,.20)!important}
+
+/* Main app: cleaner, flatter and closer to the original identity. */
+.shell{background:var(--bg)!important}.sidebar{background:rgba(255,255,255,.95)!important;border-color:var(--line)!important;box-shadow:8px 0 28px rgba(75,34,112,.035)!important}
+.topbar{background:rgba(250,248,253,.94)!important;border-color:var(--line)!important;backdrop-filter:blur(14px)!important}
+.btn.primary,.send{background:linear-gradient(135deg,#6f2dbd,#8f52d6)!important}.btn.primary{box-shadow:0 9px 20px rgba(111,45,189,.18)!important}
+.credits{background:#f3eaff!important;color:#6f2dbd!important;border-color:#e3cff0!important}.credit-coin{background:linear-gradient(145deg,#6f2dbd,#8f52d6)!important}
+.messages{background:transparent!important}
+.hero-icon{background:linear-gradient(145deg,#6f2dbd,#8f52d6)!important;box-shadow:0 14px 32px rgba(111,45,189,.18)!important}
+.suggestion{border-color:#eadff1!important;box-shadow:0 6px 18px rgba(75,34,112,.035)!important}.suggestion:hover{border-color:#d7bce9!important;box-shadow:0 10px 24px rgba(75,34,112,.075)!important}.suggestion .sicon{background:#f3eaff!important;color:#6f2dbd!important}
+.msg.user .bubble{background:linear-gradient(135deg,#6f2dbd,#8f52d6)!important;box-shadow:0 6px 16px rgba(111,45,189,.13)!important}
+.msg.assistant .bubble{border-color:#eadff1!important;box-shadow:0 5px 18px rgba(75,34,112,.035)!important}
+
+/* Composer: remove the large purple halo seen on phones and reduce visual footprint. */
+.composer-zone{background:linear-gradient(transparent 0%,rgba(250,248,253,.90) 48%,var(--bg) 100%)!important}
+.composer{border:1px solid #dfd0eb!important;background:#fff!important;box-shadow:0 8px 24px rgba(75,34,112,.09)!important;backdrop-filter:none!important}
+.composer:focus-within{border-color:#cdb1e3!important;box-shadow:0 9px 26px rgba(75,34,112,.10)!important}
+.composer textarea:focus{outline:0!important}
+.send{box-shadow:0 6px 14px rgba(111,45,189,.18)!important}
+
+/* Tables stay readable without forcing the whole chat wider than the phone. */
+.bubble-content table{display:block!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch;white-space:nowrap;border-spacing:0!important;scrollbar-width:thin}
+.bubble-content th{background:#f7f1fb!important;color:#4f2868!important;font-weight:800;position:sticky;top:0}
+.bubble-content th,.bubble-content td{padding:8px 10px!important;min-width:96px;vertical-align:top}
+
+/* Smaller, more phone-friendly controls. */
+@media(max-width:700px){
+  .topbar{height:58px!important;min-height:58px!important;flex-basis:58px!important;padding:6px 8px!important;gap:6px!important}
+  .mobile-menu,.icon-btn{width:38px!important;height:38px!important;border-radius:12px!important}
+  .icon-btn svg,.btn svg,.pill svg{width:17px!important;height:17px!important}
+  .model-trigger{height:42px!important;border-radius:13px!important;padding:5px 8px!important;box-shadow:none!important}
+  .model-trigger-icon{width:28px!important;height:28px!important;border-radius:9px!important}.model-trigger-icon svg{width:17px!important;height:17px!important}
+  .credits{min-width:68px!important;max-width:88px!important;padding:6px 8px!important;font-size:12px!important}.credit-coin{width:24px!important;height:24px!important}.credit-coin:before{font-size:10px!important}
+  .messages{padding:14px 8px calc(126px + env(safe-area-inset-bottom))!important;scroll-padding-bottom:calc(126px + env(safe-area-inset-bottom))!important}
+  .msg{gap:6px!important;margin:13px 0!important}.avatar{width:29px!important;height:29px!important;flex-basis:29px!important;border-radius:9px!important}.avatar svg{width:17px!important;height:17px!important}
+  .msg.assistant .bubble{max-width:calc(100% - 35px)!important;padding:12px 12px!important;border-radius:16px 16px 16px 5px!important}
+  .msg.user .bubble{max-width:84%!important;padding:10px 12px!important;border-radius:16px 16px 5px 16px!important}
+  .bubble{font-size:14px!important;line-height:1.75!important}
+  .composer-zone{padding:20px 7px max(7px,env(safe-area-inset-bottom))!important}
+  .composer{border-radius:17px!important;padding:6px 7px 6px!important}
+  .composer textarea{min-height:40px!important;max-height:112px!important;padding:6px 5px!important;font-size:16px!important;line-height:1.5!important}
+  .composer-foot{gap:5px!important;padding-left:43px!important;flex-wrap:nowrap!important;min-height:36px!important}
+  .pill,.estimate-toggle,.image-choice-button{min-height:34px!important;height:34px!important;border-radius:11px!important;padding:0 8px!important}
+  .attach-pill,.estimate-toggle{width:36px!important;min-width:36px!important;padding:0!important;justify-content:center!important}.estimate-toggle svg{width:16px!important;height:16px!important}
+  .send{left:8px!important;bottom:6px!important;width:38px!important;height:38px!important;border-radius:12px!important}.send svg{width:19px!important;height:19px!important}
+  .status{font-size:10px!important}
+  .scroll-latest{bottom:118px!important;width:38px!important;height:38px!important}.scroll-latest svg{width:18px!important;height:18px!important}
+  .suggestion .sicon{width:34px!important;height:34px!important;border-radius:10px!important}.suggestion svg{width:18px!important;height:18px!important}
+  .compact-tool-grid button>span{width:32px!important;height:32px!important;border-radius:10px!important;font-size:14px!important}
+  .task-card-icon{width:48px!important;height:48px!important;border-radius:14px!important}.task-card-icon svg{width:24px!important;height:24px!important}
+}
+@media(max-width:430px){
+  .messages{padding-inline:7px!important}.msg.assistant .bubble{max-width:calc(100% - 33px)!important}
+  .composer-zone{padding-inline:6px!important}.composer{border-radius:16px!important}
+  .pill,.estimate-toggle{height:33px!important;min-height:33px!important}.attach-pill,.estimate-toggle{width:34px!important;min-width:34px!important}
+  .send{width:37px!important;height:37px!important}.composer-foot{padding-left:41px!important}
+}
+</style>
+<!-- AIWAY CLASSIC REFINED THEME END -->
 
 </head>
 <body>
