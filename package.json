@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "22.x"
+    "node": "24.x"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.110.8",
+    "@supabase/supabase-js": "2.57.4",
     "jose": "6.1.0"
   },
   "devDependencies": {
