@@ -7,7 +7,7 @@
     "node": "24.x"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.57.4",
+    "@supabase/supabase-js": "2.110.9",
     "jose": "6.1.0"
   },
   "devDependencies": {

@@ -1146,9 +1146,9 @@ function shortModelName(name){
 
   return value.slice(0,40);
 }
-async function loadModels(){
+async function loadModels(withQuotes=false){
   const selected=$('model').value;
-  const data=await api('/api/models');
+  const data=await api(withQuotes?'/api/models?quotes=1':'/api/models');
   window.aiwayPackages=data.packages||{};window.aiwayTokenUsd=Number(data.tokenUsd||0.00001);
   window.aiwayModels=data.models||[];
   window.aiwayChatModelOrders=data.chatModelOrders||{};
@@ -2081,7 +2081,7 @@ async function exportChat(){if(!history.length)return toast(lang==='ar'?'لا ت
 function toggleWeb(){if(userProfile&&!userProfile.has_purchased)return toast(lang==='ar'?'بحث الويب متاح بعد أول عملية شراء.':'Web search unlocks after your first purchase.');webSearch=!webSearch;$('webPill').classList.toggle('on',webSearch);toast(webSearch?(lang==='ar'?'تم تفعيل بحث الويب':'Web search enabled'):(lang==='ar'?'تم إيقاف بحث الويب':'Web search disabled'))}
 function relativeUsageTime(value){if(!value)return lang==='ar'?'لا يوجد استخدام بعد':'No usage yet';const seconds=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/1000));if(seconds<60)return lang==='ar'?'منذ لحظات':'Just now';const minutes=Math.floor(seconds/60);if(minutes<60)return lang==='ar'?`منذ ${minutes} دقيقة`:`${minutes} min ago`;const hours=Math.floor(minutes/60);if(hours<24)return lang==='ar'?`منذ ${hours} ساعة`:`${hours} hr ago`;const days=Math.floor(hours/24);return lang==='ar'?`منذ ${days} يوم`:`${days} d ago`}
 function renderUsageSummary(){const u=window.aiwayUsageSummary||{};const remaining=Math.max(0,Number(userProfile?.has_purchased?userProfile?.ai_tokens:(userProfile?.free_trial_tokens??userProfile?.trial_messages_remaining)||0));const consumed=Math.max(0,Number(u.consumedTokens||0));const last=Math.max(0,Number(u.lastRequestTokens||0));const total=remaining+consumed;const percent=total>0?Math.min(100,Math.round(consumed/total*100)):0;const set=(id,text)=>{const el=$(id);if(el)el.textContent=text};set('payUsageTitle',lang==='ar'?'تفاصيل الاستهلاك':'Usage details');set('payUsagePeriod',lang==='ar'?'آخر 30 يومًا':'Last 30 days');set('payRemainingLabel',lang==='ar'?'المتبقي':'Remaining');set('payConsumedLabel',lang==='ar'?'المستهلك':'Consumed');set('payLastLabel',lang==='ar'?'آخر رسالة / طلب':'Last message / request');set('payBalance',remaining.toLocaleString('en-US'));set('payConsumed',consumed.toLocaleString('en-US'));set('payLastUsage',last.toLocaleString('en-US'));set('payUsageProgressText',lang==='ar'?`${percent}% مستخدم`:`${percent}% used`);set('payLastUsageTime',relativeUsageTime(u.lastRequestAt));const bar=$('payUsageProgress');if(bar)bar.style.width=percent+'%'}
-function openPay(){if(!auth)return login();renderPackages();renderAccountState();renderUsageSummary();$('payModal').classList.add('open')}
+async function openPay(){if(!auth)return login();renderPackages();renderAccountState();renderUsageSummary();$('payModal').classList.add('open');try{await loadModels(true)}catch(e){console.warn('Package quote load:',e)}}
 function toggleValidityNote(id,button){const note=document.getElementById(`validity-note-${id}`);if(!note)return;const show=!note.classList.contains('show');document.querySelectorAll('.validity-note.show').forEach(x=>x.classList.remove('show'));document.querySelectorAll('.validity-help[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false'));note.classList.toggle('show',show);button?.setAttribute('aria-expanded',String(show))}
 function renderPackages(){const box=document.querySelector('.packs');if(!box||!window.aiwayPackages)return;const labels=lang==='ar'?{lite:'تجربة خفيفة',starter:'أساسية',plus:'الأكثر توفيرًا',pro:'احترافية'}:{lite:'Light use',starter:'Starter',plus:'Best value',pro:'Pro'};const validity=lang==='ar'?'الرصيد صالح لمدة 30 يومًا':'Balance valid for 30 days';box.innerHTML=Object.entries(window.aiwayPackages).map(([id,p])=>{const exactPi=Number(p.amountPi||0);const displayPi=exactPi>0?Math.floor(exactPi).toLocaleString('en-US'):'--';const exactTitle=exactPi>0?(lang==='ar'?`قيمة الدفع الدقيقة: ${exactPi.toLocaleString('en-US',{maximumFractionDigits:7})} Pi`:`Exact payment: ${exactPi.toLocaleString('en-US',{maximumFractionDigits:7})} Pi`):'';return `<div class="pack ${id==='plus'?'featured':''}"><small>${labels[id]||id}</small><span class="pi-estimate" data-exact-pi="${exactPi||''}" title="${exactTitle}">${displayPi} Pi</span><b>${Number(p.tokens).toLocaleString('en-US')}</b><span class="pack-token-label">AiWay Tokens</span><span class="pack-validity-simple">${validity}</span><button class="btn ${id==='plus'?'primary':'soft'}" data-buy-pack="${esc(id)}">${lang==='ar'?'شراء بـ Pi':'Buy with Pi'}</button></div>`}).join('');box.querySelectorAll('[data-buy-pack]').forEach(btn=>btn.onclick=()=>buy(btn.dataset.buyPack))}
 async function buy(packageId){
@@ -2089,7 +2089,7 @@ async function buy(packageId){
   let pkg=window.aiwayPackages?.[packageId];
   const quoteExpiry=new Date(pkg?.quoteExpiresAt||0).getTime();
   if(!pkg?.quoteToken||!Number.isFinite(quoteExpiry)||quoteExpiry-Date.now()<30000){
-    try{await loadModels();pkg=window.aiwayPackages?.[packageId]}catch(e){console.warn('Secure quote refresh:',e)}
+    try{await loadModels(true);pkg=window.aiwayPackages?.[packageId]}catch(e){console.warn('Secure quote refresh:',e)}
   }
   if(!pkg?.amountPi||!pkg?.quoteToken)return toast(lang==='ar'?'تعذر جلب سعر Pi الآمن الآن. حدّث الصفحة وحاول مرة أخرى.':'Could not retrieve a secure Pi quote. Refresh and try again.');
   const btn=document.querySelector(`[data-buy-pack="${CSS.escape(String(packageId))}"]`);const original=btn?.textContent;
