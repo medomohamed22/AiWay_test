@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#6f2dbd">
+<meta name="theme-color" content="#5d3bdf">
 <meta name="color-scheme" content="light">
 <script>
 // Keep first paint independent from deployment checks and Service Worker updates.
@@ -682,6 +682,60 @@ body:not(.all-models-active) .topbar>.model-wrap{display:none!important}
   body.all-models-active .model-trigger-copy b{font-size:11px!important}
 }
 </style>
+<style id="aiway-2026-visual-system">
+:root{
+  --pi:#6d45e5;--pi2:#8f5df1;--pi3:#f0edff;--gold:#f6b84a;
+  --bg:#f7f8fc;--surface:#ffffff;--surface2:#f1f3f9;--text:#151625;--muted:#74778c;
+  --line:#e7e8f0;--danger:#d34a64;--ok:#0e9f74;--shadow:0 24px 70px rgba(39,31,75,.12);--radius:22px;
+  --cyan:#39c6d8;--ink:#111322;--violet:#7652f6;--violet-deep:#5032c5;
+}
+body{font-family:"Segoe UI",Tahoma,Arial,system-ui,-apple-system,sans-serif;background:linear-gradient(180deg,#fafbfe 0%,#f5f6fb 100%)}
+button,.task-card,.suggestion,.model-option,.chat-item{will-change:transform}
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid rgba(109,69,229,.22);outline-offset:3px}
+
+/* Landing */
+.intro-screen{--mx:72%;--my:18%;background:
+ radial-gradient(circle at var(--mx) var(--my),rgba(57,198,216,.13),transparent 23%),
+ radial-gradient(circle at 88% 8%,rgba(109,69,229,.20),transparent 30%),
+ radial-gradient(circle at 8% 85%,rgba(246,184,74,.12),transparent 22%),
+ linear-gradient(145deg,#fbfcff 0%,#f4f2ff 50%,#fafcff 100%)!important}
+.intro-screen:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.42;background-image:linear-gradient(rgba(92,80,142,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(92,80,142,.035) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent 78%)}
+.intro-shell{width:min(1240px,calc(100% - 30px))!important;padding-bottom:42px!important}
+.compact-nav{top:12px!important;min-height:64px!important;padding:9px 11px!important;border:1px solid rgba(255,255,255,.78)!important;background:rgba(255,255,255,.72)!important;box-shadow:0 12px 34px rgba(54,47,91,.08)!important;backdrop-filter:blur(24px) saturate(145%)!important;border-radius:21px!important}
+.intro-brand-button{padding:4px 7px!important;border-radius:14px!important}.intro-brand-button:hover{background:rgba(109,69,229,.06)!important}
+.intro-brand img{width:42px!important;height:42px!important;border-radius:14px!important;box-shadow:0 8px 22px rgba(109,69,229,.2)}
+.intro-brand span{font-size:17px;letter-spacing:-.2px}.intro-links button{font-size:13px!important;padding:9px 13px!important;border-radius:12px!important;transition:.2s ease}
+.intro-login-btn,.intro-packages-btn,.intro-lang{transition:.22s cubic-bezier(.2,.8,.2,1)!important}.intro-login-btn{background:var(--ink)!important;color:#fff!important;border-color:transparent!important;box-shadow:0 8px 18px rgba(17,19,34,.13)}
+.intro-login-btn:hover,.intro-packages-btn:hover,.intro-lang:hover{transform:translateY(-2px)}
+.compact-hero{position:relative;grid-template-columns:minmax(0,1.05fr) minmax(410px,.95fr)!important;min-height:620px!important;padding:74px 16px 42px!important;gap:clamp(28px,6vw,72px)!important}
+.compact-hero-copy{position:relative;z-index:2}.intro-eyebrow{border:1px solid rgba(109,69,229,.13)!important;background:rgba(255,255,255,.68)!important;color:var(--violet-deep)!important;box-shadow:0 8px 24px rgba(58,45,104,.06);backdrop-filter:blur(12px);padding:8px 13px!important}
+.intro-title{font-size:clamp(45px,6.2vw,78px)!important;line-height:.99!important;letter-spacing:-3.2px!important;margin:19px 0 20px!important;max-width:760px}.intro-title span{background:linear-gradient(115deg,#6542de 10%,#8a55ee 52%,#26a9bd 95%)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
+.intro-copy{font-size:clamp(16px,1.55vw,19px)!important;line-height:1.85!important;color:#686b80!important;max-width:650px!important}
+.intro-actions{margin-top:30px!important;gap:11px!important}.intro-start,.intro-secondary,.intro-packages-btn{min-height:54px!important;border-radius:16px!important;padding:12px 20px!important;transition:.25s cubic-bezier(.2,.8,.2,1)!important}
+.intro-start{background:linear-gradient(135deg,#5d3bdf,#8056f0 62%,#55bccc)!important;box-shadow:0 16px 34px rgba(91,62,209,.28)!important;position:relative;overflow:hidden}
+.intro-start:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.34) 50%,transparent 70%);transform:translateX(-140%);transition:transform .7s ease}.intro-start:hover:before{transform:translateX(140%)}
+.intro-start:hover{transform:translateY(-3px) scale(1.01)!important;box-shadow:0 20px 42px rgba(91,62,209,.32)!important}.intro-packages-btn{background:rgba(255,255,255,.74)!important;backdrop-filter:blur(12px);border-color:rgba(109,69,229,.14)!important;color:#43318e!important}
+.compact-free-note{display:block!important;margin:15px 2px 0!important;color:#77788d!important;font-size:12px!important}.compact-free-note:before{content:"✓";display:inline-grid;place-items:center;width:18px;height:18px;margin-inline-end:6px;border-radius:50%;background:#e7faf4;color:#0b9b71;font-weight:950}
+.compact-tool-panel{position:relative!important;padding:18px!important;border-radius:30px!important;border:1px solid rgba(255,255,255,.86)!important;background:linear-gradient(155deg,rgba(255,255,255,.84),rgba(249,249,255,.72))!important;backdrop-filter:blur(24px) saturate(140%);box-shadow:0 30px 80px rgba(57,45,105,.16),inset 0 1px 0 #fff!important;transform:perspective(900px) rotateY(-1.5deg) rotateX(.5deg);transition:transform .35s ease}
+.compact-tool-panel:before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(109,69,229,.34),rgba(57,198,216,.18),rgba(255,255,255,.4));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.compact-tool-head{padding:4px 3px 10px!important}.compact-tool-head b{font-size:18px!important;letter-spacing:-.2px}.compact-tool-head small{font-size:12px!important;color:#7d7e91!important}
+.compact-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}.compact-tool-grid button{position:relative;min-height:106px!important;padding:15px!important;border-radius:19px!important;border:1px solid #ececf4!important;background:rgba(255,255,255,.86)!important;box-shadow:0 6px 18px rgba(42,38,70,.04);transition:.25s cubic-bezier(.2,.8,.2,1)!important;overflow:hidden}
+.compact-tool-grid button:after{content:"";position:absolute;inset:auto -30% -70% 20%;height:100%;background:radial-gradient(circle,rgba(109,69,229,.11),transparent 65%);opacity:0;transition:.25s ease}.compact-tool-grid button:hover{transform:translateY(-5px)!important;border-color:rgba(109,69,229,.25)!important;box-shadow:0 16px 30px rgba(62,50,112,.10)!important}.compact-tool-grid button:hover:after{opacity:1}
+.compact-tool-grid button>span{width:38px!important;height:38px!important;border-radius:13px!important;background:linear-gradient(145deg,#f0ecff,#edfaff)!important;color:#6040d7!important;box-shadow:inset 0 0 0 1px rgba(109,69,229,.08);font-size:16px!important}.compact-tool-grid button:nth-child(2n)>span{color:#168fa0!important;background:linear-gradient(145deg,#eafbfe,#f3f0ff)!important}.compact-tool-grid b{font-size:14px!important}.compact-tool-grid small{font-size:11px!important;color:#838497!important}
+.compact-how{padding:40px 10px 52px!important}.compact-how h2{font-size:clamp(28px,4vw,40px)!important;letter-spacing:-1px}.compact-steps{gap:14px!important}.compact-steps>div{position:relative;padding:18px!important;border-radius:20px!important;background:rgba(255,255,255,.74)!important;border-color:rgba(222,222,237,.8)!important;box-shadow:0 10px 28px rgba(49,42,82,.05);transition:.22s ease}.compact-steps>div:hover{transform:translateY(-3px);box-shadow:0 15px 34px rgba(49,42,82,.09)}.compact-steps span{width:36px!important;height:36px!important;border-radius:12px!important;background:linear-gradient(135deg,#6543e0,#8a5cf2)!important;color:#fff!important;box-shadow:0 8px 17px rgba(109,69,229,.2)}
+.compact-bottom-cta{position:relative;overflow:hidden;margin:0 8px 24px!important;padding:34px!important;border-radius:30px!important;background:linear-gradient(120deg,#17182b 0%,#332459 38%,#6444d8 72%,#388fa0 115%)!important;box-shadow:0 24px 60px rgba(39,31,75,.22)}.compact-bottom-cta:after{content:"";position:absolute;width:300px;height:300px;border-radius:50%;right:-100px;top:-170px;background:rgba(255,255,255,.09);filter:blur(2px)}.compact-bottom-cta>*{position:relative;z-index:1}.compact-bottom-cta .intro-start{background:#fff!important;color:#5136c2!important;box-shadow:0 12px 26px rgba(0,0,0,.12)!important}.intro-footer{padding:8px 0 16px!important;color:#8a8b9d!important}
+
+/* Task picker */
+.task-screen{background:radial-gradient(circle at 80% 5%,rgba(109,69,229,.17),transparent 28%),radial-gradient(circle at 10% 90%,rgba(57,198,216,.12),transparent 25%),linear-gradient(180deg,#fbfcff,#f4f4fb)!important}.task-shell{width:min(1160px,100%)!important}.task-nav{margin-bottom:40px!important}.task-brand img{border-radius:16px!important;box-shadow:0 10px 25px rgba(88,61,197,.2)!important}.task-kicker{background:rgba(255,255,255,.75)!important;backdrop-filter:blur(12px);border-color:#e8e8f0!important}.task-head h1{letter-spacing:-1.6px}.task-head h1 span{background:linear-gradient(110deg,#6542df,#359cac);background-clip:text;-webkit-background-clip:text;color:transparent!important}.task-grid{gap:14px!important}.task-card{position:relative;min-height:220px!important;border-radius:24px!important;border:1px solid rgba(229,229,239,.95)!important;background:rgba(255,255,255,.86)!important;backdrop-filter:blur(16px);box-shadow:0 12px 30px rgba(46,41,76,.065)!important;overflow:hidden;transition:.28s cubic-bezier(.2,.8,.2,1)!important}.task-card:before{content:"";position:absolute;width:130px;height:130px;border-radius:50%;inset:auto -48px -55px auto;background:radial-gradient(circle,rgba(109,69,229,.11),transparent 70%);transition:.3s ease}.task-card:hover{transform:translateY(-7px) scale(1.008)!important;border-color:rgba(109,69,229,.25)!important;box-shadow:0 22px 45px rgba(50,43,90,.13)!important}.task-card:hover:before{transform:scale(1.35)}.task-card-icon{width:62px!important;height:62px!important;border-radius:19px!important;background:linear-gradient(145deg,#6241dc,#8259ef)!important;box-shadow:0 12px 24px rgba(93,62,211,.24)!important}.task-card:nth-child(3n+2) .task-card-icon{background:linear-gradient(145deg,#2fa6ba,#5e6ee8)!important}.task-card:nth-child(3n) .task-card-icon{background:linear-gradient(145deg,#8c4be4,#c05fbc)!important}
+
+/* Main application */
+.shell{background:#f7f8fc}.sidebar{padding:16px!important;background:rgba(255,255,255,.88)!important;border-color:#eaebf2!important;box-shadow:12px 0 45px rgba(39,35,66,.045);backdrop-filter:blur(18px)}.brand-mark{border-radius:14px!important;box-shadow:0 8px 20px rgba(91,62,205,.16)!important}.btn,.icon-btn{border-color:#e8e9f0!important;border-radius:14px!important}.btn.primary{background:linear-gradient(135deg,#6040dc,#8258ef)!important;box-shadow:0 10px 23px rgba(93,64,206,.22)!important}.chat-item{border-radius:12px!important;transition:.18s ease}.chat-item:hover,.chat-item.active{background:#f0edff!important;color:#5c3bd0!important;transform:translateX(-2px)}.user-card{background:#f5f5fa!important;border:1px solid #ececf3}.topbar{background:rgba(250,251,254,.82)!important;border-color:#e9eaf1!important;backdrop-filter:blur(22px) saturate(135%)!important}.credits{background:#efedff!important;color:#5f3ed4!important;border:1px solid #e4ddff}.credit-coin{background:linear-gradient(145deg,#5f40db,#7f57ec)!important}.messages{background:radial-gradient(circle at 50% 8%,rgba(109,69,229,.045),transparent 28%)}.hero-icon{border-radius:25px!important;background:linear-gradient(145deg,#6040dd,#7c54eb 64%,#40a8b7)!important;box-shadow:0 18px 42px rgba(92,62,207,.24)!important}.welcome h1{letter-spacing:-1.2px}.suggestion{border-color:#e9e9f1!important;border-radius:19px!important;box-shadow:0 8px 22px rgba(47,41,74,.04)!important;transition:.22s ease}.suggestion:hover{transform:translateY(-4px)!important;border-color:#d8cff8!important;box-shadow:0 14px 30px rgba(55,46,94,.09)!important}.suggestion .sicon{background:#efecff!important;color:#6040d8!important}.msg.assistant .bubble{border-color:#e9e9f0!important;border-radius:19px 19px 19px 6px!important;box-shadow:0 8px 24px rgba(43,39,67,.045)!important}.msg.user .bubble{background:linear-gradient(135deg,#5d3ed8,#7d55eb)!important;border-radius:19px 19px 6px 19px!important;box-shadow:0 8px 20px rgba(91,61,205,.16)}.composer{border:1px solid #e2e2ec!important;background:rgba(255,255,255,.94)!important;box-shadow:0 18px 50px rgba(40,35,67,.13)!important;backdrop-filter:blur(20px)}.composer:focus-within{border-color:#cfc5f8!important;box-shadow:0 20px 55px rgba(78,62,141,.16),0 0 0 4px rgba(109,69,229,.06)!important}.send{background:linear-gradient(135deg,#5e3edb,#8057ef)!important;box-shadow:0 8px 18px rgba(92,62,207,.23)!important}.modal{border:1px solid rgba(255,255,255,.75);box-shadow:0 30px 90px rgba(29,25,48,.24)!important}.overlay{background:rgba(20,18,34,.34)!important;backdrop-filter:blur(8px)!important}
+
+@media(max-width:900px){.compact-hero{grid-template-columns:1fr!important;padding-top:54px!important}.compact-tool-panel{transform:none!important;max-width:720px;margin-inline:auto;width:100%}.intro-title{font-size:clamp(42px,10vw,68px)!important}.compact-steps{grid-template-columns:1fr!important}.compact-bottom-cta{align-items:flex-start!important}}
+@media(max-width:620px){.intro-shell{width:min(100% - 14px,1240px)!important}.compact-nav{top:6px!important;min-height:58px!important;border-radius:18px!important}.intro-brand img{width:38px!important;height:38px!important}.compact-hero{padding:48px 5px 26px!important;gap:28px!important}.intro-title{font-size:clamp(39px,12vw,57px)!important;letter-spacing:-2.2px!important}.intro-copy{font-size:15px!important}.intro-actions>*{flex:1 1 140px}.compact-tool-panel{padding:12px!important;border-radius:24px!important}.compact-tool-grid{gap:8px!important}.compact-tool-grid button{min-height:102px!important;padding:12px!important;border-radius:16px!important}.compact-tool-grid button>span{width:34px!important;height:34px!important}.compact-bottom-cta{padding:24px!important;border-radius:24px!important;flex-direction:column!important}.compact-bottom-cta .intro-start{width:100%}.task-card{min-height:180px!important;padding:16px!important}.task-card-icon{width:52px!important;height:52px!important;border-radius:16px!important}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}.compact-tool-panel{transform:none!important}}
+</style>
+
 </head>
 <body>
 
@@ -701,9 +755,9 @@ body:not(.all-models-active) .topbar>.model-wrap{display:none!important}
 
     <section class="intro-hero compact-hero intro-section" id="introHero">
       <div class="compact-hero-copy">
-        <span class="intro-eyebrow" id="introEyebrow">✦ أدوات ذكاء اصطناعي تعمل بحساب Pi</span>
-        <h1 class="intro-title" id="introTitle">كل أدوات الذكاء الاصطناعي<br><span>في مكان واحد.</span></h1>
-        <p class="intro-copy" id="introCopy">اكتب، لخّص، برمج، حلّل ملفات وأنشئ صورًا باستخدام النموذج المناسب لمهمتك.</p>
+        <span class="intro-eyebrow" id="introEyebrow">✦ مساحة ذكاء اصطناعي واحدة لكل ما تريد إنجازه</span>
+        <h1 class="intro-title" id="introTitle">كل قوة الذكاء الاصطناعي<br><span>بطريقة أبسط وأذكى.</span></h1>
+        <p class="intro-copy" id="introCopy">ابدأ بما تريد إنجازه — دردشة، صور، ملفات، ترجمة أو برمجة — ودع AiWay يحول فكرتك إلى نتيجة بسرعة.</p>
         <div class="intro-actions compact-hero-actions">
           <button class="intro-start" id="introStart" type="button"><span id="introStartText">استعراض الأدوات</span><span aria-hidden="true">←</span></button>
           <button class="intro-packages-btn" id="introHeroPackages" type="button"><span id="introHeroPackagesText">عرض الباقات</span></button>
@@ -1237,9 +1291,9 @@ function playCompareDemo(index){
 function updateIntroLanguage(){
   const ar=lang==='ar',set=(id,text)=>{const el=$(id);if(el)el.textContent=text};
   const intro=$('introScreen');if(intro){intro.setAttribute('aria-label',ar?'مرحبًا بك في AiWay':'Welcome to AiWay');intro.dir=ar?'rtl':'ltr'}
-  set('introEyebrow',ar?'✦ أدوات ذكاء اصطناعي تعمل بحساب Pi':'✦ Practical AI tools powered by Pi');
-  const title=$('introTitle');if(title)title.innerHTML=ar?'كل أدوات الذكاء الاصطناعي<br><span>في مكان واحد.</span>':'All your AI tools<br><span>in one place.</span>';
-  set('introCopy',ar?'اكتب، لخّص، برمج، حلّل ملفات وأنشئ صورًا باستخدام النموذج المناسب لمهمتك.':'Write, summarize, code, analyze files, and create images with the right model for your task.');
+  set('introEyebrow',ar?'✦ مساحة ذكاء اصطناعي واحدة لكل ما تريد إنجازه':'✦ Practical AI tools powered by Pi');
+  const title=$('introTitle');if(title)title.innerHTML=ar?'كل قوة الذكاء الاصطناعي<br><span>بطريقة أبسط وأذكى.</span>':'The power of AI<br><span>made beautifully simple.</span>';
+  set('introCopy',ar?'ابدأ بما تريد إنجازه — دردشة، صور، ملفات، ترجمة أو برمجة — ودع AiWay يحول فكرتك إلى نتيجة بسرعة.':'Write, summarize, code, analyze files, and create images with the right model for your task.');
   set('introStartText',ar?'استعراض الأدوات':'Explore tools');set('introHeroPackagesText',ar?'عرض الباقات':'View packages');
   set('introFreeNote',ar?'10 استخدامات مجانية عند تسجيل الدخول لأول مرة — بدون دفع':'10 free uses on your first sign-in — no payment required');
   set('introToolHead',ar?'ابدأ بالمهمة التي تريدها':'Start with the task you need');set('introToolSub',ar?'الموقع يختار نموذجًا مناسبًا وموفرًا تلقائيًا':'AiWay automatically chooses a suitable, cost-efficient model');
@@ -2471,5 +2525,29 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
   body:not(.all-models-active) .topbar>.mobile-task-identity b{font-size:12px!important;max-width:100px!important}
 }
 </style>
+
+<script id="aiway-2026-microinteractions">
+(()=>{
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const intro=document.getElementById('introScreen');
+  if(!intro||reduce)return;
+  let raf=0;
+  intro.addEventListener('pointermove',e=>{
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{
+      const x=Math.round((e.clientX/innerWidth)*100),y=Math.round((e.clientY/innerHeight)*100);
+      intro.style.setProperty('--mx',x+'%');intro.style.setProperty('--my',y+'%');raf=0;
+    });
+  },{passive:true});
+  const panel=document.getElementById('introToolPanel');
+  if(panel&&matchMedia('(hover:hover) and (pointer:fine)').matches){
+    panel.addEventListener('pointermove',e=>{
+      const r=panel.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+      panel.style.transform=`perspective(900px) rotateY(${x*3}deg) rotateX(${-y*2.4}deg) translateY(-2px)`;
+    },{passive:true});
+    panel.addEventListener('pointerleave',()=>panel.style.transform='perspective(900px) rotateY(-1.5deg) rotateX(.5deg)');
+  }
+})();
+</script>
 
 </body></html>
