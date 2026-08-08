@@ -643,31 +643,61 @@ export const FALLBACK_OPENROUTER_VIDEO_MODELS = [
   {id:'google/veo-3.1',name:'Veo 3.1',description:'Google flagship video generation with synchronized audio.',pricing:{video_second:0.40},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p','4K']},aspect_ratio:{type:'enum',values:['16:9','9:16']},duration:{type:'enum',values:['4','6','8']}},provider:'google'}
 ];
 
-export function videoPricePerSecond(model){
+function videoResolutionDimensions(resolution='720p',aspectRatio='16:9',supportedSizes=[]){
+  const ratioParts=String(aspectRatio||'16:9').split(':').map(Number);const rw=ratioParts[0]>0?ratioParts[0]:16,rh=ratioParts[1]>0?ratioParts[1]:9,targetRatio=rw/rh;
+  const resolutionNumber=Math.max(1,Number(String(resolution||'720p').match(/\d+/)?.[0]||720));
+  const parsed=(Array.isArray(supportedSizes)?supportedSizes:[]).map(v=>{const m=String(v).toLowerCase().match(/(\d+)\s*x\s*(\d+)/);return m?{w:Number(m[1]),h:Number(m[2])}:null}).filter(Boolean);
+  if(parsed.length){
+    const scored=parsed.map(size=>{const ratio=size.w/size.h;const short=Math.min(size.w,size.h);return {...size,score:Math.abs(Math.log(ratio/targetRatio))*3+Math.abs(short-resolutionNumber)/resolutionNumber};}).sort((a,b)=>a.score-b.score);
+    if(scored[0])return {width:scored[0].w,height:scored[0].h};
+  }
+  if(rw>=rh)return {width:Math.max(1,Math.round(resolutionNumber*rw/rh)),height:resolutionNumber};
+  return {width:resolutionNumber,height:Math.max(1,Math.round(resolutionNumber*rh/rw))};
+}
+function videoSkuEntries(model){
+  const skus=model?.pricing_skus&&typeof model.pricing_skus==='object'?model.pricing_skus:{};
+  return Object.entries(skus).map(([key,value])=>[String(key).toLowerCase(),Number(value)]).filter(([,value])=>Number.isFinite(value)&&value>0);
+}
+function seedanceTokenUnitPrice(model){
+  if(!/^bytedance\/seedance-/i.test(String(model?.id||'')))return 0;
+  const entries=videoSkuEntries(model);
+  const base=entries.filter(([key,value])=>value<0.001&&!/audio/.test(key));
+  const candidates=(base.length?base:entries.filter(([,value])=>value<0.001)).map(([,value])=>value);
+  return candidates.length?Math.min(...candidates):0;
+}
+function seedancePricePerSecond(model,{resolution='720p',aspectRatio='16:9'}={}){
+  const unit=seedanceTokenUnitPrice(model);if(!unit)return 0;
+  const {width,height}=videoResolutionDimensions(resolution,aspectRatio,model?.supported_sizes||[]);
+  return (width*height*24/1024)*unit;
+}
+export function videoPricePerSecond(model,options={}){
+  const seedance=seedancePricePerSecond(model,options);if(seedance>0)return seedance;
+  const entries=videoSkuEntries(model);
+  const explicit=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/.test(key)).map(([,value])=>value);
+  if(explicit.length)return Math.min(...explicit);
   const p=model?.pricing||{};
   const candidates=[p.video_second,p.video_output_per_second,p.second,p.video,p.request_per_second]
     .map(Number).filter(v=>Number.isFinite(v)&&v>0);
   return candidates.length?Math.min(...candidates):0;
 }
 
-export function videoPriceForRequest(model,{resolution=''}={}){
-  const skus=model?.pricing_skus&&typeof model.pricing_skus==='object'?model.pricing_skus:{};
-  const entries=Object.entries(skus).map(([key,value])=>[String(key).toLowerCase(),Number(value)]).filter(([,value])=>Number.isFinite(value)&&value>0);
+export function videoPriceForRequest(model,{resolution='',aspectRatio=''}={}){
+  const seedance=seedancePricePerSecond(model,{resolution:resolution||'720p',aspectRatio:aspectRatio||'16:9'});if(seedance>0)return seedance;
+  const entries=videoSkuEntries(model);
   const r=String(resolution||'').toLowerCase().replace(/\s+/g,'');
-  const resolutionMatches=r?entries.filter(([key])=>key.replace(/\s+/g,'').includes(r)&&/second|generate/.test(key)):[];
+  const resolutionMatches=r?entries.filter(([key])=>key.replace(/\s+/g,'').includes(r)&&/second/.test(key)):[];
   if(resolutionMatches.length)return Math.min(...resolutionMatches.map(([,value])=>value));
   const base=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/.test(key)&&!/(480p|720p|1080p|2160p|4k)/.test(key));
   if(base.length)return Math.min(...base.map(([,value])=>value));
-  return videoPricePerSecond(model);
+  return videoPricePerSecond(model,{resolution:resolution||'720p',aspectRatio:aspectRatio||'16:9'});
 }
 
 let videoCatalogCache={expires:0,data:null};
 function positiveNumber(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:0}
 function videoSkuPrice(item){
-  const skus=item?.pricing_skus&&typeof item.pricing_skus==='object'?item.pricing_skus:{};
-  const preferred=Object.entries(skus).filter(([key])=>/second|generate/i.test(key)).map(([,value])=>positiveNumber(value)).filter(Boolean);
-  const any=Object.values(skus).map(positiveNumber).filter(Boolean);
-  return preferred.length?Math.min(...preferred):(any.length?Math.min(...any):0);
+  const entries=videoSkuEntries(item);
+  const preferred=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/i.test(key)).map(([,value])=>positiveNumber(value)).filter(Boolean);
+  return preferred.length?Math.min(...preferred):0;
 }
 function enumDescriptor(values){return Array.isArray(values)&&values.length?{type:'enum',values:values.map(String)}:undefined}
 export async function getOpenRouterVideoModels(){
@@ -691,7 +721,8 @@ export async function getOpenRouterVideoModels(){
       const id=String(item?.id||'');if(!id)return null;
       const general=generalMap.get(id)||{};const fallback=fallbackMap.get(id)||{};
       const provider=id.split('/')[0]||'openrouter';
-      const rate=videoSkuPrice(item)||videoPricePerSecond(general)||videoPricePerSecond(fallback);
+      const provisional={...fallback,...general,...item,id,pricing_skus:item.pricing_skus||{},supported_sizes:Array.isArray(item.supported_sizes)?item.supported_sizes:[]};
+      const rate=videoPricePerSecond(provisional,{resolution:'720p',aspectRatio:'16:9'})||videoSkuPrice(item)||videoPricePerSecond(general)||videoPricePerSecond(fallback);
       const supported_parameters={
         ...(fallback.supported_parameters||{}),
         ...(general.supported_parameters||{}),

@@ -17,7 +17,7 @@ const chooseEnum=(descriptor,requested,preferred=[])=>{
   for(const wanted of preferred){const match=values.find(v=>String(v).toLowerCase()===String(wanted).toLowerCase());if(match)return match;}
   return values[0];
 };
-function videoEstimate(model,duration,resolution){const seconds=Math.max(1,Number(duration)||5),rate=videoPriceForRequest(model,{resolution})||videoPricePerSecond(model)||0.05,providerUsd=rate*seconds*1.05;return {seconds,rate,providerUsd,chargedTokens:Math.max(1,Math.ceil(providerUsd/TOKEN_USD))};}
+function videoEstimate(model,duration,resolution,aspectRatio){const seconds=Math.max(1,Number(duration)||5),rate=videoPriceForRequest(model,{resolution,aspectRatio})||videoPricePerSecond(model,{resolution,aspectRatio})||0.05,providerUsd=rate*seconds*1.05;return {seconds,rate,providerUsd,chargedTokens:Math.max(1,Math.ceil(providerUsd/TOKEN_USD))};}
 function validOpenRouterPollUrl(value){try{const u=new URL(String(value||''),'https://openrouter.ai');return u.protocol==='https:'&&u.hostname==='openrouter.ai'&&u.pathname.startsWith('/api/v1/videos/')?u.toString():''}catch{return ''}}
 function detectVideoType(file,declared=''){if(!Buffer.isBuffer(file)||file.length<12)return '';const d=String(declared||'').toLowerCase();if(file.toString('ascii',4,8)==='ftyp')return 'video/mp4';if(file.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])))return d.includes('webm')?'video/webm':'video/webm';return ''}
 function extensionFor(type){return type==='video/webm'?'webm':'mp4'}
@@ -36,11 +36,11 @@ async function submitVideo(req,res,locale){
   const configured=String((await getToolModelSettings()).video||'');const requested=cleanText(b.modelId,120);let model;
   if(taskId==='video')model=models.find(x=>x.id===configured)||models[0];else model=models.find(x=>x.id===requested)||models.find(x=>x.id===configured)||models[0];
   const sp=model.supported_parameters||{};const duration=chooseEnum(sp.duration,b.duration,['5','4','6','8'])||String(Math.max(1,Math.min(15,Number(b.duration)||5)));const resolution=chooseEnum(sp.resolution,b.resolution,['720p','1080p']);const aspectRatio=chooseEnum(sp.aspect_ratio,b.aspectRatio,['16:9','1:1']);
-  const estimate=videoEstimate(model,duration,resolution),reserved=reservationTokens(estimate.chargedTokens,'video'),available=Math.max(0,Number(profile.ai_tokens||0));if(available<reserved)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens:available,requiredTokens:reserved,shortfall:reserved-available});
+  const estimate=videoEstimate(model,duration,resolution,aspectRatio),reserved=reservationTokens(estimate.chargedTokens,'video'),available=Math.max(0,Number(profile.ai_tokens||0));if(available<reserved)throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST',{availableTokens:available,requiredTokens:reserved,shortfall:reserved-available});
   if(!String(process.env.OPENROUTER_API_KEY||'').trim())throw appError('MISSING_CONFIGURATION',{missing:['OPENROUTER_API_KEY']});
   await reserveAiTokens(s,user.id,requestId,'video',reserved);let reservationActive=true,savedUser=null,savedAssistant=null,savedMedia=null;
   try{
-    const body={model:model.id,prompt};if(duration)body.duration=Number.isFinite(Number(duration))?Number(duration):duration;if(resolution)body.resolution=resolution;if(aspectRatio)body.aspect_ratio=aspectRatio;
+    const body={model:model.id,prompt,generate_audio:false};if(duration)body.duration=Number.isFinite(Number(duration))?Number(duration):duration;if(resolution)body.resolution=resolution;if(aspectRatio)body.aspect_ratio=aspectRatio;
     const response=await fetchWithTimeout('https://openrouter.ai/api/v1/videos',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'},body:JSON.stringify(body)},30000);
     const payload=await response.json().catch(()=>({}));if(!response.ok)throw appError('MODEL_UNAVAILABLE',{providerStatus:response.status},new Error(payload?.error?.message||`OpenRouter ${response.status}`));
     const jobId=String(payload?.id||'');const pollingUrl=validOpenRouterPollUrl(payload?.polling_url);if(!jobId||!pollingUrl)throw appError('EMPTY_RESPONSE');

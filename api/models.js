@@ -72,7 +72,7 @@ export default async function handler(req, res) {
         if (!estimatePurchased) throw appError('MODEL_LOCKED');
         const durations=video.supportedDurations||[]; const requested=String(body.duration||'');
         const duration=Number(durations.find(v=>String(v)===requested)||durations[0]||requested||5);
-        const rate=Number(videoPriceForRequest(video,{resolution:String(body.resolution||'')})||video.pricePerSecond||videoPricePerSecond(video)||0.05); const providerUsd=rate*Math.max(1,duration)*1.05; const chargedTokens=Math.max(1,Math.ceil(providerUsd/TOKEN_USD));
+        const rate=Number(videoPriceForRequest(video,{resolution:String(body.resolution||''),aspectRatio:String(body.aspectRatio||'')})||video.pricePerSecond||videoPricePerSecond(video)||0.05); const providerUsd=rate*Math.max(1,duration)*1.05; const chargedTokens=Math.max(1,Math.ceil(providerUsd/TOKEN_USD));
         return json(res,200,{type:'video',modelId:video.id,routedModelId:video.id,modelName:video.name,...(estimatePurchased?{providerUsd,chargedTokens}:{providerUsd:0,chargedTokens:1}),approximate:true,freeTrial:!estimatePurchased,billingMode:estimatePurchased?'paid':'free_trial',duration,resolution:String(body.resolution||''),aspectRatio:String(body.aspectRatio||''),pricePerSecond:rate});
       }
       const image = (configuredImageId && IMAGE_MODELS.find(model => model.id === configuredImageId))
