@@ -1156,9 +1156,14 @@ function shortModelName(name){
 
   return value.slice(0,40);
 }
+function clientEmergencyModels(){
+  const models=[{id:'openrouter/free',name:'OpenRouter Free Router',type:'chat',isFree:true,locked:false,trial:true,contextLength:128000,pricing:{prompt:0,completion:0},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openrouter',costPerMillion:0}];
+  return {name:'AiWay',models,chatModelOrders:{cheapest:['openrouter/free'],mostExpensive:['openrouter/free'],free:['openrouter/free']},trialModelId:'openrouter/free',packages:{},tokenUsd:.00001,imageModels:[{id:'google/gemini-2.5-flash-image',name:'Gemini 2.5 Flash Image',shortName:'Gemini 2.5 Flash Image',type:'image',provider:'google',providerLabel:'google',locked:false,isFree:false,pricing:{image:.04},supportedAspectRatios:['1:1','4:3','3:4','16:9','9:16'],supportedResolutions:['512','1K','2K']}],videoModels:[{id:'bytedance/seedance-1.5-pro',name:'Seedance 1.5 Pro',shortName:'Seedance 1.5 Pro',type:'video',provider:'bytedance',providerLabel:'bytedance',locked:false,isFree:false,pricing:{video_second:.02306},pricePerSecond:.02306,supportedAspectRatios:['16:9','9:16','1:1'],supportedResolutions:['720p','1080p'],supportedDurations:['4','5','6','8','10']}],tools:[],degraded:true};
+}
 async function loadModels(withQuotes=false){
   const selected=$('model').value;
-  const data=await api(withQuotes?'/api/models?quotes=1':'/api/models');
+  let data;
+  try{data=await api(withQuotes?'/api/models?quotes=1':'/api/models')}catch(error){console.warn('[CLIENT_MODELS_FALLBACK]',error?.message||error);data=clientEmergencyModels();window.aiwayCatalogDegraded=true}
   window.aiwayPackages=data.packages||{};window.aiwayTokenUsd=Number(data.tokenUsd||0.00001);
   window.aiwayModels=data.models||[];
   window.aiwayChatModelOrders=data.chatModelOrders||{};
