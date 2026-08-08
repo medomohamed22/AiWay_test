@@ -11,6 +11,7 @@ const ADMIN_TOKEN_AUDIENCE = 'aiway-admin';
 const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
 const PAYMENT_QUOTE_AUDIENCE = 'aiway-payment-quote';
 const APP_SESSION_TTL = '24h';
+let supabaseClient = null;
 
 export function requireEnv() {
   const missing = [];
@@ -22,9 +23,13 @@ export function requireEnv() {
 
 export function db() {
   requireEnv();
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false }
-  });
+  if (!supabaseClient) {
+    supabaseClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { 'X-Client-Info': 'aiway-vercel-api' } }
+    });
+  }
+  return supabaseClient;
 }
 
 
@@ -82,8 +87,22 @@ export function telegramHtml(value) {
 
 export function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  if (!res.getHeader('Cache-Control')) res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   return res.end(JSON.stringify(body));
+}
+
+export function enforceJsonBodySize(req, maxBytes = 4_000_000) {
+  const length = Number(req?.headers?.['content-length'] || 0);
+  if (Number.isFinite(length) && length > maxBytes) throw appError('PAYLOAD_TOO_LARGE');
+}
+
+export function safeHttpUrl(value, fallback = '') {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return fallback;
+    return url.toString();
+  } catch { return fallback; }
 }
 
 
@@ -316,6 +335,7 @@ export function errorDetails(error, locale = 'ar') {
   const messages = {
     METHOD_NOT_ALLOWED: [405, { ar: 'طريقة الطلب غير مسموح بها.', en: 'This request method is not allowed.' }],
     INVALID_REQUEST: [400, { ar: 'بيانات الطلب غير مكتملة أو غير صحيحة. راجع المدخلات وحاول مرة أخرى.', en: 'The request data is incomplete or invalid. Check the inputs and try again.' }],
+    PAYLOAD_TOO_LARGE: [413, { ar: 'حجم الطلب أو المرفقات أكبر من الحد المسموح. قلّل حجم الملفات وحاول مرة أخرى.', en: 'The request or attachments are too large. Reduce the file size and try again.' }],
     INVALID_CHAT_REQUEST: [400, { ar: 'تعذر إرسال الرسالة لأن بيانات المحادثة غير مكتملة. حدّث الصفحة وحاول مرة أخرى.', en: 'The message could not be sent because the chat data is incomplete. Refresh the page and try again.' }],
     INVALID_IMAGE_REQUEST: [400, { ar: 'بيانات طلب الصورة غير مكتملة. اكتب وصفًا واضحًا ثم حاول مرة أخرى.', en: 'The image request is incomplete. Enter a clear description and try again.' }],
     UNAUTHORIZED: [401, { ar: 'انتهت جلسة تسجيل الدخول أو لم تبدأ بعد. سجّل الدخول بحساب Pi ثم حاول مرة أخرى.', en: 'Your sign-in session is missing or expired. Sign in with Pi and try again.' }],
