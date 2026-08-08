@@ -1,5 +1,5 @@
 import {
-  allowMethods, json, requestLocale, localize, requireUser, db,
+  allowMethods, appError, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
   TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, getOpenRouterVideoModels, videoPricePerSecond, videoPriceForRequest
 } from './_lib.js';
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
       if (body.action !== 'estimate-message') return json(res, 400, { error: localize(locale, 'طلب غير صالح.', 'Invalid request.') });
-      let estimatePurchased = true;
+      let estimatePurchased = false;
       try {
         const estimateUser = await requireUser(req);
         const { data: estimateProfile } = await db().from('users').select('has_purchased').eq('id', estimateUser.id).single();
@@ -69,6 +69,7 @@ export default async function handler(req, res) {
         || VIDEO_MODELS.find(model => model.id === body.modelId)
         || (routingTaskId === 'video' ? VIDEO_MODELS[0] : null);
       if (video) {
+        if (!estimatePurchased) throw appError('MODEL_LOCKED');
         const durations=video.supportedDurations||[]; const requested=String(body.duration||'');
         const duration=Number(durations.find(v=>String(v)===requested)||durations[0]||requested||5);
         const rate=Number(videoPriceForRequest(video,{resolution:String(body.resolution||'')})||video.pricePerSecond||videoPricePerSecond(video)||0.05); const providerUsd=rate*Math.max(1,duration)*1.05; const chargedTokens=Math.max(1,Math.ceil(providerUsd/TOKEN_USD));

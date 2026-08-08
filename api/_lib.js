@@ -722,6 +722,8 @@ export async function getOpenRouterVideoModels(){
   }
 }
 
+let imageCatalogCache={expires:0,data:null};
+
 export async function getOpenRouterImageModels(){
   if(imageCatalogCache.data&&Date.now()<imageCatalogCache.expires)return imageCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
   try{
