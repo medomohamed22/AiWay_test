@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin.html
+Disallow: /signin-callback.html
+
+Sitemap: https://ai-way-web3.vercel.app/sitemap.xml
