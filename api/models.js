@@ -1,7 +1,7 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, getOpenRouterVideoModels, videoPricePerSecond, videoPriceForRequest
 } from './_lib.js';
 
 
@@ -40,6 +40,7 @@ async function imageEstimate(model,resolution='',aspectRatio='1:1',hasReferenceI
 
 const enumValues=(descriptor,fallback=[])=>Array.isArray(descriptor)?descriptor.map(String):(Array.isArray(descriptor?.values)?descriptor.values.map(String):fallback);
 const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['512','1K','2K','4K']) }));
+const videoModels = async () => (await getOpenRouterVideoModels()).map(model=>({ ...model, shortName:model.name, type:'video', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['16:9','9:16','1:1']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['720p','1080p']), supportedDurations:enumValues(model.supported_parameters?.duration,['4','5','6','8','10']), pricePerSecond:videoPricePerSecond(model) })).sort((a,b)=>(a.pricePerSecond||Infinity)-(b.pricePerSecond||Infinity)||a.name.localeCompare(b.name));
 
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ['GET', 'POST'])) return;
@@ -62,6 +63,17 @@ export default async function handler(req, res) {
       // must honor the exact model explicitly selected by the user.
       const routingTaskId = taskId === 'all-models' ? '' : taskId;
       const configuredImageId = routingTaskId === 'image' ? String(settings.image || '').trim() : '';
+      const VIDEO_MODELS=await videoModels();
+      const configuredVideoId = routingTaskId === 'video' ? String(settings.video || '').trim() : '';
+      const video = (configuredVideoId && VIDEO_MODELS.find(model => model.id === configuredVideoId))
+        || VIDEO_MODELS.find(model => model.id === body.modelId)
+        || (routingTaskId === 'video' ? VIDEO_MODELS[0] : null);
+      if (video) {
+        const durations=video.supportedDurations||[]; const requested=String(body.duration||'');
+        const duration=Number(durations.find(v=>String(v)===requested)||durations[0]||requested||5);
+        const rate=Number(videoPriceForRequest(video,{resolution:String(body.resolution||'')})||video.pricePerSecond||videoPricePerSecond(video)||0.05); const providerUsd=rate*Math.max(1,duration)*1.05; const chargedTokens=Math.max(1,Math.ceil(providerUsd/TOKEN_USD));
+        return json(res,200,{type:'video',modelId:video.id,routedModelId:video.id,modelName:video.name,...(estimatePurchased?{providerUsd,chargedTokens}:{providerUsd:0,chargedTokens:1}),approximate:true,freeTrial:!estimatePurchased,billingMode:estimatePurchased?'paid':'free_trial',duration,resolution:String(body.resolution||''),aspectRatio:String(body.aspectRatio||''),pricePerSecond:rate});
+      }
       const image = (configuredImageId && IMAGE_MODELS.find(model => model.id === configuredImageId))
         || IMAGE_MODELS.find(model => model.id === body.modelId)
         || null;
@@ -153,6 +165,7 @@ export default async function handler(req, res) {
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
       trialModelId:'openrouter/free', packages,
       imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
+      videoModels:(await videoModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
       tokenUsd:TOKEN_USD, tools:await getAiTools(), providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {

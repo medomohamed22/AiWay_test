@@ -35,13 +35,21 @@ async function cleanupExpiredImages(req, res) {
   const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data: expired, error } = await supabase
     .from('generated_images')
-    .select('id,storage_path')
+    .select('id,user_id,storage_path,storage_status,media_type,token_usage')
     .lt('created_at', cutoff)
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) throw error;
 
   const rows = Array.isArray(expired) ? expired : [];
+  // A user can close Pi Browser while a long-running video job is still pending.
+  // Expired unfinished jobs must release their token reservation before deletion.
+  for (const row of rows) {
+    if (String(row.media_type || '').startsWith('video/') && row.storage_status === 'processing') {
+      const requestId = String(row.token_usage?.requestId || '');
+      if (requestId && row.user_id) await releaseAiTokens(supabase, row.user_id, requestId, { code:'VIDEO_EXPIRED_BEFORE_COMPLETION', videoId:row.id });
+    }
+  }
   const storagePaths = rows.map(row => row.storage_path).filter(Boolean);
   if (storagePaths.length) {
     const { error: removeError } = await supabase.storage

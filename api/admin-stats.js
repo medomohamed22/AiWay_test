@@ -1,4 +1,4 @@
-import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, getOpenRouterImageModels, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
+import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterVideoModels, videoPricePerSecond, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd } from './_lib.js';
 
 const num=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
 const isoDay=v=>new Date(v).toISOString().slice(0,10);
@@ -60,12 +60,14 @@ export default async function handler(req,res){
         const models=(await getAvailableModels()).sort((a,b)=>(a.pricing.prompt+a.pricing.completion)-(b.pricing.prompt+b.pricing.completion));
         const liveModels=GEMINI_LIVE_MODELS.map(x=>({...x}));
         const imageModels=(await getOpenRouterImageModels()).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
-        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,liveModels,pricingSource:'OpenRouter Models API pricing',pricingSourceUrl:'https://openrouter.ai/models',refreshedAt:new Date().toISOString(),catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
+        const enumVals=d=>Array.isArray(d)?d.map(String):(Array.isArray(d?.values)?d.values.map(String):[]);const videoModels=(await getOpenRouterVideoModels()).map(m=>({...m,type:'video',pricePerSecond:videoPricePerSecond(m),supportedResolutions:enumVals(m.supported_parameters?.resolution),supportedAspectRatios:enumVals(m.supported_parameters?.aspect_ratio),supportedDurations:enumVals(m.supported_parameters?.duration)})).sort((a,b)=>(a.pricePerSecond||Infinity)-(b.pricePerSecond||Infinity));
+        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,videoModels,liveModels,pricingSource:'OpenRouter Models API pricing',pricingSourceUrl:'https://openrouter.ai/models',refreshedAt:new Date().toISOString(),catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
       }
       const b=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const action=String(b.action||'bulk-models');
       const validText=new Set((await getAvailableModels()).map(x=>x.id));
       const validImages=new Set((await getOpenRouterImageModels()).map(x=>x.id));
+      const validVideos=new Set((await getOpenRouterVideoModels()).map(x=>x.id));
       const validLive=new Set(GEMINI_LIVE_MODELS.map(x=>x.id));
       const clean=v=>String(v??'').trim();
       const safeId=v=>clean(v).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48);
@@ -76,9 +78,9 @@ export default async function handler(req,res){
         return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }
       if(action==='save-tool'){
-        const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image','live_audio','live_translate']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
+        const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image','video','live_audio','live_translate']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
         if(!id||!clean(t.name_ar)||!clean(t.name_en))return json(res,400,{error:localize(locale,'أدخل معرّفًا واسمًا عربيًا وإنجليزيًا.','Enter an id plus Arabic and English names.')});
-        if(!(type==='image'?validImages:(type==='live_audio'||type==='live_translate'?validLive:validText)).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
+        if(!(type==='image'?validImages:type==='video'?validVideos:(type==='live_audio'||type==='live_translate'?validLive:validText)).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
         let promptConfig=t.prompt_config;
         if(typeof promptConfig==='string'){try{promptConfig=JSON.parse(promptConfig)}catch{return json(res,400,{error:localize(locale,'كود JSON الخاص بتعليمات الأداة غير صالح.','The tool instruction JSON is invalid.')})}}
         if(!promptConfig||typeof promptConfig!=='object'||Array.isArray(promptConfig))promptConfig={};

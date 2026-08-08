@@ -114,8 +114,9 @@ export default async function handler(req,res){
           const hydrated=await Promise.all((images||[]).map(async image=>{
             const output={...image};
             if(output.storage_path||output.thumbnail_data||output.source_url){
-              const ticket=await createDownloadTicket({sub:user.id,imageId:output.id,kind:'image-view'},'2h');
-              output.display_url=`/api/image?action=view&ticket=${encodeURIComponent(ticket)}`;
+              const isVideo=String(output.media_type||'').startsWith('video/')||output.token_usage?.mediaKind==='video';
+              const ticket=await createDownloadTicket({sub:user.id,imageId:output.id,kind:isVideo?'video-view':'image-view'},'2h');
+              output.display_url=isVideo?`/api/video?action=view&ticket=${encodeURIComponent(ticket)}`:`/api/image?action=view&ticket=${encodeURIComponent(ticket)}`;
             }
             return output;
           }));
