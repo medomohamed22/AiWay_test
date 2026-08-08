@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, enforceJsonBodySize } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints } from './_lib.js';
 
 
 const SAFE_IMAGE_TYPES = new Set(['image/png','image/jpeg','image/webp']);
@@ -35,21 +35,13 @@ async function cleanupExpiredImages(req, res) {
   const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const { data: expired, error } = await supabase
     .from('generated_images')
-    .select('id,user_id,storage_path,storage_status,media_type,token_usage')
+    .select('id,storage_path')
     .lt('created_at', cutoff)
     .order('created_at', { ascending: true })
     .limit(500);
   if (error) throw error;
 
   const rows = Array.isArray(expired) ? expired : [];
-  // A user can close Pi Browser while a long-running video job is still pending.
-  // Expired unfinished jobs must release their token reservation before deletion.
-  for (const row of rows) {
-    if (String(row.media_type || '').startsWith('video/') && row.storage_status === 'processing') {
-      const requestId = String(row.token_usage?.requestId || '');
-      if (requestId && row.user_id) await releaseAiTokens(supabase, row.user_id, requestId, { code:'VIDEO_EXPIRED_BEFORE_COMPLETION', videoId:row.id });
-    }
-  }
   const storagePaths = rows.map(row => row.storage_path).filter(Boolean);
   if (storagePaths.length) {
     const { error: removeError } = await supabase.storage
@@ -118,18 +110,10 @@ async function downloadImage(req, res, ticketed = false, inline = false) {
   let file;
   let mediaType = String(image.media_type || 'image/jpeg').toLowerCase();
   if (image.storage_path) {
-    const extension = imageExtension(SAFE_IMAGE_TYPES.has(mediaType) ? mediaType : 'image/jpeg');
-    const filename = safeFilename(`AiWay-${image.id}`, extension);
-    const { data: signed, error: signedError } = await db().storage.from('generated-images').createSignedUrl(
-      image.storage_path,
-      300,
-      inline ? {} : { download: filename }
-    );
-    if (!signedError && signed?.signedUrl) {
-      res.statusCode = 302;
-      res.setHeader('Location', signed.signedUrl);
-      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-      return res.end();
+    const { data } = await db().storage.from('generated-images').download(image.storage_path);
+    if (data) {
+      file = Buffer.from(await data.arrayBuffer());
+      mediaType = String(data.type || mediaType);
     }
   }
   if (!file && image.thumbnail_data) {
@@ -297,7 +281,6 @@ export default async function handler(req, res) {
     if (action === 'prepare-download' && req.method === 'POST') return await prepareImageDownload(req, res);
     if (action === 'download') return await downloadImage(req, res);
     if (req.method === 'GET') throw appError('INVALID_IMAGE_REQUEST');
-    enforceJsonBodySize(req, 4_000_000);
     if (action === 'persist') return await persistImage(req, res);
 
     const user = await requireUser(req);
@@ -335,7 +318,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     if (!String(process.env.OPENROUTER_API_KEY || '').trim()) throw appError('MISSING_CONFIGURATION', { missing:['OPENROUTER_API_KEY'] });
     const hasReferenceImage = typeof referenceImage === 'string' && referenceImage.startsWith('data:image/');
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
-    if (hasReferenceImage && referenceImage.length > 3_500_000) throw appError('ATTACHMENT_TOO_LARGE');
+    if (hasReferenceImage && referenceImage.length > 4_300_000) throw appError('ATTACHMENT_TOO_LARGE');
     let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage), taskId);
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
     if (purchased && freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
@@ -416,11 +399,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     if(!response.ok)throw openRouterError(response.status,payload);
     const imagePart=payload?.data?.[0];
     if(!imagePart?.b64_json)throw appError('EMPTY_RESPONSE');
-    const declaredMediaType=String(imagePart.media_type||'image/png').toLowerCase();
-    const generatedFile=Buffer.from(String(imagePart.b64_json||'').replace(/\s/g,''),'base64');
-    const detectedMediaType=detectSafeImageType(generatedFile);
-    if(!generatedFile.length||generatedFile.length>25*1024*1024||!detectedMediaType||!SAFE_IMAGE_TYPES.has(detectedMediaType))throw appError('EMPTY_RESPONSE');
-    const mediaType=detectedMediaType;
+    const mediaType=imagePart.media_type||'image/png';
     const thumbnailData=`data:${mediaType};base64,${imagePart.b64_json}`; const sourceUrl=null;
     const imageUsage={prompt_tokens:Number(payload.usage?.prompt_tokens||0),completion_tokens:Number(payload.usage?.completion_tokens||0),total_tokens:Number(payload.usage?.total_tokens||0),cost:Number(payload.usage?.cost||0)};
     const generationId = String(payload.id || payload?.data?.[0]?.id || '');
@@ -430,7 +409,6 @@ ${JSON.stringify(safeToolConfig)}`; }
     let savedUser = null;
     let savedAssistant = null;
     let savedImage = null;
-    let uploadedStoragePath = null;
     try {
       const userInsert = await supabase.from('messages').insert({
         conversation_id: conversationId,
@@ -460,7 +438,7 @@ ${JSON.stringify(safeToolConfig)}`; }
         model_id: model.id,
         prompt: cleanPrompt,
         media_type: mediaType,
-        thumbnail_data: null,
+        thumbnail_data: thumbnailData,
         source_url: sourceUrl,
         storage_status: 'pending',
         width: Number(item.width) || null,
@@ -474,25 +452,7 @@ ${JSON.stringify(safeToolConfig)}`; }
       }).select('*').single();
       if (imageInsert.error || !imageInsert.data) throw appError('DATABASE_ERROR', {}, imageInsert.error);
       savedImage = imageInsert.data;
-
-      const extension=imageExtension(mediaType);
-      const storagePath=`${user.id}/${savedImage.id}.${extension}`;
-      const {error:uploadError}=await supabase.storage.from('generated-images').upload(storagePath,generatedFile,{contentType:mediaType,cacheControl:'31536000',upsert:false});
-      if(!uploadError||/already exists|duplicate/i.test(String(uploadError?.message||''))){
-        uploadedStoragePath=storagePath;
-        const {data:updated,error:updateError}=await supabase.from('generated_images').update({storage_path:storagePath,storage_status:'ready',file_size:generatedFile.length,stored_at:new Date().toISOString(),thumbnail_data:null,fallback_reason:null}).eq('id',savedImage.id).eq('user_id',user.id).select('*').single();
-        if(updateError||!updated)throw appError('DATABASE_ERROR',{},updateError);
-        savedImage=updated;
-      }else if(thumbnailData.length<=3_500_000){
-        const {data:updated,error:updateError}=await supabase.from('generated_images').update({storage_status:'client_only',fallback_reason:isStorageCapacityError(uploadError)?'storage_capacity':'storage_unavailable',file_size:generatedFile.length,thumbnail_data:thumbnailData}).eq('id',savedImage.id).eq('user_id',user.id).select('*').single();
-        if(updateError||!updated)throw appError('DATABASE_ERROR',{},updateError);
-        savedImage=updated;
-      }else{
-        throw appError('DATABASE_ERROR',{},uploadError);
-      }
     } catch (saveError) {
-      const cleanupStoragePath=savedImage?.storage_path||uploadedStoragePath;
-      if (cleanupStoragePath) await supabase.storage.from('generated-images').remove([cleanupStoragePath]).catch(()=>{});
       if (savedImage?.id) await supabase.from('generated_images').delete().eq('id', savedImage.id).eq('user_id', user.id);
       if (savedAssistant?.id) await supabase.from('messages').delete().eq('id', savedAssistant.id).eq('user_id', user.id);
       if (savedUser?.id) await supabase.from('messages').delete().eq('id', savedUser.id).eq('user_id', user.id);
@@ -510,12 +470,8 @@ ${JSON.stringify(safeToolConfig)}`; }
       .eq('user_id', user.id);
     if (conversationUpdate.error) console.warn('Conversation timestamp update failed:', conversationUpdate.error.message);
 
-    const imageTicket=await createDownloadTicket({sub:user.id,imageId:savedImage.id,kind:'image-view'},'2h');
-    const responseImage={...savedImage,display_url:`/api/image?action=view&ticket=${encodeURIComponent(imageTicket)}`};
-    // Storage-backed images must never carry their Base64 payload back through Vercel.
-    if(responseImage.storage_path)responseImage.thumbnail_data=null;
     return json(res, 200, {
-      image: responseImage,
+      image: savedImage,
       chargedTokens: purchased ? charge.chargedTokens : 1,
       providerUsd: charge.providerUsd,
       selectedModelName: model.name || model.id,

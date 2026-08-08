@@ -1,6 +1,6 @@
 export const maxDuration = 300;
 
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, enforceJsonBodySize } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -159,7 +159,6 @@ export default async function handler(req, res) {
     if ((req.method === 'GET' || req.method === 'POST') && downloadAction === 'download-file') return await downloadGeneratedFile(req, res);
     if ((req.method === 'GET' || req.method === 'POST') && downloadAction === 'download-project') return await downloadGeneratedProject(req, res);
     if (req.method !== 'POST') throw appError('INVALID_REQUEST');
-    enforceJsonBodySize(req, 4_000_000);
 
     const user = await requireUser(req);
     const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId } = req.body || {};
@@ -226,9 +225,8 @@ export default async function handler(req, res) {
     const sourceAttachments = Array.isArray(attachments) ? attachments.slice(0, 3) : [];
     const invalidAttachment = sourceAttachments.some(a => !a || typeof a.name !== 'string' || typeof a.type !== 'string' || typeof a.dataUrl !== 'string' || !a.dataUrl.startsWith('data:'));
     if (invalidAttachment) throw appError('INVALID_ATTACHMENT');
-    if (sourceAttachments.some(a => a.dataUrl.length > 3_200_000)) throw appError('ATTACHMENT_TOO_LARGE');
-    if (sourceAttachments.reduce((n,a)=>n+String(a?.dataUrl||'').length,0) > 3_500_000) throw appError('ATTACHMENT_TOO_LARGE');
-    const safeAttachments = sourceAttachments.filter(a => a.dataUrl.length <= 3_200_000);
+    if (sourceAttachments.some(a => a.dataUrl.length > 4_300_000)) throw appError('ATTACHMENT_TOO_LARGE');
+    const safeAttachments = sourceAttachments.filter(a => a.dataUrl.length <= 4_300_000);
 
     if (safeAttachments.length) {
       const lastIndex = [...cleaned].map(x => x.role).lastIndexOf('user');

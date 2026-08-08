@@ -11,7 +11,6 @@ const ADMIN_TOKEN_AUDIENCE = 'aiway-admin';
 const DOWNLOAD_TOKEN_AUDIENCE = 'aiway-download';
 const PAYMENT_QUOTE_AUDIENCE = 'aiway-payment-quote';
 const APP_SESSION_TTL = '24h';
-let supabaseClient = null;
 
 export function requireEnv() {
   const missing = [];
@@ -23,13 +22,9 @@ export function requireEnv() {
 
 export function db() {
   requireEnv();
-  if (!supabaseClient) {
-    supabaseClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { 'X-Client-Info': 'aiway-vercel-api' } }
-    });
-  }
-  return supabaseClient;
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
 }
 
 
@@ -87,22 +82,8 @@ export function telegramHtml(value) {
 
 export function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
-  if (!res.getHeader('Cache-Control')) res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'no-store');
   return res.end(JSON.stringify(body));
-}
-
-export function enforceJsonBodySize(req, maxBytes = 4_000_000) {
-  const length = Number(req?.headers?.['content-length'] || 0);
-  if (Number.isFinite(length) && length > maxBytes) throw appError('PAYLOAD_TOO_LARGE');
-}
-
-export function safeHttpUrl(value, fallback = '') {
-  try {
-    const url = new URL(String(value || ''));
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return fallback;
-    return url.toString();
-  } catch { return fallback; }
 }
 
 
@@ -335,7 +316,6 @@ export function errorDetails(error, locale = 'ar') {
   const messages = {
     METHOD_NOT_ALLOWED: [405, { ar: 'طريقة الطلب غير مسموح بها.', en: 'This request method is not allowed.' }],
     INVALID_REQUEST: [400, { ar: 'بيانات الطلب غير مكتملة أو غير صحيحة. راجع المدخلات وحاول مرة أخرى.', en: 'The request data is incomplete or invalid. Check the inputs and try again.' }],
-    PAYLOAD_TOO_LARGE: [413, { ar: 'حجم الطلب أو المرفقات أكبر من الحد المسموح. قلّل حجم الملفات وحاول مرة أخرى.', en: 'The request or attachments are too large. Reduce the file size and try again.' }],
     INVALID_CHAT_REQUEST: [400, { ar: 'تعذر إرسال الرسالة لأن بيانات المحادثة غير مكتملة. حدّث الصفحة وحاول مرة أخرى.', en: 'The message could not be sent because the chat data is incomplete. Refresh the page and try again.' }],
     INVALID_IMAGE_REQUEST: [400, { ar: 'بيانات طلب الصورة غير مكتملة. اكتب وصفًا واضحًا ثم حاول مرة أخرى.', en: 'The image request is incomplete. Enter a clear description and try again.' }],
     UNAUTHORIZED: [401, { ar: 'انتهت جلسة تسجيل الدخول أو لم تبدأ بعد. سجّل الدخول بحساب Pi ثم حاول مرة أخرى.', en: 'Your sign-in session is missing or expired. Sign in with Pi and try again.' }],
@@ -597,7 +577,7 @@ function normalizeOpenRouterModel(model){
   return {
     id:String(model.id), name:String(model.name||model.id), description:String(model.description||''),
     created:Number(model.created||0), contextLength:Number(model.context_length||model.contextLength||0),
-    pricing:{prompt:num(pricing.prompt),completion:num(pricing.completion),request:num(pricing.request),image:num(pricing.image),image_output:num(pricing.image_output),output_image:num(pricing.output_image),megapixel:num(pricing.megapixel),web_search:num(pricing.web_search),video:num(pricing.video),second:num(pricing.second),video_second:num(pricing.video_second),video_output:num(pricing.video_output),video_output_per_second:num(pricing.video_output_per_second)},
+    pricing:{prompt:num(pricing.prompt),completion:num(pricing.completion),request:num(pricing.request),image:num(pricing.image),image_output:num(pricing.image_output),output_image:num(pricing.output_image),megapixel:num(pricing.megapixel),web_search:num(pricing.web_search)},
     inputModalities:Array.isArray(architecture.input_modalities)?architecture.input_modalities:['text'],
     outputModalities:Array.isArray(architecture.output_modalities)?architecture.output_modalities:['text'],
     supported_parameters:model.supported_parameters||{}, provider, providerLabel:provider,
@@ -609,7 +589,7 @@ let modelCatalogCache={expires:0,data:null};
 export async function getAvailableModels(){
   if(modelCatalogCache.data&&Date.now()<modelCatalogCache.expires)return modelCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
   try{
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=text',{headers:{Accept:'application/json'}},4500);
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=text',{headers:{Accept:'application/json'}},15000);
     if(!response.ok)throw new Error(`OpenRouter models ${response.status}`);
     const payload=await response.json();
     const all=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.id&&x.outputModalities.includes('text'));
@@ -621,144 +601,11 @@ export async function getAvailableModels(){
   }catch(error){console.warn('[OPENROUTER_CATALOG_FALLBACK]',error?.message||error);return FALLBACK_OPENROUTER_MODELS.map(x=>({...x,pricing:{...x.pricing}}));}
 }
 
-
-// OpenRouter video catalog is loaded from the dedicated video Models API so newly
-// supported models and capability changes appear without a redeploy. The fallback
-// list is only used during a temporary OpenRouter catalog outage.
-export const FALLBACK_OPENROUTER_VIDEO_MODELS = [
-  {id:'bytedance/seedance-1.5-pro',name:'Seedance 1.5 Pro',description:'Audio-visual video generation up to 1080p.',pricing:{video_second:0.02306},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['4','5','6','8','10','12']}},provider:'bytedance'},
-  {id:'alibaba/wan-2.6',name:'Wan 2.6',description:'Text, image, video and audio conditioned generation up to 1080p.',pricing:{video_second:0.04},inputModalities:['text','image','video','audio'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['5','10','15']}},provider:'alibaba'},
-  {id:'google/veo-3.1-lite',name:'Veo 3.1 Lite',description:'Cost-efficient Google video generation with synchronized audio.',pricing:{video_second:0.05},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16']},duration:{type:'enum',values:['4','6','8']}},provider:'google'},
-  {id:'x-ai/grok-imagine-video',name:'Grok Imagine Video',description:'Text, image and reference-conditioned short video generation.',pricing:{video_second:0.05},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['480p','720p']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4','3:2','2:3']},duration:{type:'enum',values:['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15']}},provider:'x-ai'},
-  {id:'bytedance/seedance-2.0-fast',name:'Seedance 2.0 Fast',description:'Fast and cost-efficient multimodal video generation.',pricing:{video_second:0.0538},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['4','5','6','8','10','12']}},provider:'bytedance'},
-  {id:'bytedance/seedance-2.0',name:'Seedance 2.0',description:'High quality multimodal reference-to-video generation.',pricing:{video_second:0.06726},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['4','5','6','8','10','12']}},provider:'bytedance'},
-  {id:'minimax/hailuo-2.3',name:'Hailuo 2.3',description:'Text-to-video and image-to-video generation.',pricing:{video_second:0.0817},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['6','10']}},provider:'minimax'},
-  {id:'alibaba/happyhorse-1.1',name:'HappyHorse 1.1',description:'Text, start-image and reference-image video generation up to 1080p.',pricing:{video_second:0.0988},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1','4:3','3:4']},duration:{type:'enum',values:['3','5','8','10','12','15']}},provider:'alibaba'},
-  {id:'google/veo-3.1-fast',name:'Veo 3.1 Fast',description:'Fast high-quality video with synchronized audio.',pricing:{video_second:0.10},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16']},duration:{type:'enum',values:['4','6','8']}},provider:'google'},
-  {id:'alibaba/wan-2.7',name:'Wan 2.7',description:'Text, image and reference-to-video generation.',pricing:{video_second:0.10},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['5','10','15']}},provider:'alibaba'},
-  {id:'kwaivgi/kling-video-o1',name:'Video O1',description:'Kling cinematic text-to-video and image-to-video.',pricing:{video_second:0.112},inputModalities:['text','image'],outputModalities:['video'],supported_parameters:{aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['5','10']}},provider:'kwaivgi'},
-  {id:'kwaivgi/kling-v3.0-std',name:'Video v3.0 Standard',description:'Kling Standard video generation with optional native audio.',pricing:{video_second:0.126},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['3','5','8','10','12','15']}},provider:'kwaivgi'},
-  {id:'kwaivgi/kling-v3.0-pro',name:'Video v3.0 Pro',description:'Premium Kling video generation.',pricing:{video_second:0.168},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['3','5','8','10','12','15']}},provider:'kwaivgi'},
-  {id:'openai/sora-2-pro',name:'Sora 2 Pro',description:'Production-quality video generation with synchronized audio.',pricing:{video_second:0.30},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p']},aspect_ratio:{type:'enum',values:['16:9','9:16','1:1']},duration:{type:'enum',values:['4','8','12']}},provider:'openai'},
-  {id:'google/veo-3.1',name:'Veo 3.1',description:'Google flagship video generation with synchronized audio.',pricing:{video_second:0.40},inputModalities:['text','image'],outputModalities:['video','audio'],supported_parameters:{resolution:{type:'enum',values:['720p','1080p','4K']},aspect_ratio:{type:'enum',values:['16:9','9:16']},duration:{type:'enum',values:['4','6','8']}},provider:'google'}
-];
-
-function videoResolutionDimensions(resolution='720p',aspectRatio='16:9',supportedSizes=[]){
-  const ratioParts=String(aspectRatio||'16:9').split(':').map(Number);const rw=ratioParts[0]>0?ratioParts[0]:16,rh=ratioParts[1]>0?ratioParts[1]:9,targetRatio=rw/rh;
-  const resolutionNumber=Math.max(1,Number(String(resolution||'720p').match(/\d+/)?.[0]||720));
-  const parsed=(Array.isArray(supportedSizes)?supportedSizes:[]).map(v=>{const m=String(v).toLowerCase().match(/(\d+)\s*x\s*(\d+)/);return m?{w:Number(m[1]),h:Number(m[2])}:null}).filter(Boolean);
-  if(parsed.length){
-    const scored=parsed.map(size=>{const ratio=size.w/size.h;const short=Math.min(size.w,size.h);return {...size,score:Math.abs(Math.log(ratio/targetRatio))*3+Math.abs(short-resolutionNumber)/resolutionNumber};}).sort((a,b)=>a.score-b.score);
-    if(scored[0])return {width:scored[0].w,height:scored[0].h};
-  }
-  if(rw>=rh)return {width:Math.max(1,Math.round(resolutionNumber*rw/rh)),height:resolutionNumber};
-  return {width:resolutionNumber,height:Math.max(1,Math.round(resolutionNumber*rh/rw))};
-}
-function videoSkuEntries(model){
-  const skus=model?.pricing_skus&&typeof model.pricing_skus==='object'?model.pricing_skus:{};
-  return Object.entries(skus).map(([key,value])=>[String(key).toLowerCase(),Number(value)]).filter(([,value])=>Number.isFinite(value)&&value>0);
-}
-function seedanceTokenUnitPrice(model){
-  if(!/^bytedance\/seedance-/i.test(String(model?.id||'')))return 0;
-  const entries=videoSkuEntries(model);
-  const base=entries.filter(([key,value])=>value<0.001&&!/audio/.test(key));
-  const candidates=(base.length?base:entries.filter(([,value])=>value<0.001)).map(([,value])=>value);
-  return candidates.length?Math.min(...candidates):0;
-}
-function seedancePricePerSecond(model,{resolution='720p',aspectRatio='16:9'}={}){
-  const unit=seedanceTokenUnitPrice(model);if(!unit)return 0;
-  const {width,height}=videoResolutionDimensions(resolution,aspectRatio,model?.supported_sizes||[]);
-  return (width*height*24/1024)*unit;
-}
-export function videoPricePerSecond(model,options={}){
-  const seedance=seedancePricePerSecond(model,options);if(seedance>0)return seedance;
-  const entries=videoSkuEntries(model);
-  const explicit=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/.test(key)).map(([,value])=>value);
-  if(explicit.length)return Math.min(...explicit);
-  const p=model?.pricing||{};
-  const candidates=[p.video_second,p.video_output_per_second,p.second,p.video,p.request_per_second]
-    .map(Number).filter(v=>Number.isFinite(v)&&v>0);
-  return candidates.length?Math.min(...candidates):0;
-}
-
-export function videoPriceForRequest(model,{resolution='',aspectRatio=''}={}){
-  const seedance=seedancePricePerSecond(model,{resolution:resolution||'720p',aspectRatio:aspectRatio||'16:9'});if(seedance>0)return seedance;
-  const entries=videoSkuEntries(model);
-  const r=String(resolution||'').toLowerCase().replace(/\s+/g,'');
-  const resolutionMatches=r?entries.filter(([key])=>key.replace(/\s+/g,'').includes(r)&&/second/.test(key)):[];
-  if(resolutionMatches.length)return Math.min(...resolutionMatches.map(([,value])=>value));
-  const base=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/.test(key)&&!/(480p|720p|1080p|2160p|4k)/.test(key));
-  if(base.length)return Math.min(...base.map(([,value])=>value));
-  return videoPricePerSecond(model,{resolution:resolution||'720p',aspectRatio:aspectRatio||'16:9'});
-}
-
-let videoCatalogCache={expires:0,data:null};
-function positiveNumber(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:0}
-function videoSkuPrice(item){
-  const entries=videoSkuEntries(item);
-  const preferred=entries.filter(([key])=>/per-video-second|video-second|per_second|per-second/i.test(key)).map(([,value])=>positiveNumber(value)).filter(Boolean);
-  return preferred.length?Math.min(...preferred):0;
-}
-function enumDescriptor(values){return Array.isArray(values)&&values.length?{type:'enum',values:values.map(String)}:undefined}
-export async function getOpenRouterVideoModels(){
-  if(videoCatalogCache.data&&Date.now()<videoCatalogCache.expires)return videoCatalogCache.data.map(x=>({...x,pricing:{...x.pricing},supported_parameters:{...(x.supported_parameters||{})}}));
-  try{
-    const apiKey=String(process.env.OPENROUTER_API_KEY||'').trim();
-    const headers={Accept:'application/json'};if(apiKey)headers.Authorization=`Bearer ${apiKey}`;
-    // The dedicated endpoint is the source of truth for generation controls and
-    // pricing SKUs; the general Models API supplies architecture input/output modalities.
-    const [videoResponse,generalResponse]=await Promise.all([
-      fetchWithTimeout('https://openrouter.ai/api/v1/videos/models',{headers},4500),
-      fetchWithTimeout('https://openrouter.ai/api/v1/models?output_modalities=video',{headers:{Accept:'application/json'}},4500)
-    ]);
-    if(!videoResponse.ok)throw new Error(`OpenRouter video models ${videoResponse.status}`);
-    const videoPayload=await videoResponse.json();
-    const generalPayload=generalResponse.ok?await generalResponse.json():{data:[]};
-    const generalMap=new Map((Array.isArray(generalPayload?.data)?generalPayload.data:[]).map(item=>[String(item.id||''),normalizeOpenRouterModel(item)]));
-    const raw=Array.isArray(videoPayload?.data)?videoPayload.data:[];
-    const fallbackMap=new Map(FALLBACK_OPENROUTER_VIDEO_MODELS.map(x=>[x.id,x]));
-    const items=raw.map(item=>{
-      const id=String(item?.id||'');if(!id)return null;
-      const general=generalMap.get(id)||{};const fallback=fallbackMap.get(id)||{};
-      const provider=id.split('/')[0]||'openrouter';
-      const provisional={...fallback,...general,...item,id,pricing_skus:item.pricing_skus||{},supported_sizes:Array.isArray(item.supported_sizes)?item.supported_sizes:[]};
-      const rate=videoPricePerSecond(provisional,{resolution:'720p',aspectRatio:'16:9'})||videoSkuPrice(item)||videoPricePerSecond(general)||videoPricePerSecond(fallback);
-      const supported_parameters={
-        ...(fallback.supported_parameters||{}),
-        ...(general.supported_parameters||{}),
-        ...(enumDescriptor(item.supported_resolutions)?{resolution:enumDescriptor(item.supported_resolutions)}:{}),
-        ...(enumDescriptor(item.supported_aspect_ratios)?{aspect_ratio:enumDescriptor(item.supported_aspect_ratios)}:{}),
-        ...(enumDescriptor(item.supported_durations)?{duration:enumDescriptor(item.supported_durations)}:{})
-      };
-      const inputModalities=(general.inputModalities||fallback.inputModalities||['text']).map(String);
-      let outputModalities=(general.outputModalities||fallback.outputModalities||['video']).map(String);
-      if(!outputModalities.includes('video'))outputModalities=['video',...outputModalities.filter(x=>x!=='text')];
-      if(item.generate_audio===true&&!outputModalities.includes('audio'))outputModalities.push('audio');
-      return {
-        ...fallback,...general,
-        id,name:String(item.name||general.name||fallback.name||id),description:String(item.description||general.description||fallback.description||''),
-        created:Number(item.created||general.created||0),provider,providerLabel:provider,type:'video',
-        pricing:{...(fallback.pricing||{}),...(general.pricing||{}),...(rate?{video_second:rate}: {})},
-        pricing_skus:item.pricing_skus||{},inputModalities,outputModalities,supported_parameters,
-        supported_sizes:Array.isArray(item.supported_sizes)?item.supported_sizes:[],generateAudio:item.generate_audio===true,
-        allowedPassthroughParameters:Array.isArray(item.allowed_passthrough_parameters)?item.allowed_passthrough_parameters:[]
-      };
-    }).filter(Boolean);
-    if(!items.length)throw new Error('OpenRouter returned an empty video catalog');
-    videoCatalogCache={expires:Date.now()+10*60*1000,data:items};
-    return items.map(x=>({...x,pricing:{...x.pricing},supported_parameters:{...(x.supported_parameters||{})}}));
-  }catch(error){
-    console.warn('[OPENROUTER_VIDEO_CATALOG_FALLBACK]',error?.message||error);
-    return FALLBACK_OPENROUTER_VIDEO_MODELS.map(x=>({...x,type:'video',pricing:{...x.pricing},supported_parameters:{...(x.supported_parameters||{})}}));
-  }
-}
-
 let imageCatalogCache={expires:0,data:null};
-
 export async function getOpenRouterImageModels(){
   if(imageCatalogCache.data&&Date.now()<imageCatalogCache.expires)return imageCatalogCache.data.map(x=>({...x,pricing:{...x.pricing}}));
   try{
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images/models',{headers:{Accept:'application/json'}},4500);
+    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images/models',{headers:{Accept:'application/json'}},15000);
     if(!response.ok)throw new Error(`OpenRouter image models ${response.status}`);
     const payload=await response.json();
     const items=(Array.isArray(payload?.data)?payload.data:[]).map(normalizeOpenRouterModel).filter(x=>x.outputModalities.includes('image'));
@@ -809,7 +656,6 @@ export const DEFAULT_AI_TOOLS = [
   {id:'study',name_ar:'الدراسة',name_en:'Study',description_ar:'شرح الدروس، حل الأسئلة وإنشاء خطط ومراجعات دراسية.',description_en:'Explain lessons, solve questions, and create study plans and reviews.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:60},
   {id:'business',name_ar:'الأعمال',name_en:'Business',description_ar:'تحليل الأفكار وخطط الأعمال والمحتوى المهني.',description_en:'Analyze ideas, business plans, and professional content.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',is_active:true,sort_order:70},
   {id:'all-models',name_ar:'كل نماذج الذكاء الاصطناعي',name_en:'All AI Models',description_ar:'شات عادي مع اختيار النموذج من قائمة مرتبة حسب السعر والمجاني.',description_en:'General chat with a model picker sorted by price and free options.',tool_type:'text',model_id:'deepseek/deepseek-v4-flash',prompt_config:{_ui:{icon_svg:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg>'}},is_active:true,sort_order:5},
-  {id:'video',name_ar:'إنشاء فيديو',name_en:'Video Generation',description_ar:'أنشئ فيديو بالذكاء الاصطناعي مع اختيار الأبعاد والدقة والمدة.',description_en:'Generate AI video with aspect ratio, resolution, and duration controls.',tool_type:'video',model_id:'bytedance/seedance-1.5-pro',prompt_config:{_ui:{icon_svg:'<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M4 5.5A2.5 2.5 0 0 1 6.5 3h7A2.5 2.5 0 0 1 16 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 4 18.5v-13Zm13 4 4-2v9l-4-2v-5Z"/></svg>'}},is_active:true,sort_order:90},
   {id:'image',name_ar:'الصور',name_en:'Images',description_ar:'توليد الصور وتعديلها باستخدام أرخص نموذج FLUX.',description_en:'Generate and edit images with the cheapest FLUX model.',tool_type:'image',model_id:'black-forest-labs/flux.2-klein-4b',is_active:true,sort_order:100}
 ];
 
@@ -819,14 +665,7 @@ export async function getAiTools({includeInactive=false}={}){
     if(!includeInactive)query=query.eq('is_active',true);
     const {data,error}=await query;
     if(error||!Array.isArray(data)||!data.length)throw error||new Error('NO_AI_TOOLS');
-    const filtered=data.filter(tool=>!['live_audio','live_translate'].includes(tool.tool_type)&&!['voice-chat','voice-translate'].includes(tool.id));
-    // Video is a built-in workspace. Keep it available on existing databases that
-    // were created before this tool existed, without performing a write during GET.
-    if(!filtered.some(tool=>tool.id==='video')){
-      const builtin=DEFAULT_AI_TOOLS.find(tool=>tool.id==='video');
-      if(builtin&&(includeInactive||builtin.is_active))filtered.push({...builtin});
-    }
-    return filtered.sort((a,b)=>Number(a.sort_order||0)-Number(b.sort_order||0));
+    return data.filter(tool=>!['live_audio','live_translate'].includes(tool.tool_type)&&!['voice-chat','voice-translate'].includes(tool.id));
   }catch{
     return DEFAULT_AI_TOOLS.filter(tool=>(includeInactive||tool.is_active)&&!['live_audio','live_translate'].includes(tool.tool_type)&&!['voice-chat','voice-translate'].includes(tool.id)).map(tool=>({...tool}));
   }
