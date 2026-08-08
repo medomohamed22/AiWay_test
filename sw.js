@@ -1,6 +1,6 @@
 // AiWay service worker — reliable reloads on Pi Browser.
 // API requests and normal page navigations use the network directly.
-const CACHE_VERSION = 'aiway-static-v7';
+const CACHE_VERSION = 'aiway-static-v8';
 const STATIC_ASSETS = ['/aiway-logo.png', '/manifest.json'];
 
 self.addEventListener('install', (event) => {
