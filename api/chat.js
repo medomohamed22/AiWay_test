@@ -162,9 +162,8 @@ export default async function handler(req, res) {
     enforceJsonBodySize(req, 4_000_000);
 
     const user = await requireUser(req);
-    const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId, toolOptions: rawToolOptions } = req.body || {};
+    const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId } = req.body || {};
     const taskId = cleanText(rawTaskId, 30).toLowerCase();
-    const toolOptions = rawToolOptions && typeof rawToolOptions === 'object' && !Array.isArray(rawToolOptions) ? rawToolOptions : null;
     // all-models is a UI workspace identity that must be persisted in chat history,
     // but it must never trigger task auto-routing or inject a specialist prompt.
     const routingTaskId = taskId === 'all-models' ? '' : taskId;
@@ -271,24 +270,6 @@ export default async function handler(req, res) {
       if (toolError) throw appError('DATABASE_ERROR', {}, toolError);
       toolConfig = configuredTool || null;
     }
-    const allowedToolOptions = {
-      coding:{action:['write','fix','explain','optimize','convert'],priority:['balanced','simple','performance','security','best-practices'],detail:['normal','brief','step-by-step']},
-      summary:{length:['short','medium','detailed','executive'],format:['bullets','paragraphs','qa','structured'],focus:['key-points','decisions','study','facts']},
-      ads:{platform:['general','instagram','facebook','tiktok','linkedin','google'],goal:['sales','leads','traffic','awareness','engagement'],tone:['persuasive','professional','friendly','bold']},
-      writing:{type:['article','email','social','product','letter','script'],tone:['professional','friendly','persuasive','simple','creative'],length:['short','medium','long']},
-      translate:{target:['auto','ar','en','fr','de','es'],style:['natural','professional','literal','simple'],domain:['general','business','academic','technical']},
-      study:{action:['explain','solve','summarize','quiz','plan'],level:['beginner','intermediate','advanced','child'],method:['clear','examples','step-by-step','practice']},
-      business:{action:['analyze','plan','swot','growth','pricing','pitch'],focus:['balanced','profit','risk','competition','execution'],depth:['standard','quick','deep']}
-    };
-    const normalizedToolOptions = (() => {
-      if (!routingTaskId || routingTaskId === 'image' || !toolOptions) return null;
-      const schema = allowedToolOptions[routingTaskId]; if (!schema) return null;
-      const mode = toolOptions.mode === 'professional' ? 'professional' : 'normal';
-      if (mode !== 'professional') return {mode:'normal'};
-      const input = toolOptions.values && typeof toolOptions.values === 'object' ? toolOptions.values : {};
-      const values = {}; for (const [key, allowed] of Object.entries(schema)) { const val=cleanText(input[key],40); if (allowed.includes(val)) values[key]=val; }
-      return {mode,values};
-    })();
     const legacyInstructions = {
       coding: {role:'coding specialist',objective_ar:'كتابة كود صحيح وقابل للتشغيل، إصلاح الأخطاء وشرح الحلول التقنية.',objective_en:'Write correct runnable code, fix bugs, and explain technical solutions.',rules:['Consider security, performance, edge cases, and complete syntax.']},
       summary: {role:'summarization specialist',objective_ar:'تلخيص المحتوى مع الحفاظ على الأفكار والقرارات والخطوات المهمة.',objective_en:'Summarize content while preserving key ideas, decisions, and action items.',rules:['Do not invent information.']},
@@ -301,7 +282,6 @@ export default async function handler(req, res) {
       tool_name:language==='ar'?(toolConfig?.name_ar||routingTaskId):(toolConfig?.name_en||routingTaskId),
       tool_description:language==='ar'?(toolConfig?.description_ar||''):(toolConfig?.description_en||''),
       locale:language,
-      ...(normalizedToolOptions ? {guided_options:normalizedToolOptions} : {}),
       ...promptConfig
     } : null;
     const taskPrompt = toolInstructionPayload ? `
