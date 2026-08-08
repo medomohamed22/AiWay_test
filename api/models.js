@@ -1,7 +1,8 @@
 import {
   allowMethods, appError, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, getOpenRouterVideoModels, videoPricePerSecond, videoPriceForRequest
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, getOpenRouterVideoModels, videoPricePerSecond, videoPriceForRequest,
+  FALLBACK_OPENROUTER_VIDEO_MODELS, GEMINI_IMAGE_MODELS, DEFAULT_AI_TOOLS
 } from './_lib.js';
 
 
@@ -42,9 +43,19 @@ const enumValues=(descriptor,fallback=[])=>Array.isArray(descriptor)?descriptor.
 const imageModels = async () => (await getOpenRouterImageModels()).map(model=>({ ...model, shortName:model.name, type:'image', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['512','1K','2K','4K']) }));
 const videoModels = async () => (await getOpenRouterVideoModels()).map(model=>({ ...model, shortName:model.name, type:'video', provider:model.provider||model.id.split('/')[0], providerLabel:model.providerLabel||model.id.split('/')[0], supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['16:9','9:16','1:1']), supportedResolutions:enumValues(model.supported_parameters?.resolution,['720p','1080p']), supportedDurations:enumValues(model.supported_parameters?.duration,['4','5','6','8','10']), pricePerSecond:videoPricePerSecond(model) })).sort((a,b)=>(a.pricePerSecond||Infinity)-(b.pricePerSecond||Infinity)||a.name.localeCompare(b.name));
 
-async function safeCatalog(load, fallback = []) {
+function within(promise, timeoutMs, label = 'operation') {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
+async function safeCatalog(load, fallback = [], timeoutMs = 3200) {
   try {
-    const value = await load();
+    const value = await within(load(), timeoutMs, 'model catalog');
     return Array.isArray(value) && value.length ? value : fallback;
   } catch (error) {
     console.warn('[MODELS_OPTIONAL_CATALOG_FALLBACK]', error?.message || error);
@@ -54,13 +65,39 @@ async function safeCatalog(load, fallback = []) {
 
 async function safeUnlocked(req) {
   try {
-    const user = await requireUser(req);
-    const { data, error } = await db().from('users').select('has_purchased').eq('id', user.id).single();
-    if (error) throw error;
-    return Boolean(data?.has_purchased);
-  } catch {
+    return await within((async () => {
+      const user = await requireUser(req);
+      const { data, error } = await db().from('users').select('has_purchased').eq('id', user.id).single();
+      if (error) throw error;
+      return Boolean(data?.has_purchased);
+    })(), 1800, 'account entitlement lookup');
+  } catch (error) {
+    if (error?.message?.includes('timed out')) console.warn('[MODELS_ENTITLEMENT_FALLBACK]', error.message);
     return false;
   }
+}
+
+function emergencyCatalog(unlocked = false) {
+  const catalog = [
+    { id:'openrouter/free', name:'OpenRouter Free Router', description:'Free fallback router.', contextLength:128000, pricing:{prompt:0,completion:0}, inputModalities:['text','image','files'], outputModalities:['text'], provider:'openrouter' },
+    { id:'deepseek/deepseek-v4-flash', name:'DeepSeek V4 Flash', description:'Fast cost-efficient fallback model.', contextLength:1048576, pricing:{prompt:0.08806/1e6,completion:0.1761/1e6}, inputModalities:['text'], outputModalities:['text'], provider:'deepseek' }
+  ];
+  const models = catalog.map(model => ({
+    ...model, type:'chat', isFree:model.id==='openrouter/free', locked:!unlocked && model.id!=='openrouter/free', trial:model.id==='openrouter/free',
+    costPerMillion:(Number(model.pricing?.prompt||0)+Number(model.pricing?.completion||0))*1e6
+  }));
+  return {
+    name:'AiWay', models,
+    chatModelOrders:{cheapest:models.map(model=>model.id),mostExpensive:[...models].reverse().map(model=>model.id),free:['openrouter/free']},
+    trialModelId:'openrouter/free',
+    packages:Object.fromEntries(Object.entries(PACKAGES).map(([id, pack])=>[id,{...pack,amountPi:null}])),
+    imageModels:GEMINI_IMAGE_MODELS.map(model=>({...model,type:'image',locked:!unlocked,isFree:false})),
+    videoModels:FALLBACK_OPENROUTER_VIDEO_MODELS.map(model=>({...model,type:'video',locked:!unlocked,isFree:false,pricePerSecond:videoPricePerSecond(model)})),
+    tokenUsd:TOKEN_USD,
+    tools:DEFAULT_AI_TOOLS.filter(tool=>tool.is_active&&!['live_audio','live_translate'].includes(tool.tool_type)&&!['voice-chat','voice-translate'].includes(tool.id)).map(tool=>({...tool})),
+    providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'},
+    rankingsSource:'Built-in resilient fallback', refreshedAt:new Date().toISOString(), degraded:true
+  };
 }
 
 async function loadPackageQuotes() {
@@ -142,11 +179,11 @@ export default async function handler(req, res) {
       : Promise.resolve(Object.fromEntries(Object.entries(PACKAGES).map(([id, pack]) => [id, { ...pack, amountPi:null }])));
     const [unlocked, catalog, IMAGE_MODELS, VIDEO_MODELS, packages, tools] = await Promise.all([
       safeUnlocked(req),
-      safeCatalog(() => getAvailableModels(), []),
-      safeCatalog(() => imageModels(), []),
-      safeCatalog(() => videoModels(), []),
+      safeCatalog(() => getAvailableModels(), emergencyCatalog(false).models.map(({type,isFree,locked,trial,costPerMillion,...model})=>model), 3200),
+      safeCatalog(() => imageModels(), GEMINI_IMAGE_MODELS.map(model=>({...model,shortName:model.name,type:'image',provider:model.provider||model.id.split('/')[0],providerLabel:model.providerLabel||model.id.split('/')[0],supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['1:1','4:3','3:4','16:9','9:16']),supportedResolutions:enumValues(model.supported_parameters?.resolution,['512','1K','2K','4K'])})), 3200),
+      safeCatalog(() => videoModels(), FALLBACK_OPENROUTER_VIDEO_MODELS.map(model=>({...model,shortName:model.name,type:'video',provider:model.provider||model.id.split('/')[0],providerLabel:model.providerLabel||model.id.split('/')[0],supportedAspectRatios:enumValues(model.supported_parameters?.aspect_ratio,['16:9','9:16','1:1']),supportedResolutions:enumValues(model.supported_parameters?.resolution,['720p','1080p']),supportedDurations:enumValues(model.supported_parameters?.duration,['4','5','6','8','10']),pricePerSecond:videoPricePerSecond(model)})), 3200),
       packagePromise,
-      safeCatalog(() => getAiTools(), [])
+      safeCatalog(() => getAiTools(), emergencyCatalog(false).tools, 1800)
     ]);
     const freeModels = catalog.filter(model =>
       (model.id === 'openrouter/free' ||
@@ -212,7 +249,11 @@ export default async function handler(req, res) {
       tokenUsd:TOKEN_USD, tools, providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {
-    console.error(error);
+    console.error('[MODELS_HANDLER_ERROR]', error);
+    // The model picker is a boot-critical endpoint. A temporary provider/database
+    // failure must not make the whole AiWay UI unusable. GET requests always get a
+    // functional built-in catalog; write/estimate failures retain normal errors.
+    if (req.method === 'GET') return json(res, 200, emergencyCatalog(false));
     return json(res, 500, { error:localize(locale, 'تعذر تحميل النماذج والأسعار.', 'Could not load models and pricing.'), code:'SERVER_ERROR' });
   }
 }
