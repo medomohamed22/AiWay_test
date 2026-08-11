@@ -576,6 +576,7 @@ export const PACKAGES = {
 // OpenRouter catalog. Prices are normalized to USD per token; image pricing is USD per request/megapixel when exposed.
 const CURATED_MODEL_IDS = [
   'deepseek/deepseek-v4-flash',
+  'openai/gpt-5.6-luna', 'openai/gpt-5.6-sol-pro',
   'openai/gpt-5.4', 'openai/gpt-5.4-mini', 'openai/gpt-5.4-nano',
   'google/gemini-3.1-pro-preview', 'google/gemini-3.1-flash-lite-preview',
   'x-ai/grok-4.1-fast', 'x-ai/grok-4',
@@ -585,7 +586,9 @@ const CURATED_MODEL_IDS = [
   'qwen/qwen3.5-397b-a17b', 'meta-llama/llama-4-maverick'
 ];
 const FALLBACK_OPENROUTER_MODELS = [
-  {id:'deepseek/deepseek-v4-flash',name:'DeepSeek V4 Flash',description:'سريع واقتصادي للبرمجة والتلخيص والكتابة والمهام العامة.',contextLength:1048576,pricing:{prompt:0.08806/1e6,completion:0.1761/1e6},inputModalities:['text'],outputModalities:['text'],provider:'deepseek'},
+  {id:'deepseek/deepseek-v4-flash',name:'DeepSeek V4 Flash',description:'سريع واقتصادي للبرمجة والتلخيص والكتابة والمهام العامة.',contextLength:1048576,pricing:{prompt:0.09/1e6,completion:0.18/1e6},inputModalities:['text'],outputModalities:['text'],provider:'deepseek'},
+  {id:'openai/gpt-5.6-luna',name:'GPT-5.6 Luna',description:'نموذج سريع وفعال للتوازن بين الجودة والتكلفة.',contextLength:1048576,pricing:{prompt:0.10/1e6,completion:0.60/1e6},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openai'},
+  {id:'openai/gpt-5.6-sol-pro',name:'GPT-5.6 Sol Pro',description:'نموذج عالي الجودة للمهام المعقدة والاستدلال والبرمجة.',contextLength:1048576,pricing:{prompt:5/1e6,completion:30/1e6},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openai'},
   {id:'openrouter/free',name:'OpenRouter Free Router',description:'يوجّه الطلب إلى نموذج مجاني متاح يدعم خصائص الطلب.',contextLength:128000,pricing:{prompt:0,completion:0},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openrouter'},
   {id:'openrouter/auto',name:'OpenRouter Auto',description:'اختيار تلقائي ذكي من OpenRouter.',contextLength:128000,pricing:{prompt:1/1e6,completion:3/1e6},inputModalities:['text','image','files'],outputModalities:['text'],provider:'openrouter'}
 ];

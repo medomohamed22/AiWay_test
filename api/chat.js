@@ -271,7 +271,6 @@ export default async function handler(req, res) {
     // OpenRouter's free router, regardless of the selected open text tool.
     if (!purchased) model = await getModel('openrouter/free') || await getModel(trialModelId);
     if (!model) throw appError('MODEL_UNAVAILABLE');
-    if (webSearch && !/^gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(model.id || ''))) throw appError('SEARCH_MODEL_UNSUPPORTED');
     if (isFreeModel(model) && purchased) await claimFreeDailyUse(supabase, user.id, 'chat');
     const language = detectLanguage(latestTextValue);
     let toolConfig = null;
@@ -351,7 +350,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'
     };
     const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),stream:true,stream_options:{include_usage:true},provider:{sort:'throughput',allow_fallbacks:true}};
-    if(webSearch)requestBody.plugins=[{id:'web',max_results:5}];
+    if(webSearch)requestBody.tools=[...(Array.isArray(requestBody.tools)?requestBody.tools:[]),{type:'openrouter:web_search'}];
     const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},240000);
     if(!response.ok){const payload=await response.json().catch(()=>({}));throw openRouterError(response.status,payload,{webSearch});}
     if(!response.body)throw appError('EMPTY_RESPONSE');

@@ -39,6 +39,37 @@ async function imageEstimate(model,resolution='',aspectRatio='1:1',hasReferenceI
 }
 
 
+function smartWebDecision(text='') {
+  const q=String(text||'').toLowerCase().replace(/\s+/g,' ').trim();
+  // Explicit user intent always wins.
+  if (/(?:بدون بحث|من غير بحث|لا تبحث|متبحثش|لا تستخدم (?:ال)?ويب|بدون (?:ال)?ويب|offline|without (?:web )?search|don['’]?t search|do not search|no web)/i.test(q)) {
+    return {enabled:false,score:-99,reason:'explicit_off'};
+  }
+  if (/(?:ابحث|دور (?:على|عن)|فتش|تحقق من (?:ال)?ويب|استخدم (?:ال)?ويب|بحث ويب|search (?:the )?web|browse|look (?:it )?up|verify online|web search)/i.test(q)) {
+    return {enabled:true,score:99,reason:'explicit_on'};
+  }
+  let score=0;
+  const hit=(re,weight)=>{ if(re.test(q)) score+=weight; };
+  // Freshness / recency signals.
+  hit(/(?:اليوم|النهارده|الآن|دلوقتي|حاليًا|حالياً|هذه اللحظة|هذا الأسبوع|هذا الشهر|هذا العام|today|right now|currently|this week|this month|this year|as of now)/i,4);
+  hit(/(?:أحدث|احدث|آخر|اخر|الجديد|جديد|مؤخرًا|مؤخراً|latest|newest|recent|recently|up[- ]?to[- ]?date|breaking)/i,3);
+  hit(/(?:2026|2027|2028|2029|2030)/i,2);
+  // Information that is inherently volatile.
+  hit(/(?:أخبار|خبر|news|headline|developments?|تطورات)/i,5);
+  hit(/(?:سعر|أسعار|سهم|بورصة|ذهب|نفط|بيتكوين|كريبتو|عملة|سعر الصرف|price|pricing|stock|share price|market|bitcoin|crypto|exchange rate|forex)/i,5);
+  hit(/(?:طقس|درجة الحرارة|حرارة|مطر|عاصفة|weather|temperature|forecast|rain|storm)/i,6);
+  hit(/(?:نتيجة|نتائج|مباراة|مباريات|ترتيب|الدوري|بطولة|موعد المباراة|score|scores|match|game|standings|fixture|schedule|tournament|league)/i,5);
+  hit(/(?:موعد|مواعيد|جدول|رحلة|طيران|قطار|حجز|تذاكر|متاح|توفر|availability|available|booking|reservation|flight|train|tickets?|opening hours|hours today)/i,4);
+  hit(/(?:قانون|لائحة|ضريبة|تأشيرة|فيزا|رسوم|سياسة رسمية|regulation|law|legal rule|tax|visa|fee|official policy|eligibility)/i,4);
+  hit(/(?:رئيس|رئيس الوزراء|وزير|مدير تنفيذي|ceo|president|prime minister|minister|current .* (?:ceo|president|leader))/i,4);
+  hit(/(?:إصدار|نسخة|تحديث|update|version|release|changelog|patch|specs?|مواصفات|يدعم الآن|support now)/i,3);
+  hit(/(?:من فاز|مين فاز|من هو الحالي|مين الحالي|who won|who is the current|current holder|current champion)/i,4);
+  // Comparisons/recommendations become web-worthy when paired with current market signals.
+  if (/(?:أفضل|احسن|أنسب|recommend|best|compare|مقارنة)/i.test(q) && /(?:هاتف|موبايل|لابتوب|منتج|خدمة|سعر|شراء|2026|حالياً|currently|buy|phone|laptop|product|service)/i.test(q)) score+=3;
+  // Stable/historical explanation cues reduce accidental searches unless freshness is also explicit.
+  if (/(?:اشرح|ما هو|ما هي|تعريف|تاريخ|مبدأ|نظرية|explain|what is|definition|history of|concept)/i.test(q) && score<4) score-=2;
+  return {enabled:score>=4,score,reason:score>=4?'freshness_signals':'stable_query'};
+}
 function smartIntent(text='', attachments=[]) {
   const q=String(text||'').toLowerCase();
   const hasImageAttachment=(attachments||[]).some(a=>String(a?.type||'').startsWith('image/'));
@@ -50,10 +81,10 @@ function smartIntent(text='', attachments=[]) {
   const business=/(?:مشروع|خطة عمل|دراسة جدوى|business|startup|strategy|market plan)/i.test(q);
   const ads=/(?:إعلان|تسويق|منشور|سوشيال|ad copy|marketing|social post)/i.test(q);
   const writing=/(?:اكتب|مقال|رسالة|صياغة|rewrite|article|email|write)/i.test(q);
-  const web=/(?:اليوم|الآن|حاليًا|احدث|أحدث|آخر أخبار|سعر|أسعار|نتيجة|موعد|current|latest|today|news|price|weather|score|schedule|202[5-9])/i.test(q);
+  const webDecision=smartWebDecision(q);
   const task=image?'image':coding?'coding':translate?'translate':summary?'summary':study?'study':business?'business':ads?'ads':writing?'writing':'general';
   const complex=q.length>1400||/(?:تحليل عميق|قارن بالتفصيل|معمارية|أمان|استراتيجية|برهان|multi-step|deep analysis|architecture|security|reasoning|research)/i.test(q)||(attachments||[]).length>0;
-  return {task,webSearch:web&&!image,hasAttachments:(attachments||[]).length>0,hasImageAttachment,complex};
+  return {task,webSearch:webDecision.enabled&&!image,webScore:webDecision.score,webReason:webDecision.reason,hasAttachments:(attachments||[]).length>0,hasImageAttachment,complex};
 }
 function smartCost(model){return Math.max(0,Number(model?.pricing?.prompt||0))+Math.max(0,Number(model?.pricing?.completion||0));}
 function isLyriaModel(model){const label=`${model?.id||''} ${model?.name||''}`.toLowerCase();return /(?:^|[\s\/_-])lyria(?:[\s\/_-]|$)/i.test(label);}
@@ -70,34 +101,52 @@ function smartQuality(model,intent){
   if(intent.hasAttachments&&context>=64000)score+=8;
   return Math.max(0,Math.min(100,score));
 }
+const SMART_PRIMARY_MODELS={
+  economy:'deepseek/deepseek-v4-flash',
+  balanced:'openai/gpt-5.6-luna',
+  quality:'openai/gpt-5.6-sol-pro'
+};
+function modelSupportsAttachments(model,intent){
+  if(!intent.hasAttachments)return true;
+  const modalities=model?.inputModalities||model?.architecture?.input_modalities||model?.input_modalities||[];
+  if(intent.hasImageAttachment)return Array.isArray(modalities)&&modalities.includes('image');
+  return !Array.isArray(modalities)||!modalities.length||modalities.includes('files')||modalities.includes('text');
+}
 function chooseSmartChatModel(models,intent,mode='balanced'){
   let pool=(models||[]).filter(m=>m&&!m.locked&&!isLyriaModel(m)&&!(String(m.id||'').endsWith(':free')||m.id==='openrouter/free'));
-  const isText=m=>{const out=m?.architecture?.output_modalities||m?.output_modalities||[];return !Array.isArray(out)||out.includes('text')||!out.length};
-  pool=pool.filter(isText);
-  if(intent.webSearch){const webCapable=pool.filter(m=>/^google\/gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(m.id||'')));if(webCapable.length)pool=webCapable;else intent.webSearch=false;}
-  if(intent.hasAttachments){const large=pool.filter(m=>Number(m.contextLength||m.context_length||0)>=64000);if(large.length)pool=large;}
+  const isText=m=>{const out=m?.outputModalities||m?.architecture?.output_modalities||m?.output_modalities||[];return !Array.isArray(out)||out.includes('text')||!out.length};
+  pool=pool.filter(isText).filter(m=>modelSupportsAttachments(m,intent));
   if(!pool.length)return null;
+  // Each Smart profile has a predictable primary model. We only deviate when the
+  // requested capability is unavailable, the model is missing, or later budget checks require it.
+  const preferredId=SMART_PRIMARY_MODELS[mode]||SMART_PRIMARY_MODELS.balanced;
+  const preferred=pool.find(m=>String(m.id||'')===preferredId);
+  if(preferred)return preferred;
   const costs=pool.map(smartCost).filter(x=>x>0).sort((a,b)=>a-b);const mid=costs[Math.floor(costs.length/2)]||1;
   return [...pool].sort((a,b)=>{
     const qa=smartQuality(a,intent),qb=smartQuality(b,intent),ca=smartCost(a),cb=smartCost(b);
     const normCost=c=>Math.log10(1+(c/(mid||1))*10);
-    const score=(q,c)=>mode==='economy'?q*.52-normCost(c)*30:mode==='quality'?q*1.28-normCost(c)*5:q*.92-normCost(c)*15;
+    const score=(q,c)=>mode==='economy'?q*.58-normCost(c)*34:mode==='quality'?q*1.35-normCost(c)*4:q*.98-normCost(c)*14;
     return score(qb,cb)-score(qa,ca)||(ca-cb);
   })[0];
 }
 function smartReasons(intent,mode,model,locale='en'){
   const ar=locale==='ar',reasons=[];
   const push=(a,e)=>reasons.push(ar?a:e);
-  if(intent.task==='coding')push('قوي في البرمجة والتحليل التقني','Strong fit for coding and technical analysis');
-  else if(intent.task==='translate')push('مناسب للترجمة والحفاظ على السياق','Well suited to translation and context preservation');
-  else if(intent.task==='summary')push('مناسب للتلخيص والسياقات الطويلة','Well suited to summarization and longer context');
-  else if(intent.task==='image')push('مخصص لإنشاء الصور','Designed for image generation');
-  else push('مناسب لنوع الطلب الذي كتبته','Good match for the request you wrote');
-  if(intent.webSearch)push('تم تفعيل بحث الويب لأن الطلب يحتاج معلومات حديثة','Web search was enabled because the request appears time-sensitive');
-  if(intent.hasAttachments)push('يراعي وجود الملفات أو الصور المرفقة','Selected with your attachments in mind');
-  if(mode==='economy')push('أولوية لأقل تكلفة مع جودة مناسبة','Prioritizes lower cost while keeping acceptable quality');
-  if(mode==='balanced')push('توازن بين الجودة والسرعة والتكلفة','Balances quality, speed, and cost');
-  if(mode==='quality')push('أولوية لأعلى جودة وقدرات أقوى','Prioritizes stronger capabilities and higher quality');
+  const primaryId=SMART_PRIMARY_MODELS[mode]||SMART_PRIMARY_MODELS.balanced;
+  if(String(model?.id||'')===primaryId){
+    if(mode==='economy')push('النموذج الأساسي للوضع الاقتصادي: سريع ومنخفض التكلفة','Primary Economy model: fast and low-cost');
+    if(mode==='balanced')push('النموذج الأساسي للوضع المتوازن: توازن قوي بين الجودة والتكلفة','Primary Balanced model: strong quality/cost balance');
+    if(mode==='quality')push('النموذج الأساسي لأعلى جودة: مخصص للمهام الأصعب والاستدلال الأقوى','Primary Highest Quality model: optimized for harder tasks and stronger reasoning');
+  }else push('تم استخدام بديل متوافق لأن النموذج الأساسي غير مناسب لقدرات هذا الطلب أو غير متاح','A compatible fallback was used because the primary model was unavailable or lacked a required capability');
+  if(intent.task==='coding')push('الطلب يتضمن برمجة أو تحليلًا تقنيًا','The request includes coding or technical analysis');
+  else if(intent.task==='translate')push('تم التعرف على طلب ترجمة','A translation request was detected');
+  else if(intent.task==='summary')push('تم التعرف على طلب تلخيص أو سياق طويل','A summarization or long-context request was detected');
+  else if(intent.task==='image')push('تم التعرف على طلب إنشاء صورة','An image-generation request was detected');
+  else push('تم تحليل نوع الطلب قبل التنفيذ','The request type was analyzed before execution');
+  if(intent.webSearch)push('تم تشغيل بحث الويب لأن الطلب يحتوي إشارات قوية لمعلومات حديثة أو متغيرة','Web search was enabled because the request strongly signals current or changing information');
+  else push('تم إبقاء بحث الويب مغلقًا لأن الطلب لا يحتاج معلومات حديثة على الأرجح','Web search stayed off because the request likely does not require fresh information');
+  if(intent.hasAttachments)push('تمت مراعاة قدرات النموذج مع الملفات أو الصور المرفقة','Model capabilities were checked against your attachments');
   return reasons.slice(0,4);
 }
 
@@ -142,7 +191,7 @@ export default async function handler(req, res) {
         let model=chooseSmartChatModel(models,intent,mode);if(!model)return json(res,503,{error:localize(locale,'لا يوجد نموذج مناسب متاح حاليًا.','No suitable model is currently available.')});
         const reserve=mode==='economy'?1536:mode==='quality'?6144:3072;
         let estimate=estimateChatCharge(model.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),reserve),budgetAdjusted=false;
-        if(estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens){const candidates=(models||[]).filter(m=>m&&!m.locked&&!isLyriaModel(m)&&m.id!=='openrouter/free'&&!String(m.id||'').endsWith(':free')).sort((a,b)=>smartCost(a)-smartCost(b));for(const candidate of candidates){if(intent.webSearch&&!/^google\/gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(candidate.id||'')))continue;const trial=estimateChatCharge(candidate.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),Math.min(reserve,1536));if(trial.chargedTokens<=estimateAvailableTokens){model=candidate;estimate=trial;budgetAdjusted=true;break;}}}
+        if(estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens){const candidates=(models||[]).filter(m=>m&&!m.locked&&!isLyriaModel(m)&&m.id!=='openrouter/free'&&!String(m.id||'').endsWith(':free')).sort((a,b)=>smartCost(a)-smartCost(b));for(const candidate of candidates){const trial=estimateChatCharge(candidate.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),Math.min(reserve,1536));if(trial.chargedTokens<=estimateAvailableTokens){model=candidate;estimate=trial;budgetAdjusted=true;break;}}}
         const reasons=smartReasons(intent,mode,model,locale);if(budgetAdjusted)reasons.push(localize(locale,'تم اختيار بديل يناسب رصيدك الحالي.','An alternative was selected to fit your current balance.'));
         return json(res,200,{action:'smart-plan',type:'chat',mode,task:intent.task,webSearch:Boolean(intent.webSearch),modelId:model.id,routedModelId:model.id,modelName:model.name,...estimate,billingMode:'paid',approximate:true,reasons:reasons.slice(0,4),budgetAdjusted,availableTokens:estimateAvailableTokens,overBudget:estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens});
       }
