@@ -56,6 +56,7 @@ function smartIntent(text='', attachments=[]) {
   return {task,webSearch:web&&!image,hasAttachments:(attachments||[]).length>0,hasImageAttachment,complex};
 }
 function smartCost(model){return Math.max(0,Number(model?.pricing?.prompt||0))+Math.max(0,Number(model?.pricing?.completion||0));}
+function isLyriaModel(model){const label=`${model?.id||''} ${model?.name||''}`.toLowerCase();return /(?:^|[\s\/_-])lyria(?:[\s\/_-]|$)/i.test(label);}
 function smartQuality(model,intent){
   const label=`${model?.id||''} ${model?.name||''}`.toLowerCase();
   let score=45;
@@ -70,7 +71,7 @@ function smartQuality(model,intent){
   return Math.max(0,Math.min(100,score));
 }
 function chooseSmartChatModel(models,intent,mode='balanced'){
-  let pool=(models||[]).filter(m=>m&&!m.locked&&!(String(m.id||'').endsWith(':free')||m.id==='openrouter/free'));
+  let pool=(models||[]).filter(m=>m&&!m.locked&&!isLyriaModel(m)&&!(String(m.id||'').endsWith(':free')||m.id==='openrouter/free'));
   const isText=m=>{const out=m?.architecture?.output_modalities||m?.output_modalities||[];return !Array.isArray(out)||out.includes('text')||!out.length};
   pool=pool.filter(isText);
   if(intent.webSearch){const webCapable=pool.filter(m=>/^google\/gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(m.id||'')));if(webCapable.length)pool=webCapable;else intent.webSearch=false;}
@@ -126,7 +127,7 @@ export default async function handler(req, res) {
         const messageText=Array.isArray(body.messages)?String([...body.messages].reverse().find(m=>m?.role==='user')?.content||''):String(body.text||'');
         const intent=smartIntent(messageText,attachments);
         if (!estimatePurchased) {
-          const free=models.find(m=>m.id==='openrouter/free')||models.find(m=>String(m.id||'').endsWith(':free'))||models[0];
+          const free=models.find(m=>m.id==='openrouter/free')||models.find(m=>!isLyriaModel(m)&&String(m.id||'').endsWith(':free'))||models.find(m=>!isLyriaModel(m));
           return json(res,200,{action:'smart-plan',type:'chat',mode,task:intent.task,webSearch:false,modelId:free?.id||'openrouter/free',routedModelId:free?.id||'openrouter/free',modelName:free?.name||'OpenRouter Free',providerUsd:0,chargedTokens:1,billingMode:'free_trial',approximate:true,reasons:smartReasons(intent,mode,free,locale)});
         }
         if(intent.task==='image'){
@@ -141,7 +142,7 @@ export default async function handler(req, res) {
         let model=chooseSmartChatModel(models,intent,mode);if(!model)return json(res,503,{error:localize(locale,'لا يوجد نموذج مناسب متاح حاليًا.','No suitable model is currently available.')});
         const reserve=mode==='economy'?1536:mode==='quality'?6144:3072;
         let estimate=estimateChatCharge(model.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),reserve),budgetAdjusted=false;
-        if(estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens){const candidates=(models||[]).filter(m=>m&&!m.locked&&m.id!=='openrouter/free'&&!String(m.id||'').endsWith(':free')).sort((a,b)=>smartCost(a)-smartCost(b));for(const candidate of candidates){if(intent.webSearch&&!/^google\/gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(candidate.id||'')))continue;const trial=estimateChatCharge(candidate.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),Math.min(reserve,1536));if(trial.chargedTokens<=estimateAvailableTokens){model=candidate;estimate=trial;budgetAdjusted=true;break;}}}
+        if(estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens){const candidates=(models||[]).filter(m=>m&&!m.locked&&!isLyriaModel(m)&&m.id!=='openrouter/free'&&!String(m.id||'').endsWith(':free')).sort((a,b)=>smartCost(a)-smartCost(b));for(const candidate of candidates){if(intent.webSearch&&!/^google\/gemini-(?:3|[4-9])(?:[.-]|$)/i.test(String(candidate.id||'')))continue;const trial=estimateChatCharge(candidate.pricing,Array.isArray(body.messages)?body.messages:[],Boolean(intent.webSearch),Math.min(reserve,1536));if(trial.chargedTokens<=estimateAvailableTokens){model=candidate;estimate=trial;budgetAdjusted=true;break;}}}
         const reasons=smartReasons(intent,mode,model,locale);if(budgetAdjusted)reasons.push(localize(locale,'تم اختيار بديل يناسب رصيدك الحالي.','An alternative was selected to fit your current balance.'));
         return json(res,200,{action:'smart-plan',type:'chat',mode,task:intent.task,webSearch:Boolean(intent.webSearch),modelId:model.id,routedModelId:model.id,modelName:model.name,...estimate,billingMode:'paid',approximate:true,reasons:reasons.slice(0,4),budgetAdjusted,availableTokens:estimateAvailableTokens,overBudget:estimateAvailableTokens>0&&estimate.chargedTokens>estimateAvailableTokens});
       }
@@ -177,6 +178,7 @@ export default async function handler(req, res) {
 
     const catalog = await getAvailableModels();
     const freeModels = catalog.filter(model =>
+      !isLyriaModel(model) &&
       (model.id === 'openrouter/free' ||
       model.id.endsWith(':free') ||
       (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0)) &&
@@ -189,7 +191,8 @@ export default async function handler(req, res) {
       const outputs = Array.isArray(outputModalities) ? outputModalities.map(value => String(value).toLowerCase()) : [];
       const imageOnly = outputs.includes('image') && !outputs.includes('text');
       const knownImageName = /nano[\s-]*banana|image[\s-]*(generation|preview)|gemini.*image|imagen|flash-image/.test(`${id} ${name}`);
-      return !imageOnly && !knownImageName;
+      const knownAudioMusicModel = /(?:^|[\s\/_-])lyria(?:[\s\/_-]|$)/.test(`${id} ${name}`);
+      return !imageOnly && !knownImageName && !knownAudioMusicModel;
     };
     const normalizedModelName = model => String(model?.name || model?.id || '')
       .toLowerCase()
