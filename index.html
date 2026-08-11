@@ -914,7 +914,11 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 <div class="backdrop" id="backdrop"></div>
 <main class="main">
 <header class="topbar">
-  <button class="icon-btn mobile-menu" id="menuBtn" aria-label="Menu" aria-expanded="false"><span data-icon="menu"></span></button><button class="mobile-task-identity" id="mobileTaskIdentity" type="button" aria-label="Open tasks"><span id="mobileTaskIcon"></span><b id="mobileTaskName">AiWay</b><i class="mobile-task-chevron" aria-hidden="true">⌄</i></button>
+  <button class="icon-btn mobile-menu" id="menuBtn" aria-label="Menu" aria-expanded="false"><span data-icon="menu"></span></button>
+  <div class="mobile-header-center" id="mobileHeaderCenter">
+    <div class="mobile-task-identity" id="mobileTaskIdentity" aria-live="polite"><span id="mobileTaskIcon"></span><b id="mobileTaskName">AiWay</b></div>
+    <button class="mobile-all-tools-btn" id="mobileAllToolsBtn" type="button" aria-label="عرض كل الأدوات" title="عرض كل الأدوات"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg><span id="mobileAllToolsLabel">كل الأدوات</span></button>
+  </div>
   <button class="top-tools-btn" id="topToolsBtn" type="button"><span data-icon="apps"></span><span id="topToolsLabel">كل الأدوات</span></button>
   <button class="top-login-btn" id="topLoginBtn" type="button"><span data-icon="login"></span><span id="topLoginLabel">تسجيل الدخول</span></button>
   <div class="task-context" id="taskContext"><span class="task-context-icon" id="taskContextIcon"></span><span class="task-context-copy"><b id="taskContextName">AiWay</b><small id="taskContextHint">Smart task mode</small></span><button class="task-change" id="taskChangeBtn" type="button">تغيير المهمة</button></div>
@@ -938,10 +942,10 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 <div class="desktop-preview-pane" id="desktopPreviewPane"><div class="desktop-preview-head"><b id="desktopPreviewTitle">معاينة</b><button class="icon-btn" id="desktopPreviewClose" type="button">×</button></div><div class="desktop-preview-body" id="desktopPreviewBody"></div></div>
 <button class="scroll-latest" id="scrollLatest" type="button" aria-label="Go to latest message" title="Go to latest message"><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 
-<div class="composer-zone"><div class="composer"><div class="attachment-strip" id="attachmentStrip"></div><textarea id="prompt" rows="1" placeholder="Ask anything..."></textarea><div class="composer-foot"><button class="composer-more" id="composerMoreBtn" type="button" aria-label="More tools" aria-expanded="false"><span data-icon="plus"></span></button><button class="estimate-toggle active" id="costEstimateQuickToggle" type="button" aria-pressed="true" title="إظهار الحساب التقريبي قبل الإرسال"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h2m3 0h3M8 16h2m3 0h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="estimate-label">الحساب التقريبي</span></button><button class="pill" id="webPill"><span data-icon="globe"></span><span class="pill-text" data-i18n="webSearch">Web search</span></button><button class="pill attach-pill" id="attachBtn" aria-label="Attach image or file" title="Attach image or file"><span data-icon="camera"></span></button><span class="ratio-wrap" id="ratioWrap"><select class="ratio-select" id="aspectRatio" aria-label="Image aspect ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></span><span class="ratio-wrap" id="resolutionWrap"><select class="ratio-select" id="imageResolution" aria-label="Image resolution"></select></span><input id="fileInput" type="file" hidden multiple accept="*/*"><span class="status" id="status"></span><button class="send" id="sendBtn" type="button" aria-label="Send"><span data-icon="send"></span></button></div></div></div>
+<div class="composer-zone"><div class="composer"><div class="attachment-strip" id="attachmentStrip"></div><textarea id="prompt" rows="1" placeholder="Ask anything..."></textarea><div class="composer-foot"><button class="composer-more" id="composerMoreBtn" type="button" aria-label="More tools" aria-expanded="false"><span data-icon="plus"></span></button><button class="estimate-toggle active" id="costEstimateQuickToggle" type="button" aria-pressed="true" title="إظهار الحساب التقريبي قبل الإرسال"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h2m3 0h3M8 16h2m3 0h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="estimate-label">الحساب التقريبي</span></button><button class="pill" id="webPill" type="button" aria-pressed="false"><span data-icon="globe"></span><span class="pill-text" data-i18n="webSearch">Web search</span></button><button class="pill attach-pill" id="attachBtn" aria-label="Attach image or file" title="Attach image or file"><span data-icon="camera"></span></button><span class="ratio-wrap" id="ratioWrap"><select class="ratio-select" id="aspectRatio" aria-label="Image aspect ratio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></span><span class="ratio-wrap" id="resolutionWrap"><select class="ratio-select" id="imageResolution" aria-label="Image resolution"></select></span><input id="fileInput" type="file" hidden multiple accept="*/*"><span class="status" id="status"></span><button class="send" id="sendBtn" type="button" aria-label="Send"><span data-icon="send"></span></button></div></div></div>
 </main>
 </div>
-<div class="mobile-tools-sheet" id="mobileToolsSheet" aria-hidden="true"><button class="mobile-tools-scrim" id="mobileToolsScrim" type="button" aria-label="Close tools"></button><section class="mobile-tools-panel" role="dialog" aria-modal="true" aria-labelledby="mobileToolsTitle"><div class="sheet-handle" aria-hidden="true"></div><div class="mobile-tools-head"><div><b id="mobileToolsTitle">أدوات الرسالة</b><small id="mobileToolsSubtitle">أظهر فقط ما تحتاجه الآن</small></div><button class="icon-btn" id="mobileToolsClose" type="button" aria-label="Close">×</button></div><div class="mobile-tools-grid"><button type="button" id="mobileAttachAction"><span data-icon="camera"></span><b id="mobileAttachLabel">إرفاق ملف</b></button><button type="button" id="mobileWebAction"><span data-icon="globe"></span><b id="mobileWebLabel">بحث الويب</b><i id="mobileWebState"></i></button><button type="button" id="mobileEstimateAction"><span>≈</span><b id="mobileEstimateLabel">تقدير التكلفة</b><i id="mobileEstimateState"></i></button><button type="button" id="mobileTaskAction"><span data-icon="apps"></span><b id="mobileTaskActionLabel">تغيير المهمة</b></button></div><div class="mobile-image-options" id="mobileImageOptions"><label><span id="mobileRatioLabel">نسبة الصورة</span><select id="mobileAspectRatio" aria-label="Image aspect ratio"></select></label><label><span id="mobileResolutionLabel">الدقة</span><select id="mobileImageResolution" aria-label="Image resolution"></select></label></div></section></div>
+<div class="mobile-tools-sheet" id="mobileToolsSheet" aria-hidden="true"><button class="mobile-tools-scrim" id="mobileToolsScrim" type="button" aria-label="Close tools"></button><section class="mobile-tools-panel" role="dialog" aria-modal="true" aria-labelledby="mobileToolsTitle"><div class="sheet-handle" aria-hidden="true"></div><div class="mobile-tools-head"><div><b id="mobileToolsTitle">أدوات الرسالة</b><small id="mobileToolsSubtitle">أظهر فقط ما تحتاجه الآن</small></div><button class="icon-btn" id="mobileToolsClose" type="button" aria-label="Close">×</button></div><div class="mobile-tools-grid"><button type="button" id="mobileAttachAction"><span data-icon="camera"></span><b id="mobileAttachLabel">إرفاق ملف</b></button><button type="button" id="mobileWebAction"><span data-icon="globe"></span><b id="mobileWebLabel">بحث الويب</b><i id="mobileWebState"></i></button><button type="button" id="mobileEstimateAction"><span>≈</span><b id="mobileEstimateLabel">تقدير التكلفة</b><i id="mobileEstimateState"></i></button><button type="button" id="mobileTaskAction"><span class="tool-change-svg"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="4" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="13.5" y="13" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 6h4.5a2 2 0 0 1 2 2v2M10 18H5.5a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m18 8 2.5 2.5L23 8M6 16l-2.5-2.5L1 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b id="mobileTaskActionLabel">تغيير الأداة</b></button></div></section></div>
 <div class="desktop-drop-zone" id="desktopDropZone"><span id="desktopDropText">اسحب الملفات هنا لإضافتها إلى المحادثة</span></div>
 <div class="command-palette" id="commandPalette"><div class="command-box"><input id="commandInput" type="search" placeholder="ابحث عن أمر أو محادثة..." autocomplete="off"><div class="command-results" id="commandResults"></div></div></div>
 <div class="desktop-context-menu" id="desktopContextMenu"></div>
@@ -2171,7 +2175,7 @@ async function downloadTextFile(filename,content){
   }catch(error){console.error('Text file download failed',error);toast(lang==='ar'?'تعذر تنزيل الملف':'Could not download the file')}
 }
 async function exportChat(){if(!history.length)return toast(lang==='ar'?'لا توجد محادثة لتصديرها':'There is no conversation to export');const text=history.map(m=>`${m.role==='user'?'أنت':'AiWay'}:\n${m.content}`).join('\n\n');try{await triggerPiCompatibleDownload(new Blob([text],{type:'text/plain;charset=utf-8'}),'pi-ai-chat.txt')}catch(error){console.error('Chat export failed',error);toast(lang==='ar'?'تعذر تصدير المحادثة':'Could not export the conversation')}}
-function toggleWeb(){if(userProfile&&!userProfile.has_purchased)return toast(lang==='ar'?'بحث الويب متاح بعد أول عملية شراء.':'Web search unlocks after your first purchase.');webSearch=!webSearch;$('webPill').classList.toggle('on',webSearch);toast(webSearch?(lang==='ar'?'تم تفعيل بحث الويب':'Web search enabled'):(lang==='ar'?'تم إيقاف بحث الويب':'Web search disabled'))}
+function toggleWeb(){if(userProfile&&!userProfile.has_purchased)return toast(lang==='ar'?'بحث الويب متاح بعد أول عملية شراء.':'Web search unlocks after your first purchase.');webSearch=!webSearch;const webButton=$('webPill');webButton.classList.toggle('on',webSearch);webButton.setAttribute('aria-pressed',webSearch?'true':'false');toast(webSearch?(lang==='ar'?'تم تفعيل بحث الويب':'Web search enabled'):(lang==='ar'?'تم إيقاف بحث الويب':'Web search disabled'))}
 function relativeUsageTime(value){if(!value)return lang==='ar'?'لا يوجد استخدام بعد':'No usage yet';const seconds=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/1000));if(seconds<60)return lang==='ar'?'منذ لحظات':'Just now';const minutes=Math.floor(seconds/60);if(minutes<60)return lang==='ar'?`منذ ${minutes} دقيقة`:`${minutes} min ago`;const hours=Math.floor(minutes/60);if(hours<24)return lang==='ar'?`منذ ${hours} ساعة`:`${hours} hr ago`;const days=Math.floor(hours/24);return lang==='ar'?`منذ ${days} يوم`:`${days} d ago`}
 function renderUsageSummary(){const u=window.aiwayUsageSummary||{};const remaining=Math.max(0,Number(userProfile?.has_purchased?userProfile?.ai_tokens:(userProfile?.free_trial_tokens??userProfile?.trial_messages_remaining)||0));const consumed=Math.max(0,Number(u.consumedTokens||0));const last=Math.max(0,Number(u.lastRequestTokens||0));const total=remaining+consumed;const percent=total>0?Math.min(100,Math.round(consumed/total*100)):0;const set=(id,text)=>{const el=$(id);if(el)el.textContent=text};set('payUsageTitle',lang==='ar'?'تفاصيل الاستهلاك':'Usage details');set('payUsagePeriod',lang==='ar'?'آخر 30 يومًا':'Last 30 days');set('payRemainingLabel',lang==='ar'?'المتبقي':'Remaining');set('payConsumedLabel',lang==='ar'?'المستهلك':'Consumed');set('payLastLabel',lang==='ar'?'آخر رسالة / طلب':'Last message / request');set('payBalance',remaining.toLocaleString('en-US'));set('payConsumed',consumed.toLocaleString('en-US'));set('payLastUsage',last.toLocaleString('en-US'));set('payUsageProgressText',lang==='ar'?`${percent}% مستخدم`:`${percent}% used`);set('payLastUsageTime',relativeUsageTime(u.lastRequestAt));const bar=$('payUsageProgress');if(bar)bar.style.width=percent+'%'}
 function openPay(){if(!auth)return login();renderPackages();renderAccountState();renderUsageSummary();$('payModal').classList.add('open')}
@@ -2694,6 +2698,115 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
 @media(max-width:390px){.suggestions{grid-template-columns:1fr!important}.suggestion{min-height:64px!important}.task-core-grid,.task-more-grid{grid-template-columns:1fr 1fr!important}.task-card{min-height:118px!important;padding:11px!important}.task-head p{font-size:12px!important}.mobile-tools-panel{padding-inline:12px}.mobile-tools-grid>button{min-height:70px!important;padding:10px!important}.mobile-task-identity b{max-width:92px!important}}
 @media(min-width:701px){.task-core-grid,.task-more-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.task-more-grid.open{display:grid}.task-card{min-height:180px!important}.task-pro-wrap{max-width:760px;margin:0 auto}.task-pro-card{min-height:104px}}
 </style>
+<style id="aiway-mobile-header-professional-final">
+/* Final authoritative phone header. Physical placement is deliberate so RTL cannot flip it. */
+.mobile-header-center,.mobile-all-tools-btn{display:none}
+@media (max-width:760px){
+  body:not(.all-models-active) .topbar{
+    position:relative!important;display:block!important;width:100%!important;
+    height:62px!important;min-height:62px!important;padding:7px 8px!important;
+    overflow:visible!important;direction:ltr!important;background:rgba(250,248,253,.96)!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-menu{
+    display:grid!important;position:absolute!important;right:8px!important;left:auto!important;top:50%!important;
+    transform:translateY(-50%)!important;width:44px!important;min-width:44px!important;height:44px!important;
+    margin:0!important;z-index:7!important;border-radius:13px!important;
+  }
+  body:not(.all-models-active) .topbar>.credits{
+    display:flex!important;position:absolute!important;left:8px!important;right:auto!important;top:50%!important;
+    transform:translateY(-50%)!important;width:auto!important;min-width:74px!important;max-width:104px!important;height:42px!important;
+    margin:0!important;padding:6px 8px!important;align-items:center!important;justify-content:center!important;gap:5px!important;
+    z-index:7!important;direction:ltr!important;border:1px solid #e3cff0!important;border-radius:14px!important;
+  }
+  body:not(.all-models-active) .topbar>.credits .label,
+  body:not(.all-models-active) .topbar>.credits .credit-buy-label{display:none!important}
+  body:not(.all-models-active) .topbar>.credits .credit-coin{width:22px!important;height:22px!important;min-width:22px!important}
+  body:not(.all-models-active) .topbar>.credits .credit-coin:before{font-size:8px!important}
+  body:not(.all-models-active) .topbar>.credits #credits{
+    display:block!important;max-width:70px!important;font-size:12px!important;font-weight:900!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  body:not(.all-models-active) .topbar>.mobile-header-center{
+    display:flex!important;position:absolute!important;left:50%!important;right:auto!important;top:50%!important;
+    transform:translate(-50%,-50%)!important;width:min(52vw,230px)!important;max-width:calc(100% - 214px)!important;
+    min-width:0!important;height:44px!important;align-items:center!important;justify-content:center!important;gap:6px!important;z-index:6!important;
+  }
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity{
+    display:flex!important;min-width:0!important;width:auto!important;max-width:calc(100% - 38px)!important;height:40px!important;
+    align-items:center!important;justify-content:center!important;margin:0!important;padding:0 2px!important;overflow:visible!important;
+    position:static!important;transform:none!important;direction:inherit!important;cursor:default!important;
+  }
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity>span,
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity .mobile-task-chevron{display:none!important}
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity b{
+    display:block!important;max-width:none!important;width:auto!important;min-width:0!important;margin:0!important;
+    white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;text-align:center!important;
+    font-size:14px!important;line-height:1.2!important;font-weight:900!important;color:var(--text)!important;
+  }
+  body:not(.all-models-active) .mobile-all-tools-btn{
+    display:grid!important;place-items:center!important;flex:0 0 34px!important;width:34px!important;height:34px!important;
+    padding:0!important;border:1px solid #e3d5ec!important;border-radius:11px!important;background:#fff!important;color:var(--pi)!important;
+    cursor:pointer!important;box-shadow:0 4px 12px rgba(75,34,112,.06)!important;
+  }
+  body:not(.all-models-active) .mobile-all-tools-btn svg{width:18px!important;height:18px!important}
+  body:not(.all-models-active) .mobile-all-tools-btn span{display:none!important}
+  body:not(.all-models-active) .topbar>.mobile-task-identity{display:none!important}
+  body:not(.all-models-active) .topbar>.task-context,
+  body:not(.all-models-active) .topbar>.model-wrap,
+  body:not(.all-models-active) .topbar>.top-tools-btn,
+  body:not(.all-models-active) .topbar>.top-login-btn,
+  body:not(.all-models-active) .topbar>.spacer,
+  body:not(.all-models-active) .topbar>.export{display:none!important}
+
+  /* Pro mode keeps model choice in the middle but uses the same physical right/left anchors. */
+  body.all-models-active .topbar{
+    position:relative!important;display:block!important;width:100%!important;height:62px!important;min-height:62px!important;
+    padding:7px 8px!important;overflow:visible!important;direction:ltr!important;
+  }
+  body.all-models-active .topbar>.mobile-menu{
+    display:grid!important;position:absolute!important;right:8px!important;left:auto!important;top:50%!important;
+    transform:translateY(-50%)!important;width:44px!important;height:44px!important;margin:0!important;z-index:7!important;
+  }
+  body.all-models-active .topbar>.credits{
+    display:flex!important;position:absolute!important;left:8px!important;right:auto!important;top:50%!important;
+    transform:translateY(-50%)!important;min-width:74px!important;max-width:104px!important;width:auto!important;height:42px!important;
+    padding:6px 8px!important;margin:0!important;z-index:7!important;direction:ltr!important;
+  }
+  body.all-models-active .topbar>.credits .label,body.all-models-active .topbar>.credits .credit-buy-label{display:none!important}
+  body.all-models-active .topbar>.credits .credit-coin{width:22px!important;height:22px!important;min-width:22px!important}
+  body.all-models-active .topbar>.model-wrap{
+    display:block!important;position:absolute!important;left:50%!important;right:auto!important;top:50%!important;
+    transform:translate(-50%,-50%)!important;width:min(48vw,260px)!important;max-width:calc(100% - 216px)!important;margin:0!important;z-index:6!important;
+  }
+  body.all-models-active .topbar>.model-wrap .model-trigger{width:100%!important;height:42px!important}
+
+  /* Image aspect and quality stay beside the composer only; never inside the + sheet. */
+  .mobile-tools-panel .mobile-image-options{display:none!important}
+  .image-task-active .composer-foot .ratio-wrap{display:inline-flex!important}
+
+  /* Tool sheet states and polished tool-change icon. */
+  .mobile-tools-grid>button{position:relative!important}
+  .mobile-tools-grid>button>i{width:9px!important;height:9px!important;justify-self:end!important;transition:.18s ease!important}
+  .mobile-tools-grid>button>i.on{background:#18a875!important;box-shadow:0 0 0 4px rgba(24,168,117,.12)!important}
+  .mobile-tools-grid .tool-change-svg{background:#fff!important;color:var(--pi)!important}
+  .mobile-tools-grid .tool-change-svg svg{width:20px!important;height:20px!important}
+}
+@media (max-width:390px){
+  body:not(.all-models-active) .topbar>.credits,body.all-models-active .topbar>.credits{left:6px!important;min-width:68px!important;max-width:92px!important;padding-inline:6px!important}
+  body:not(.all-models-active) .topbar>.mobile-menu,body.all-models-active .topbar>.mobile-menu{right:6px!important;width:42px!important;min-width:42px!important;height:42px!important}
+  body:not(.all-models-active) .topbar>.mobile-header-center{width:auto!important;max-width:calc(100% - 194px)!important;gap:5px!important}
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity{max-width:calc(100% - 34px)!important}
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity b{font-size:13px!important}
+  body:not(.all-models-active) .mobile-all-tools-btn{width:32px!important;height:32px!important;flex-basis:32px!important}
+  body.all-models-active .topbar>.model-wrap{width:auto!important;max-width:calc(100% - 198px)!important}
+}
+@media (max-width:340px){
+  body:not(.all-models-active) .topbar>.credits,body.all-models-active .topbar>.credits{min-width:60px!important;max-width:78px!important}
+  body:not(.all-models-active) .topbar>.credits .credit-coin,body.all-models-active .topbar>.credits .credit-coin{display:none!important}
+  body:not(.all-models-active) .topbar>.mobile-header-center{max-width:calc(100% - 164px)!important}
+  body:not(.all-models-active) .mobile-header-center>.mobile-task-identity b{font-size:12px!important}
+  body.all-models-active .topbar>.model-wrap{max-width:calc(100% - 168px)!important}
+}
+</style>
 <script id="aiway-mobile-ux-controller">
 (()=>{
  const $id=id=>document.getElementById(id);
@@ -2704,18 +2817,15 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
  function syncSheet(){
    const ar=document.documentElement.dir==='rtl';
    const web=$id('webPill'),estimate=$id('costEstimateQuickToggle');
-   $id('mobileToolsTitle').textContent=ar?'أدوات الرسالة':'Message tools';$id('mobileToolsSubtitle').textContent=ar?'أظهر فقط ما تحتاجه الآن':'Only show what you need now';$id('mobileAttachLabel').textContent=ar?'إرفاق ملف':'Attach file';$id('mobileWebLabel').textContent=ar?'بحث الويب':'Web search';$id('mobileEstimateLabel').textContent=ar?'تقدير التكلفة':'Cost estimate';$id('mobileTaskActionLabel').textContent=ar?'تغيير المهمة':'Change task';$id('mobileRatioLabel').textContent=ar?'نسبة الصورة':'Aspect ratio';$id('mobileResolutionLabel').textContent=ar?'الدقة':'Resolution';
-   $id('mobileWebState')?.classList.toggle('on',web?.classList.contains('active'));$id('mobileEstimateState')?.classList.toggle('on',estimate?.classList.contains('active'));
-   copyOptions($id('aspectRatio'),$id('mobileAspectRatio'));copyOptions($id('imageResolution'),$id('mobileImageResolution'));
+   $id('mobileToolsTitle').textContent=ar?'أدوات الرسالة':'Message tools';$id('mobileToolsSubtitle').textContent=ar?'أظهر فقط ما تحتاجه الآن':'Only show what you need now';$id('mobileAttachLabel').textContent=ar?'إرفاق ملف':'Attach file';$id('mobileWebLabel').textContent=ar?'بحث الويب':'Web search';$id('mobileEstimateLabel').textContent=ar?'تقدير التكلفة':'Cost estimate';$id('mobileTaskActionLabel').textContent=ar?'تغيير الأداة':'Change tool';if($id('mobileAllToolsLabel'))$id('mobileAllToolsLabel').textContent=ar?'كل الأدوات':'All tools';if($id('mobileAllToolsBtn')){$id('mobileAllToolsBtn').setAttribute('aria-label',ar?'عرض كل الأدوات':'Show all tools');$id('mobileAllToolsBtn').title=ar?'عرض كل الأدوات':'Show all tools';}
+   $id('mobileWebState')?.classList.toggle('on',Boolean(web?.classList.contains('on')||web?.classList.contains('active')||web?.getAttribute('aria-pressed')==='true'));$id('mobileEstimateState')?.classList.toggle('on',Boolean(estimate?.classList.contains('active')||estimate?.getAttribute('aria-pressed')==='true'));
  }
  more?.addEventListener('click',openSheet);$id('mobileToolsClose')?.addEventListener('click',closeSheet);$id('mobileToolsScrim')?.addEventListener('click',closeSheet);
  $id('mobileAttachAction')?.addEventListener('click',()=>{closeSheet();setTimeout(()=>$id('attachBtn')?.click(),20)});
  $id('mobileWebAction')?.addEventListener('click',()=>{$id('webPill')?.click();syncSheet()});
  $id('mobileEstimateAction')?.addEventListener('click',()=>{$id('costEstimateQuickToggle')?.click();syncSheet()});
  $id('mobileTaskAction')?.addEventListener('click',()=>{closeSheet();setTimeout(()=>typeof openTaskScreen==='function'&&openTaskScreen(),20)});
- $id('mobileAspectRatio')?.addEventListener('change',e=>{const src=$id('aspectRatio');if(src){src.value=e.target.value;src.dispatchEvent(new Event('change',{bubbles:true}))}});
- $id('mobileImageResolution')?.addEventListener('change',e=>{const src=$id('imageResolution');if(src){src.value=e.target.value;src.dispatchEvent(new Event('change',{bubbles:true}))}});
- $id('mobileTaskIdentity')?.addEventListener('click',()=>typeof openTaskScreen==='function'&&openTaskScreen());
+ $id('mobileAllToolsBtn')?.addEventListener('click',()=>typeof openTaskScreen==='function'&&openTaskScreen());
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet?.classList.contains('open'))closeSheet()});
  const obs=new MutationObserver(()=>syncSheet());['webPill','costEstimateQuickToggle'].forEach(id=>{const el=$id(id);if(el)obs.observe(el,{attributes:true,attributeFilter:['class','aria-pressed']})});
  window.addEventListener('resize',()=>{if(innerWidth>700&&sheet?.classList.contains('open'))closeSheet()});
