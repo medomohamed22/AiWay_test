@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, enforceJsonBodySize } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, enforceJsonBodySize, enforceRateLimit, requestIp } from './_lib.js';
 
 
 const SAFE_IMAGE_TYPES = new Set(['image/png','image/jpeg','image/webp']);
@@ -293,6 +293,19 @@ export default async function handler(req, res) {
     if (action === 'persist') return await persistImage(req, res);
 
     const user = await requireUser(req);
+
+    // Image generation is materially more expensive than text chat, so it gets a
+    // smaller burst allowance plus an hourly ceiling. Persist/download/view actions
+    // are handled above and intentionally do not consume these generation limits.
+    const rateSupabase = db();
+    const ip = requestIp(req);
+    await Promise.all([
+      enforceRateLimit(rateSupabase, `image:user:${user.id}:minute`, 4, 60),
+      enforceRateLimit(rateSupabase, `image:user:${user.id}:hour`, 30, 3600),
+      enforceRateLimit(rateSupabase, `image:ip:${ip}:minute`, 16, 60),
+      enforceRateLimit(rateSupabase, `image:ip:${ip}:hour`, 120, 3600)
+    ]);
+
     const { conversationId, prompt, referenceImage, modelId, aspectRatio = '1:1', resolution = '', requestId: rawRequestId, taskId: rawTaskId } = req.body || {};
     const requestId=normalizeRequestId(rawRequestId); reservationUserId=user.id; reservationRequestId=requestId;
     const cleanPrompt = cleanText(prompt, 4000);

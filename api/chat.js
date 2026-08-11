@@ -1,6 +1,6 @@
 export const maxDuration = 300;
 
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, enforceJsonBodySize } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, enforceJsonBodySize, enforceRateLimit, requestIp } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -178,6 +178,18 @@ export default async function handler(req, res) {
 
     const supabase = db();
     reservationSupabase = supabase;
+
+    // Cost-protection rate limits: allow normal conversational bursts while stopping
+    // automated abuse. IP limits are intentionally wider so shared networks are not
+    // penalized as aggressively as individual accounts.
+    const ip = requestIp(req);
+    await Promise.all([
+      enforceRateLimit(supabase, `chat:user:${user.id}:minute`, 15, 60),
+      enforceRateLimit(supabase, `chat:user:${user.id}:hour`, 180, 3600),
+      enforceRateLimit(supabase, `chat:ip:${ip}:minute`, 60, 60),
+      enforceRateLimit(supabase, `chat:ip:${ip}:hour`, 600, 3600)
+    ]);
+
     await ensureConversationOwner(supabase, conversationId, user.id);
     let continuationTarget = null;
     if (continueFromMessageId) {
