@@ -2698,6 +2698,20 @@ $('liveToolClose').onclick=()=>{closeLiveTool();openTaskScreen()};$('liveVoiceTr
 @media(max-width:390px){.suggestions{grid-template-columns:1fr!important}.suggestion{min-height:64px!important}.task-core-grid,.task-more-grid{grid-template-columns:1fr 1fr!important}.task-card{min-height:118px!important;padding:11px!important}.task-head p{font-size:12px!important}.mobile-tools-panel{padding-inline:12px}.mobile-tools-grid>button{min-height:70px!important;padding:10px!important}.mobile-task-identity b{max-width:92px!important}}
 @media(min-width:701px){.task-core-grid,.task-more-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.task-more-grid.open{display:grid}.task-card{min-height:180px!important}.task-pro-wrap{max-width:760px;margin:0 auto}.task-pro-card{min-height:104px}}
 </style>
+<style id="aiway-mobile-composer-physical-layout">
+/* Keep composer controls in fixed physical positions regardless of RTL/LTR. */
+@media (max-width:700px){
+  .composer-foot{direction:ltr!important;display:flex!important;width:100%!important}
+  .composer-foot>#sendBtn{order:-100!important;margin-left:0!important;margin-right:0!important;flex:0 0 44px!important}
+  .composer-foot>#status{order:0!important;direction:inherit!important}
+  .composer-foot>#aspectRatio{direction:ltr!important}
+  .composer-foot>#resolutionWrap{order:20!important}
+  .composer-foot>#ratioWrap{order:21!important}
+  .composer-foot>#composerMoreBtn{order:100!important;margin-left:auto!important;margin-right:0!important;flex:0 0 44px!important}
+  html[dir="rtl"] .composer textarea{direction:rtl!important;text-align:right!important}
+  html[dir="ltr"] .composer textarea{direction:ltr!important;text-align:left!important}
+}
+</style>
 <style id="aiway-mobile-header-professional-final">
 /* Final authoritative phone header. Physical placement is deliberate so RTL cannot flip it. */
 .mobile-header-center,.mobile-all-tools-btn{display:none}
