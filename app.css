@@ -1268,3 +1268,20 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
     min-width:44px!important;
   }
 }
+
+/* Full-screen service announcement / maintenance gate */
+body.announcement-blocked{overflow:hidden!important}
+.aiway-announcement{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:max(22px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(22px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));isolation:isolate}
+.aiway-announcement .announcement-backdrop{position:absolute;inset:0;background:rgba(248,247,252,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);z-index:-1}
+.aiway-announcement .announcement-panel{width:min(560px,100%);min-height:330px;padding:42px 34px 34px;border:1px solid rgba(82,45,125,.13);border-radius:32px;background:rgba(255,255,255,.92);box-shadow:0 28px 80px rgba(48,25,75,.16);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px}
+.aiway-announcement .announcement-mark{width:76px;height:76px;border-radius:24px;display:grid;place-items:center;font-size:38px;font-weight:800;line-height:1;background:linear-gradient(145deg,#6f2bd8,#a248dc);color:#fff;box-shadow:0 16px 36px rgba(111,43,216,.26)}
+.aiway-announcement.warning .announcement-mark{background:linear-gradient(145deg,#c67a10,#e6a72d)}
+.aiway-announcement.danger .announcement-mark{background:linear-gradient(145deg,#9f2844,#d8465d)}
+.aiway-announcement .announcement-copy{display:flex;flex-direction:column;align-items:center;gap:9px;max-width:460px}
+.aiway-announcement .announcement-kicker{font-size:13px;font-weight:800;letter-spacing:.02em;color:#7b4aa7}
+.aiway-announcement .announcement-title{margin:0;font-size:clamp(26px,5vw,36px);line-height:1.2;color:#201429}
+.aiway-announcement .announcement-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:clamp(16px,3.3vw,19px);line-height:1.8;color:#655b6c}
+.aiway-announcement .announcement-action{margin-top:8px;min-width:150px;min-height:48px;padding:0 24px;border:0;border-radius:15px;background:#7d35d1;color:#fff;font:inherit;font-weight:800;cursor:pointer;box-shadow:0 10px 24px rgba(125,53,209,.2)}
+.aiway-announcement.site-wide .announcement-panel{min-height:min(430px,70vh)}
+@media(max-width:600px){.aiway-announcement{padding:16px}.aiway-announcement .announcement-panel{min-height:360px;padding:34px 22px 28px;border-radius:28px}.aiway-announcement .announcement-mark{width:70px;height:70px;border-radius:22px}.aiway-announcement .announcement-text{line-height:1.75}}
+.aiway-announcement{left:0;top:0;width:auto;transform:none;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;color:inherit;font-size:inherit;line-height:normal}
