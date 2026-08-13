@@ -640,7 +640,7 @@ function taskSuggestions(){return TASK_SUGGESTIONS[activeTask]?.[lang]||TASK_SUG
 function welcome(){const en=lang==='en',t=taskText(activeTask),suggestions=taskSuggestions();return `<div class="welcome"><div class="hero-icon">${activeTask?(TASK_ICONS[activeTask]||ICONS.sparkles):'<img src="/aiway-logo.png" alt="AiWay">'}</div>${activeTask?`<span class="welcome-task-label">${esc(t[0])}</span>`:''}<h1>${activeTask?(en?`What would you like to do with ${esc(t[0])}?`:`كيف أساعدك في ${esc(t[0])}؟`):(en?'How can I help you today?':'كيف أقدر أساعدك اليوم؟')}</h1><p>${activeTask?esc(t[1]):(en?'Choose a task and AiWay will select a suitable paid model automatically.':'اختر مهمة وسيختار AiWay تلقائيًا نموذجًا مدفوعًا مناسبًا بأقل تكلفة ممكنة.')}</p><div class="suggestions">${suggestions.map((x,i)=>`<button class="suggestion" data-prompt="${esc(x[1])}"><span class="sicon">${TASK_ICONS[activeTask]||ICONS.sparkles}</span><span><b>${esc(x[0])}</b><small>${esc(x[1])}</small></span></button>`).join('')}</div></div>`}
 
 
-function enhanceCodeBlocks(root=$('messages')){
+function enhanceRenderedCodeBlocks(root=$('messages')){
   root.querySelectorAll('pre').forEach(pre=>{
     if(pre.dataset.enhanced)return;
     pre.dataset.enhanced='1';
@@ -671,7 +671,7 @@ function bindMessageActions(){
   $('messages').querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyMsg(Number(b.dataset.copy)));
   $('messages').querySelectorAll('[data-redo]').forEach(b=>b.onclick=regenerate);
   $('messages').querySelectorAll('[data-continue]').forEach(b=>b.onclick=()=>continueResponse(Number(b.dataset.continue)));
-  enhanceCodeBlocks();
+  enhanceRenderedCodeBlocks();
 }
 function attachmentMarkup(m){
   const list=m.attachments||[];

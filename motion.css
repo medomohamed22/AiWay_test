@@ -1,0 +1,120 @@
+/* AiWay Motion System — mobile/Pi Browser friendly. GPU-first: transform + opacity. */
+:root{
+  --motion-fast:140ms;
+  --motion-ui:210ms;
+  --motion-page:280ms;
+  --motion-slow:360ms;
+  --motion-ease:cubic-bezier(.2,.78,.2,1);
+  --motion-ease-out:cubic-bezier(.16,1,.3,1);
+}
+
+/* Keep compositing predictable on moving UI without permanently promoting the whole page. */
+.motion-ready .btn,
+.motion-ready .icon-btn,
+.motion-ready .top-tools-btn,
+.motion-ready .top-login-btn,
+.motion-ready .credits,
+.motion-ready .suggestion,
+.motion-ready .task-card,
+.motion-ready .task-pro-card,
+.motion-ready .mobile-tools-grid>button,
+.motion-ready .pack,
+.motion-ready .chat-item{
+  transition:transform var(--motion-ui) var(--motion-ease),
+             opacity var(--motion-fast) ease,
+             box-shadow var(--motion-ui) ease,
+             border-color var(--motion-ui) ease,
+             background-color var(--motion-ui) ease;
+}
+
+@media (hover:hover) and (pointer:fine){
+  .motion-ready .task-card:hover,.motion-ready .task-pro-card:hover,
+  .motion-ready .suggestion:hover,.motion-ready .pack:hover{transform:translate3d(0,-3px,0)}
+}
+.motion-ready button:active:not(:disabled){transform:scale(.975)}
+
+/* Main app entrance after choosing/changing a tool. */
+.motion-main-enter{animation:aiwayMainEnter var(--motion-page) var(--motion-ease-out) both}
+@keyframes aiwayMainEnter{
+  from{opacity:.15;transform:translate3d(0,8px,0)}
+  to{opacity:1;transform:translate3d(0,0,0)}
+}
+
+/* Task/tool chooser: one clean page transition + subtle staged cards. */
+.task-screen.open{animation:aiwayScreenFade var(--motion-page) var(--motion-ease-out) both}
+.task-screen.open .task-shell{animation:aiwayPanelEnter var(--motion-page) var(--motion-ease-out) both}
+.task-screen.open .task-card,.task-screen.open .task-pro-card,.task-screen.open .task-more-toggle{
+  animation:aiwayCardEnter 300ms var(--motion-ease-out) both;
+}
+.task-screen.open .task-core-grid .task-card:nth-child(2){animation-delay:28ms}
+.task-screen.open .task-core-grid .task-card:nth-child(3){animation-delay:56ms}
+.task-screen.open .task-core-grid .task-card:nth-child(4){animation-delay:84ms}
+.task-screen.open .task-more-toggle{animation-delay:100ms}
+.task-screen.open .task-pro-card{animation-delay:120ms}
+.task-more-grid.open .task-card{animation:aiwayCardEnter 220ms var(--motion-ease-out) both}
+.task-more-grid.open .task-card:nth-child(2){animation-delay:24ms}
+.task-more-grid.open .task-card:nth-child(3){animation-delay:48ms}
+.task-more-grid.open .task-card:nth-child(4){animation-delay:72ms}
+@keyframes aiwayScreenFade{from{opacity:0}to{opacity:1}}
+@keyframes aiwayPanelEnter{from{opacity:0;transform:translate3d(0,10px,0)}to{opacity:1;transform:none}}
+@keyframes aiwayCardEnter{from{opacity:0;transform:translate3d(0,9px,0) scale(.99)}to{opacity:1;transform:none}}
+
+/* Dialogs/payment/support/image preview. Existing display logic is preserved. */
+.overlay.open{animation:aiwayOverlayIn var(--motion-ui) ease both}
+.overlay.open>.modal,.overlay.open>.aiway-dialog{
+  animation:aiwayModalIn 240ms var(--motion-ease-out) both;
+  transform-origin:50% 55%;
+}
+@keyframes aiwayOverlayIn{from{opacity:0}to{opacity:1}}
+@keyframes aiwayModalIn{from{opacity:0;transform:translate3d(0,8px,0) scale(.985)}to{opacity:1;transform:none}}
+
+/* Mobile tool bottom sheet. */
+.mobile-tools-sheet.open .mobile-tools-scrim{animation:aiwayOverlayIn var(--motion-ui) ease both}
+.mobile-tools-sheet.open .mobile-tools-panel{animation:aiwaySheetIn 260ms var(--motion-ease-out) both}
+@keyframes aiwaySheetIn{from{opacity:.55;transform:translate3d(0,28px,0)}to{opacity:1;transform:none}}
+
+/* Live tools modal. */
+.live-tool-modal.open{animation:aiwayOverlayIn var(--motion-ui) ease both}
+.live-tool-modal.open .live-tool-sheet{animation:aiwayModalIn 260ms var(--motion-ease-out) both}
+
+/* Model chooser and lightweight popovers. */
+.model-menu.open{animation:aiwayPopoverIn 180ms var(--motion-ease-out) both;transform-origin:50% 0}
+@keyframes aiwayPopoverIn{from{opacity:0;transform:translate3d(0,-5px,0) scale(.992)}to{opacity:1;transform:none}}
+
+/* New chat content only; streaming updates are intentionally not reanimated. */
+.msg.motion-new{animation:aiwayMessageIn 190ms var(--motion-ease-out) both}
+.msg.user.motion-new{transform-origin:90% 100%}
+.msg.assistant.motion-new{transform-origin:10% 100%}
+@keyframes aiwayMessageIn{from{opacity:0;transform:translate3d(0,6px,0)}to{opacity:1;transform:none}}
+
+/* Smooth sidebar uses transform only. */
+@media(max-width:820px){
+  .sidebar{transition:transform 240ms var(--motion-ease-out),box-shadow 240ms ease!important;will-change:transform}
+  .backdrop.open{animation:aiwayOverlayIn 180ms ease both}
+  .task-screen{min-height:100vh;min-height:100svh}
+  .mobile-tools-panel{max-height:min(78vh,620px);max-height:min(78svh,620px)}
+  .overlay{padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .overlay .modal{max-width:100%;max-height:calc(100vh - 20px);max-height:calc(100svh - 20px);overflow:auto;overscroll-behavior:contain}
+}
+
+/* Small phones/Pi Browser WebView: reduce travel, preserve touch targets and safe areas. */
+@media(max-width:480px){
+  :root{--motion-page:240ms;--motion-ui:190ms}
+  .task-screen.open .task-card,.task-screen.open .task-pro-card,.task-screen.open .task-more-toggle{animation-duration:240ms}
+  .mobile-tools-grid>button,.send,.composer-more,.icon-btn{min-width:44px;min-height:44px}
+  .mobile-tools-panel{border-radius:22px 22px 0 0;padding-inline:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .modal{border-radius:20px}
+}
+
+/* Accessibility + low-power behavior. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.001ms!important;
+    animation-delay:0ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+  }
+}
+.motion-ready .msg{animation:none}
+.motion-ready .msg.motion-new{animation:aiwayMessageIn 190ms var(--motion-ease-out) both}
