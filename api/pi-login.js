@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { allowMethods, appError, db, handleError, json, localize, piApiError, requestLocale, signAppToken, requestIp, enforceRateLimit } from './_lib.js';
+import { allowMethods, appError, db, handleError, json, localize, piApiError, requestLocale, signAppToken, requestIp, enforceRateLimit, assertFeatureEnabled } from './_lib.js';
 
 const BRIDGE_TTL_MS = 10 * 60 * 1000;
 
@@ -99,6 +99,7 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
   const locale = requestLocale(req);
   try {
+    await assertFeatureEnabled('login',{allowDuringMaintenance:false});
     const supabase = db();
     const ip = requestIp(req);
     const action = String(req.body?.action || 'login').trim();

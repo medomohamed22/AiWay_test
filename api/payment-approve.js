@@ -1,4 +1,4 @@
-import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, PACKAGES, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, verifyPaymentQuote } from './_lib.js';
+import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, getPaymentPackage, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, verifyPaymentQuote, assertFeatureEnabled, assertUserCapability } from './_lib.js';
 
 const piHeaders = () => ({ Authorization: `Key ${process.env.PI_SECRET_KEY}`, 'Content-Type': 'application/json' });
 const norm = value => String(value || '').trim();
@@ -15,9 +15,9 @@ async function getPiPayment(paymentId){
 function paymentOwner(remote){return norm(remote?.user_uid||remote?.user?.uid);}
 function paymentPackage(remote){return norm(remote?.metadata?.packageId||remote?.metadata?.package_id);}
 function remoteQuoteToken(remote){return norm(remote?.metadata?.quoteToken||remote?.metadata?.quote_token);}
-function validateStoredPayment(remote,user,payment,paymentId){
+async function validateStoredPayment(remote,user,payment,paymentId){
   const packageId=norm(payment.package_id);
-  const pack=PACKAGES[packageId];
+  const pack=await getPaymentPackage(packageId,{includeInactive:true});
   if(!remote||!pack)throw appError('PAYMENT_MISMATCH');
   const remoteId=norm(remote.identifier||remote.payment_id);if(remoteId&&remoteId!==norm(paymentId))throw appError('PAYMENT_MISMATCH');
   if(paymentPackage(remote)!==packageId)throw appError('PAYMENT_MISMATCH');
@@ -25,7 +25,7 @@ function validateStoredPayment(remote,user,payment,paymentId){
   if(Number(remote?.metadata?.usd)!==Number(payment.usd_amount)||Number(remote?.metadata?.tokens)!==Number(payment.ai_tokens))throw appError('PAYMENT_MISMATCH');
   if(!amountMatches(remote?.amount,payment.amount_pi))throw appError('PAYMENT_MISMATCH');
 }
-function validateNewPayment(remote,user,quote,paymentId,quoteToken){
+async function validateNewPayment(remote,user,quote,paymentId,quoteToken){
   if(!remote)throw appError('PAYMENT_MISMATCH');
   const remoteId=norm(remote.identifier||remote.payment_id);if(remoteId&&remoteId!==norm(paymentId))throw appError('PAYMENT_MISMATCH');
   if(paymentPackage(remote)!==quote.packageId)throw appError('PAYMENT_MISMATCH');
@@ -45,11 +45,13 @@ export default async function handler(req,res){
   const locale=requestLocale(req);
   try{
     const user=await requireUser(req);
+    await assertFeatureEnabled('payments');
+    await assertUserCapability(user.id,'payment');
     await enforceRateLimit(db(),`payment:${user.id}:${requestIp(req)}`,12,60);
     const paymentId=norm(req.body?.paymentId);
     const requestedPackage=norm(req.body?.packageId);
     const quoteToken=norm(req.body?.quoteToken);
-    if(!paymentId||!PACKAGES[requestedPackage])throw appError('PAYMENT_INVALID');
+    if(!paymentId||!requestedPackage)throw appError('PAYMENT_INVALID');
     if(!process.env.PI_SECRET_KEY)throw appError('MISSING_CONFIGURATION');
 
     const supabase=db();
@@ -57,13 +59,14 @@ export default async function handler(req,res){
     const remote=await getPiPayment(paymentId);
     if(existing){
       if(norm(existing.user_id)!==norm(user.id)||norm(existing.package_id)!==requestedPackage)throw appError('PAYMENT_MISMATCH');
-      validateStoredPayment(remote,user,existing,paymentId);
+      await validateStoredPayment(remote,user,existing,paymentId);
       return json(res,200,{approved:true,amountPi:Number(existing.amount_pi),alreadyApproved:true});
     }
 
+    const requestedPack=await getPaymentPackage(requestedPackage);if(!requestedPack)throw appError('PAYMENT_INVALID');
     const quote=await verifyPaymentQuote(quoteToken);
     if(quote.packageId!==requestedPackage)throw appError('PAYMENT_MISMATCH');
-    validateNewPayment(remote,user,quote,paymentId,quoteToken);
+    await validateNewPayment(remote,user,quote,paymentId,quoteToken);
 
     const response=await fetchWithTimeout(`https://api.minepi.com/v2/payments/${encodeURIComponent(paymentId)}/approve`,{method:'POST',headers:piHeaders()},20000);
     const data=await response.json().catch(()=>null);
@@ -76,7 +79,7 @@ export default async function handler(req,res){
       if(/duplicate|unique/i.test(String(inserted.error.message||''))){
         const concurrent=await readExisting(supabase,paymentId);
         if(concurrent&&norm(concurrent.user_id)===norm(user.id)&&norm(concurrent.package_id)===requestedPackage){
-          validateStoredPayment(remote,user,concurrent,paymentId);
+          await validateStoredPayment(remote,user,concurrent,paymentId);
           return json(res,200,{approved:true,amountPi:Number(concurrent.amount_pi),alreadyApproved:true});
         }
         throw appError('PAYMENT_MISMATCH');

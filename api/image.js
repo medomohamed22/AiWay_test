@@ -1,4 +1,4 @@
-import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, enforceJsonBodySize, enforceRateLimit, requestIp } from './_lib.js';
+import { allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, fetchWithTimeout, handleError, isLowBalance, json, localize, openRouterError, requestLocale, requireUser, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, getToolModelSettings, GEMINI_IMAGE_MODELS, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, enforceJsonBodySize, enforceRateLimit, requestIp, assertFeatureEnabled, assertUserCapability, shouldTryModelFallback } from './_lib.js';
 
 
 const SAFE_IMAGE_TYPES = new Set(['image/png','image/jpeg','image/webp']);
@@ -282,6 +282,8 @@ export default async function handler(req, res) {
   const uiLocale = requestLocale(req);
   let reservationUserId=null,reservationRequestId=null,reservationSupabase=null,reservationActive=false,freeTrialActive=false;
   try {
+    const actionName=String(req.body?.action||req.query?.action||'');
+    if(!['native-download','view','prepare-download','cleanup-expired'].includes(actionName)){const gateUser=await requireUser(req);await assertFeatureEnabled('images');await assertUserCapability(gateUser.id,'chat');}
     const action = String(req.body?.action || req.query?.action || '');
     if (action === 'cleanup-expired' && req.method === 'GET') return await cleanupExpiredImages(req, res);
     if (action === 'native-download' && req.method === 'GET') return await nativeImageDownload(req, res);
@@ -342,6 +344,7 @@ ${JSON.stringify(safeToolConfig)}`; }
     if (referenceImage && !hasReferenceImage) throw appError('INVALID_ATTACHMENT');
     if (hasReferenceImage && referenceImage.length > 3_500_000) throw appError('ATTACHMENT_TOO_LARGE');
     let model = await getImageModel(cleanText(modelId,100), needsHighQualityImage(imagePrompt, resolution, hasReferenceImage), taskId);
+    let configuredFallbackId='';if(String(taskId||'').toLowerCase()==='image'){try{const t=await supabase.from('ai_tools').select('prompt_config').eq('id','image').maybeSingle();configuredFallbackId=String(t.data?.prompt_config?._admin?.fallback_model_id||'').trim()}catch{}}
     const freeImageModel = String(model.id || '').endsWith(':free') || /grok-imagine-image-quality:free/i.test(model.id);
     if (purchased && freeImageModel) await claimFreeDailyUse(supabase, user.id, 'image');
     const supported = model.supported_parameters || {};
@@ -400,8 +403,9 @@ ${JSON.stringify(safeToolConfig)}`; }
       });
     }
 
+    let reservedTokens=0;
     if (purchased) {
-      const reservedTokens = reservationTokens(estimatedCharge.chargedTokens, 'image');
+      reservedTokens = reservationTokens(estimatedCharge.chargedTokens, 'image');
       if (availableTokens < reservedTokens) {
         throw appError('INSUFFICIENT_TOKENS_FOR_REQUEST', {
           availableTokens, requiredTokens: reservedTokens, shortfall: reservedTokens - availableTokens
@@ -414,11 +418,10 @@ ${JSON.stringify(safeToolConfig)}`; }
       freeTrialActive=true;
     }
 
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/images',{
-      method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'},body:JSON.stringify(body)
-    },120000);
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok)throw openRouterError(response.status,payload);
+    const imageHeaders={'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'};
+    let response=await fetchWithTimeout('https://openrouter.ai/api/v1/images',{method:'POST',headers:imageHeaders,body:JSON.stringify(body)},120000);
+    let payload=await response.json().catch(()=>({}));
+    if(!response.ok){const firstError=openRouterError(response.status,payload);if(configuredFallbackId&&configuredFallbackId!==model.id&&shouldTryModelFallback(firstError)){const fallback=(await getImageModels()).find(x=>x.id===configuredFallbackId);if(fallback){const built=buildImageRequest(fallback);const fallbackEstimate=await estimateImageCharge(fallback,built.chosenResolution,built.chosenAspectRatio,hasReferenceImage);if(!purchased||fallbackEstimate.chargedTokens<=reservedTokens){model=fallback;body=built.requestBody;selectedResolution=built.chosenResolution;selectedAspectRatio=built.chosenAspectRatio;estimatedCharge=fallbackEstimate;response=await fetchWithTimeout('https://openrouter.ai/api/v1/images',{method:'POST',headers:imageHeaders,body:JSON.stringify(body)},120000);payload=await response.json().catch(()=>({}));}}}if(!response.ok)throw openRouterError(response.status,payload);}
     const imagePart=payload?.data?.[0];
     if(!imagePart?.b64_json)throw appError('EMPTY_RESPONSE');
     const declaredMediaType=String(imagePart.media_type||'image/png').toLowerCase();

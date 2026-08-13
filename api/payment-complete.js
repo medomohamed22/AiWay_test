@@ -1,4 +1,4 @@
-import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, PACKAGES, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, sendTelegramNotification, telegramHtml, formatCairoDateTime, verifyPaymentQuote } from './_lib.js';
+import { allowMethods, appError, db, fetchWithTimeout, handleError, json, localize, getPaymentPackage, piApiError, requestLocale, requireUser, requestIp, enforceRateLimit, sendTelegramNotification, telegramHtml, formatCairoDateTime, verifyPaymentQuote, assertFeatureEnabled, assertUserCapability } from './_lib.js';
 
 const piHeaders=()=>({Authorization:`Key ${process.env.PI_SECRET_KEY}`,'Content-Type':'application/json'});
 async function piRequest(paymentId,action='',body){
@@ -45,6 +45,8 @@ export default async function handler(req,res){
   const locale=requestLocale(req);
   try{
     const user=await requireUser(req);
+    await assertFeatureEnabled('payments');
+    await assertUserCapability(user.id,'payment');
     await enforceRateLimit(db(),`payment:${user.id}:${requestIp(req)}`,12,60);
     const paymentId=norm(req.body?.paymentId);
     const resolvePending=Boolean(req.body?.resolvePending||req.body?.recover);
@@ -82,7 +84,7 @@ export default async function handler(req,res){
     // (for example, when an outdated package_id CHECK constraint rejected the insert).
     if(!payment){
       const remotePackage=pkg(remote);
-      const pack=PACKAGES[remotePackage];
+      const pack=await getPaymentPackage(remotePackage);
       const remoteTokens=Number(remote?.metadata?.tokens);
       const remoteUsd=Number(remote?.metadata?.usd);
       const amountPi=Number(remote?.amount);
@@ -124,7 +126,8 @@ export default async function handler(req,res){
     if(payment.status==='completed')return json(res,200,{completed:true,resolved:true,tokens:payment.ai_tokens,alreadyCompleted:true});
 
     const remotePackage=pkg(remote);
-    if(remotePackage!==norm(payment.package_id)||!PACKAGES[remotePackage])mismatch('PACKAGE',{paymentId,remotePackage,storedPackage:payment.package_id});
+    const activePack=await getPaymentPackage(remotePackage,{includeInactive:true});
+    if(remotePackage!==norm(payment.package_id)||!activePack)mismatch('PACKAGE',{paymentId,remotePackage,storedPackage:payment.package_id});
     if(!closeEnough(remote.amount,payment.amount_pi))mismatch('AMOUNT',{paymentId,remoteAmount:remote.amount,storedAmount:payment.amount_pi});
     const remoteTokens=Number(remote?.metadata?.tokens);
     const remoteUsd=Number(remote?.metadata?.usd);

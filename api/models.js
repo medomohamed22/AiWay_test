@@ -1,6 +1,6 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
-  getAvailableModels, getTrialModelId, PACKAGES, packageQuote,
+  getAvailableModels, getTrialModelId, packageQuote, getPaymentPackages, getFeatureFlags, getGlobalAnnouncement,
   TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints
 } from './_lib.js';
 
@@ -149,17 +149,17 @@ export default async function handler(req, res) {
         costPerMillion:(Number(model.pricing?.prompt || 0) + Number(model.pricing?.completion || 0)) * 1e6
       };
     }).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
-    const packages = {};
-    for (const id of Object.keys(PACKAGES)) {
+    const packageConfig=await getPaymentPackages(); const packages = {};
+    for (const id of Object.keys(packageConfig)) {
       try { packages[id] = await packageQuote(id); }
-      catch { packages[id] = { ...PACKAGES[id], amountPi:null }; }
+      catch { packages[id] = { ...packageConfig[id], amountPi:null }; }
     }
     return json(res, 200, {
       name:'AiWay', models,
       chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
       trialModelId:'openrouter/free', packages,
       imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
-      tokenUsd:TOKEN_USD, tools:await getAiTools(), providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
+      tokenUsd:TOKEN_USD, tools:await getAiTools(), featureFlags:await getFeatureFlags(), globalAnnouncement:await getGlobalAnnouncement(), providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
     });
   } catch (error) {
     console.error(error);

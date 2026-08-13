@@ -210,6 +210,7 @@ export async function requireUser(req) {
       .eq('id', payload.sub)
       .maybeSingle();
     if (error || !currentUser) throw appError('UNAUTHORIZED');
+    await assertUserCapability(currentUser.id, 'account');
     return currentUser;
   } catch (error) {
     if (error?.code === 'UNAUTHORIZED') throw error;
@@ -340,6 +341,11 @@ export function errorDetails(error, locale = 'ar') {
     INVALID_IMAGE_REQUEST: [400, { ar: 'بيانات طلب الصورة غير مكتملة. اكتب وصفًا واضحًا ثم حاول مرة أخرى.', en: 'The image request is incomplete. Enter a clear description and try again.' }],
     UNAUTHORIZED: [401, { ar: 'انتهت جلسة تسجيل الدخول أو لم تبدأ بعد. سجّل الدخول بحساب Pi ثم حاول مرة أخرى.', en: 'Your sign-in session is missing or expired. Sign in with Pi and try again.' }],
     FORBIDDEN: [403, { ar: 'ليس لديك صلاحية لتنفيذ هذا الإجراء.', en: 'You do not have permission to perform this action.' }],
+    ACCOUNT_SUSPENDED: [403, { ar: 'تم إيقاف هذا الحساب مؤقتًا بواسطة الإدارة. تواصل مع الدعم للمراجعة.', en: 'This account has been suspended by an administrator. Contact support for review.' }],
+    CHAT_BLOCKED: [403, { ar: 'تم إيقاف استخدام المحادثة لهذا الحساب مؤقتًا.', en: 'Chat access is temporarily disabled for this account.' }],
+    PAYMENT_BLOCKED: [403, { ar: 'تم إيقاف عمليات الدفع لهذا الحساب مؤقتًا.', en: 'Payments are temporarily disabled for this account.' }],
+    MAINTENANCE_MODE: [503, { ar: 'AiWay تحت صيانة قصيرة حاليًا. حاول مرة أخرى بعد قليل.', en: 'AiWay is temporarily under maintenance. Try again shortly.' }],
+    FEATURE_DISABLED: [503, { ar: 'هذه الميزة متوقفة مؤقتًا بواسطة الإدارة.', en: 'This feature is temporarily disabled by the administrator.' }],
     INSUFFICIENT_TOKENS: [402, available <= 0 ? balanceFinished : {
       ar: 'رصيدك غير كافٍ لإتمام الطلب. اشحن رصيدًا إضافيًا ثم حاول مرة أخرى.',
       en: 'Your balance is insufficient to complete the request. Add more balance and try again.'
@@ -566,6 +572,67 @@ export const TRIAL_TOKENS = 10;
 export const PI_PRICE_BUFFER = 0.05;
 export const TRIAL_MODEL_FALLBACK = 'openrouter/free';
 const tokensForUsd = usd => Math.round(Number(usd) * PROVIDER_BUDGET_SHARE / TOKEN_USD);
+
+const DEFAULT_FEATURE_FLAGS = Object.freeze({ maintenance:false, login:true, payments:true, images:true, chat:true });
+
+export async function getAdminSetting(key, fallback=null) {
+  try {
+    const {data,error}=await db().from('admin_settings').select('value').eq('key',String(key)).maybeSingle();
+    if(error||!data)return fallback;
+    return data.value ?? fallback;
+  } catch { return fallback; }
+}
+
+export async function getFeatureFlags() {
+  const value=await getAdminSetting('feature_flags',{});
+  return {...DEFAULT_FEATURE_FLAGS,...(value&&typeof value==='object'&&!Array.isArray(value)?value:{})};
+}
+
+export async function assertFeatureEnabled(feature,{allowDuringMaintenance=false}={}) {
+  const flags=await getFeatureFlags();
+  if(flags.maintenance&&!allowDuringMaintenance)throw appError('MAINTENANCE_MODE');
+  if(feature&&flags[feature]===false)throw appError('FEATURE_DISABLED',{feature});
+  return flags;
+}
+
+export async function getUserAdminControl(userId) {
+  try {
+    const {data,error}=await db().from('admin_user_controls').select('user_id,account_status,chat_blocked,payment_blocked,note,updated_at').eq('user_id',userId).maybeSingle();
+    if(error)return {account_status:'active',chat_blocked:false,payment_blocked:false};
+    return data||{account_status:'active',chat_blocked:false,payment_blocked:false};
+  } catch { return {account_status:'active',chat_blocked:false,payment_blocked:false}; }
+}
+
+export async function assertUserCapability(userId, capability) {
+  const control=await getUserAdminControl(userId);
+  if(control.account_status==='suspended')throw appError('ACCOUNT_SUSPENDED');
+  if(capability==='chat'&&control.chat_blocked)throw appError('CHAT_BLOCKED');
+  if(capability==='payment'&&control.payment_blocked)throw appError('PAYMENT_BLOCKED');
+  return control;
+}
+
+export async function getPaymentPackages({includeInactive=false}={}) {
+  try {
+    let query=db().from('payment_packages').select('id,name_ar,name_en,usd,tokens,recommended_for,popular,is_active,sort_order,updated_at').order('sort_order',{ascending:true});
+    if(!includeInactive)query=query.eq('is_active',true);
+    const {data,error}=await query;
+    if(error||!Array.isArray(data)||!data.length)throw error||new Error('NO_PAYMENT_PACKAGES');
+    return Object.fromEntries(data.map(row=>[row.id,{name_ar:row.name_ar,name_en:row.name_en,usd:Number(row.usd),tokens:Number(row.tokens),recommendedFor:row.recommended_for,popular:Boolean(row.popular),is_active:Boolean(row.is_active),sort_order:Number(row.sort_order||0)}]));
+  } catch {
+    return Object.fromEntries(Object.entries(PACKAGES).map(([id,p])=>[id,{...p,is_active:true,sort_order:0}]));
+  }
+}
+
+export async function getPaymentPackage(id,{includeInactive=false}={}) {
+  const packages=await getPaymentPackages({includeInactive});
+  return packages[String(id)]||null;
+}
+
+export async function getGlobalAnnouncement() {
+  const value=await getAdminSetting('global_announcement',{enabled:false,text_ar:'',text_en:'',level:'info'});
+  return value&&typeof value==='object'&&!Array.isArray(value)?value:{enabled:false,text_ar:'',text_en:'',level:'info'};
+}
+
 export const PACKAGES = {
   lite: { name_ar:'لايت', name_en:'Lite', usd:2, tokens:tokensForUsd(2), recommendedFor:'light' },
   starter: { name_ar:'ستارتر', name_en:'Starter', usd:5, tokens:tokensForUsd(5), recommendedFor:'regular' },
@@ -1208,7 +1275,7 @@ export async function verifyPaymentQuote(token) {
       algorithms: ['HS256']
     });
     const packageId = String(payload.packageId || '');
-    const pack = PACKAGES[packageId];
+    const pack = await getPaymentPackage(packageId,{includeInactive:true});
     const amountPi = Number(payload.amountPi);
     const usd = Number(payload.usd);
     const tokens = Number(payload.tokens);
@@ -1223,7 +1290,7 @@ export async function verifyPaymentQuote(token) {
 }
 
 export async function packageQuote(id) {
-  const pack = PACKAGES[id];
+  const pack = await getPaymentPackage(id);
   if (!pack) return null;
   const piUsd = await getPiUsd();
   const baseAmountPi=pack.usd/piUsd;

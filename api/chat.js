@@ -1,6 +1,6 @@
 export const maxDuration = 300;
 
-import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, enforceJsonBodySize, enforceRateLimit, requestIp } from './_lib.js';
+import { affordableOutputLimit, allowMethods, appError, chargeTokens, classifyTokenChargeFailure, cleanText, db, errorDetails, estimateChatCharge, fetchWithTimeout, getAvailableModels, getModel, getTrialModelId, handleError, isLowBalance, localize, openRouterError, requestLocale, requireUser, shouldTryModelFallback, ensureConversationOwner, normalizeRequestId, reserveAiTokens, finalizeAiTokens, releaseAiTokens, reservationTokens, resolveOpenRouterCharge, chooseAutoModel, chooseTaskModel, isFreeModel, claimFreeDailyUse, claimFreeTrialToken, releaseFreeTrialToken, createDownloadTicket, verifyDownloadTicket, enforceJsonBodySize, enforceRateLimit, requestIp, assertFeatureEnabled, assertUserCapability } from './_lib.js';
 
 function extractDownloadableFiles(text) {
   const files = [];
@@ -162,6 +162,8 @@ export default async function handler(req, res) {
     enforceJsonBodySize(req, 4_000_000);
 
     const user = await requireUser(req);
+    await assertFeatureEnabled('chat');
+    await assertUserCapability(user.id,'chat');
     const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId } = req.body || {};
     const taskId = cleanText(rawTaskId, 30).toLowerCase();
     // all-models is a UI workspace identity that must be persisted in chat history,
@@ -287,6 +289,7 @@ export default async function handler(req, res) {
       translate: {role:'professional translator',objective_ar:'الترجمة الطبيعية مع الحفاظ على المعنى والسياق والنبرة.',objective_en:'Translate naturally while preserving meaning, context, and tone.',rules:['Avoid unnecessary literal translation.']}
     };
     const promptConfig = toolConfig?.prompt_config && typeof toolConfig.prompt_config === 'object' ? toolConfig.prompt_config : (legacyInstructions[routingTaskId] || {});
+    const configuredFallbackId=String(promptConfig?._admin?.fallback_model_id||'').trim();
     const toolInstructionPayload = routingTaskId ? {
       instruction_type:'aiway_tool_profile',
       tool_id:routingTaskId,
@@ -344,15 +347,22 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       if(error)throw appError('DATABASE_ERROR',{},error);
     }
 
-    const activeModel=model; const activeModelId=model.id; const fallbackUsed=false;
+    let activeModel=model; let activeModelId=model.id; let fallbackUsed=false;
     const openRouterHeaders={
       'Content-Type':'application/json','Authorization':`Bearer ${String(process.env.OPENROUTER_API_KEY).trim()}`,
       'HTTP-Referer':String(process.env.APP_URL||'https://aiway.app'),'X-Title':'AiWay'
     };
     const requestBody={model:activeModelId,messages:safeMessages,temperature:Number(temperature),max_tokens:Math.max(128,Math.floor(initialMaxTokens)),user:String(user.id),stream:true,stream_options:{include_usage:true},provider:{sort:'throughput',allow_fallbacks:true}};
     if(webSearch)requestBody.tools=[...(Array.isArray(requestBody.tools)?requestBody.tools:[]),{type:'openrouter:web_search'}];
-    const response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},240000);
-    if(!response.ok){const payload=await response.json().catch(()=>({}));throw openRouterError(response.status,payload,{webSearch});}
+    let response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},240000);
+    if(!response.ok){
+      const payload=await response.json().catch(()=>({}));const primaryError=openRouterError(response.status,payload,{webSearch});
+      if(configuredFallbackId&&configuredFallbackId!==activeModelId&&shouldTryModelFallback(primaryError)){
+        const candidate=await getModel(configuredFallbackId);
+        if(candidate){const fallbackEstimate=estimateChatCharge(candidate.pricing,safeMessages,webSearch,desiredOutputTokens);const fallbackMax=purchased?affordableOutputLimit(candidate.pricing,reservedTokenAmount,fallbackEstimate,desiredOutputTokens):desiredOutputTokens;if(!purchased||fallbackMax>=128){activeModel=candidate;activeModelId=candidate.id;fallbackUsed=true;requestBody.model=activeModelId;requestBody.max_tokens=Math.max(128,Math.floor(fallbackMax));response=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:openRouterHeaders,body:JSON.stringify(requestBody)},240000);}}
+      }
+      if(!response.ok){const fallbackPayload=await response.json().catch(()=>({}));throw openRouterError(response.status,fallbackPayload,{webSearch});}
+    }
     if(!response.body)throw appError('EMPTY_RESPONSE');
 
     res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.();
