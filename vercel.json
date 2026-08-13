@@ -20,7 +20,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://sdk.minepi.com https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; font-src 'self' data: https:; frame-src 'self' https://minepi.com https://*.minepi.com https://sdk.minepi.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'self' https://minepi.com https://*.minepi.com; base-uri 'self'; form-action 'self' https://minepi.com https://*.minepi.com; upgrade-insecure-requests;"
+          "value": "default-src 'self'; script-src 'self' https://sdk.minepi.com https://cdn.jsdelivr.net; script-src-attr 'none'; style-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https:; font-src 'self' data: https:; frame-src 'self' https://minepi.com https://*.minepi.com https://sdk.minepi.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'self' https://minepi.com https://*.minepi.com; base-uri 'self'; form-action 'self' https://minepi.com https://*.minepi.com; upgrade-insecure-requests;"
         },
         {
           "key": "Strict-Transport-Security",
@@ -83,6 +83,24 @@
         {
           "key": "Service-Worker-Allowed",
           "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/(app|app-head|analytics-init|desktop-ui|dropzone-ui|live-tools|landing-ui|mobile-ux|microinteractions).js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/app.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
         }
       ]
     }

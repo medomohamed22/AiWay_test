@@ -1,0 +1,1 @@
+let lang=localStorage.getItem('aiway_lang')||'en';const apply=()=>{document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.getElementById('langBtn').textContent=lang==='ar'?'English':'العربية'};document.getElementById('langBtn').onclick=()=>{lang=lang==='ar'?'en':'ar';localStorage.setItem('aiway_lang',lang);apply()};apply();
