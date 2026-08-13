@@ -283,7 +283,7 @@ export default async function handler(req, res) {
   let reservationUserId=null,reservationRequestId=null,reservationSupabase=null,reservationActive=false,freeTrialActive=false;
   try {
     const actionName=String(req.body?.action||req.query?.action||'');
-    if(!['native-download','view','prepare-download','cleanup-expired'].includes(actionName)){const gateUser=await requireUser(req);await assertFeatureEnabled('images');await assertUserCapability(gateUser.id,'chat');}
+    if(!['native-download','view','prepare-download','cleanup-expired'].includes(actionName)){const gateUser=await requireUser(req);await assertFeatureEnabled('images',{user:gateUser});await assertUserCapability(gateUser.id,'chat',gateUser.role);}
     const action = String(req.body?.action || req.query?.action || '');
     if (action === 'cleanup-expired' && req.method === 'GET') return await cleanupExpiredImages(req, res);
     if (action === 'native-download' && req.method === 'GET') return await nativeImageDownload(req, res);

@@ -210,7 +210,7 @@ export async function requireUser(req) {
       .eq('id', payload.sub)
       .maybeSingle();
     if (error || !currentUser) throw appError('UNAUTHORIZED');
-    await assertUserCapability(currentUser.id, 'account');
+    await assertUserCapability(currentUser.id, 'account', currentUser.role);
     return currentUser;
   } catch (error) {
     if (error?.code === 'UNAUTHORIZED') throw error;
@@ -588,12 +588,16 @@ export async function getFeatureFlags() {
   return {...DEFAULT_FEATURE_FLAGS,...(value&&typeof value==='object'&&!Array.isArray(value)?value:{})};
 }
 
-export async function assertFeatureEnabled(feature,{allowDuringMaintenance=false}={}) {
+export async function assertFeatureEnabled(feature,{allowDuringMaintenance=false,user=null}={}) {
   const flags=await getFeatureFlags();
+  // Admins must always retain a recovery path into the control center. Feature flags
+  // are for public/user-facing availability and must never lock an admin out.
+  if(user?.role==='admin')return flags;
   if(flags.maintenance&&!allowDuringMaintenance)throw appError('MAINTENANCE_MODE');
   if(feature&&flags[feature]===false)throw appError('FEATURE_DISABLED',{feature});
   return flags;
 }
+
 
 export async function getUserAdminControl(userId) {
   try {
@@ -603,7 +607,9 @@ export async function getUserAdminControl(userId) {
   } catch { return {account_status:'active',chat_blocked:false,payment_blocked:false}; }
 }
 
-export async function assertUserCapability(userId, capability) {
+export async function assertUserCapability(userId, capability, userRole='') {
+  // Never let account/chat/payment controls lock an administrator out of recovery.
+  if(String(userRole||'').toLowerCase()==='admin')return {account_status:'active',chat_blocked:false,payment_blocked:false,adminBypass:true};
   const control=await getUserAdminControl(userId);
   if(control.account_status==='suspended')throw appError('ACCOUNT_SUSPENDED');
   if(capability==='chat'&&control.chat_blocked)throw appError('CHAT_BLOCKED');

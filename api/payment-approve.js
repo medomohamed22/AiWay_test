@@ -45,8 +45,8 @@ export default async function handler(req,res){
   const locale=requestLocale(req);
   try{
     const user=await requireUser(req);
-    await assertFeatureEnabled('payments');
-    await assertUserCapability(user.id,'payment');
+    await assertFeatureEnabled('payments',{user});
+    await assertUserCapability(user.id,'payment',user.role);
     await enforceRateLimit(db(),`payment:${user.id}:${requestIp(req)}`,12,60);
     const paymentId=norm(req.body?.paymentId);
     const requestedPackage=norm(req.body?.packageId);

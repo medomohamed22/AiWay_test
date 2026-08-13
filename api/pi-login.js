@@ -99,7 +99,6 @@ export default async function handler(req, res) {
   if (!allowMethods(req, res, ['POST'])) return;
   const locale = requestLocale(req);
   try {
-    await assertFeatureEnabled('login',{allowDuringMaintenance:false});
     const supabase = db();
     const ip = requestIp(req);
     const action = String(req.body?.action || 'login').trim();
@@ -138,6 +137,7 @@ export default async function handler(req, res) {
       let user;
       try {
         user = await upsertPiUser(supabase, piUid, username);
+        await assertFeatureEnabled('login',{allowDuringMaintenance:false,user});
       } catch (error) {
         console.error('[PI_BRIDGE_COMPLETE_FAILED]', { stage: 'upsert-user', requestId: parsed.requestId, piUid, username, code: error?.code, message: error?.message });
         throw error;
@@ -190,6 +190,7 @@ export default async function handler(req, res) {
         .eq('id', consumed.user_id)
         .single();
       if (userError || !user) throw appError('DATABASE_ERROR', {}, userError);
+      await assertFeatureEnabled('login',{allowDuringMaintenance:false,user});
       const token = await signAppToken(user);
       return json(res, 200, { token, user });
     }
@@ -202,6 +203,7 @@ export default async function handler(req, res) {
     });
     const { piUid, username } = await verifyPiAccessToken(accessToken);
     const user = await upsertPiUser(supabase, piUid, username);
+    await assertFeatureEnabled('login',{allowDuringMaintenance:false,user});
     const token = await signAppToken(user);
     return json(res, 200, { token, user });
   } catch (error) {

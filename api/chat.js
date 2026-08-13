@@ -162,8 +162,8 @@ export default async function handler(req, res) {
     enforceJsonBodySize(req, 4_000_000);
 
     const user = await requireUser(req);
-    await assertFeatureEnabled('chat');
-    await assertUserCapability(user.id,'chat');
+    await assertFeatureEnabled('chat',{user});
+    await assertUserCapability(user.id,'chat',user.role);
     const { conversationId, modelId, messages, temperature = 0.7, webSearch = false, attachments = [], requestId: rawRequestId, continueFromMessageId: rawContinueFromMessageId, taskId: rawTaskId } = req.body || {};
     const taskId = cleanText(rawTaskId, 30).toLowerCase();
     // all-models is a UI workspace identity that must be persisted in chat history,
