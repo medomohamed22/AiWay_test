@@ -82,15 +82,33 @@ function setBalanceDisplay(value){
   const amount=Math.max(0,Math.floor(Number(value||0)));
   const formatted=amount.toLocaleString('en-US');
   const button=$('creditsButton');
-  if($('credits'))$('credits').textContent=formatted;
+  const credits=$('credits');
+  const previous=credits?Number(String(credits.textContent||'0').replace(/[^0-9]/g,''))||0:0;
+  if(credits)credits.textContent=formatted;
   if($('payBalance'))$('payBalance').textContent=formatted;
   if(button){
     button.classList.toggle('empty',amount<=0);
     button.classList.toggle('balance-long',formatted.length>=8&&formatted.length<11);
     button.classList.toggle('balance-xlong',formatted.length>=11);
     button.title=(lang==='ar'?'الرصيد المتاح: ':'Available balance: ')+formatted;
+    if(amount>previous&&previous>0){button.classList.remove('balance-pop');void button.offsetWidth;button.classList.add('balance-pop');setTimeout(()=>button.classList.remove('balance-pop'),700)}
   }
 }
+function setAuthProgress(stage,visible=true){
+  const box=$('authProgress'),title=$('authProgressTitle'),text=$('authProgressText');if(!box)return;
+  const copy=lang==='ar'?{connect:['تسجيل الدخول بأمان','جارٍ الاتصال بحساب Pi…'],account:['تم تأكيد Pi','جارٍ تحميل الحساب والرصيد…'],sync:['تجهيز حسابك','جارٍ مزامنة المحادثات والنماذج…'],done:['تم تسجيل الدخول','حسابك جاهز للاستخدام.']}:{connect:['Signing in securely','Connecting to your Pi account…'],account:['Pi verified','Loading your account and balance…'],sync:['Preparing your account','Syncing chats and models…'],done:['Signed in','Your account is ready.']};
+  const pair=copy[stage]||copy.connect;if(title)title.textContent=pair[0];if(text)text.textContent=pair[1];box.classList.toggle('show',Boolean(visible));box.setAttribute('aria-hidden',visible?'false':'true');
+}
+const PAYMENT_STEP_ORDER=['prepare','pi','verify','credit'];
+function setPaymentFlow(stage,state='busy'){
+  const modal=$('payModal'),box=$('paymentFlow'),title=$('paymentFlowTitle'),text=$('paymentFlowText');if(!box||!modal)return;
+  const copy=lang==='ar'?{prepare:['تجهيز عملية الدفع','نتحقق من السعر الآمن قبل فتح Pi.'],pi:['أكد الدفع في Pi','أكمل الموافقة داخل Pi واترك AiWay مفتوحًا.'],verify:['تم استلام الدفع','جارٍ التحقق من المعاملة بأمان…'],credit:['جارٍ إضافة الرصيد','تم التحقق من الدفع، نحدّث حسابك الآن.'],success:['تمت إضافة الرصيد','تمت العملية بنجاح وحسابك جاهز للاستخدام.'],cancel:['تم إلغاء الدفع','لم يتم خصم أو إضافة أي رصيد.'],error:['تعذر إكمال الدفع','راجع اتصالك وحاول مرة أخرى.']}:{prepare:['Preparing payment','Verifying the secure quote before opening Pi.'],pi:['Confirm in Pi','Approve the payment in Pi and keep AiWay open.'],verify:['Payment received','Securely verifying the transaction…'],credit:['Adding your balance','Payment verified. Updating your account now.'],success:['Balance added','Payment completed and your account is ready.'],cancel:['Payment cancelled','No balance was charged or added.'],error:['Payment could not complete','Check your connection and try again.']};
+  const key=stage||'prepare',pair=copy[key]||copy.prepare;if(title)title.textContent=pair[0];if(text)text.textContent=pair[1];box.classList.add('show');box.classList.toggle('success',state==='success');box.classList.toggle('error',state==='error');box.setAttribute('aria-hidden','false');modal.classList.toggle('payment-busy',state==='busy');
+  const idx=PAYMENT_STEP_ORDER.indexOf(key);box.querySelectorAll('[data-pay-step]').forEach((el,i)=>{el.classList.toggle('done',state==='success'||(idx>=0&&i<idx));el.classList.toggle('active',state==='busy'&&i===Math.max(0,idx))});
+}
+function resetPaymentFlow(){const modal=$('payModal'),box=$('paymentFlow');modal?.classList.remove('payment-busy');if(box){box.classList.remove('show','success','error');box.setAttribute('aria-hidden','true')}}
+function showChatsSkeleton(){const box=$('chats');if(!box||box.querySelector('.chat-item'))return;box.classList.add('is-loading');box.setAttribute('aria-busy','true');box.innerHTML=Array.from({length:5},()=>`<div class="chat-skeleton" aria-hidden="true"><span class="chat-skeleton-icon"></span><span class="chat-skeleton-lines"><i class="chat-skeleton-line"></i><i class="chat-skeleton-line short"></i></span></div>`).join('')}
+function clearChatsLoading(){const box=$('chats');if(!box)return;box.classList.remove('is-loading');box.removeAttribute('aria-busy')}
 function routedTaskId(){return activeTask||null}
 function taskRoutedModelId(){
   if(userProfile && !userProfile.has_purchased && activeTask!=='image') return 'openrouter/free';
@@ -539,15 +557,16 @@ function setLoginBusy(busy){
 }
 async function login(){
  if(auth){toast(lang==='ar'?'أنت مسجل بالفعل':'You are already signed in');return true}
- setLoginBusy(true);
+ setLoginBusy(true);setAuthProgress('connect',true);
  try{
-  if(!isPiBrowser()){openPiSigninModal();return false}
+  if(!isPiBrowser()){setAuthProgress('connect',false);openPiSigninModal();return false}
   $('profileState').innerHTML='<span class="loading-dot"></span> <span class="loading-dot"></span> <span class="loading-dot"></span>';
-  await authenticatePiForPayments({refreshSession:true,silentRecovery:true});
-  await Promise.all([refreshMe(),loadModels(),loadChats()]);dismissSigninGuide();
+  await authenticatePiForPayments({refreshSession:true,silentRecovery:true});setAuthProgress('account',true);showChatsSkeleton();
+  const refreshPromise=refreshMe().then(v=>{setAuthProgress('sync',true);return v});
+  await Promise.all([refreshPromise,loadModels(),loadChats()]);dismissSigninGuide();setAuthProgress('done',true);setTimeout(()=>setAuthProgress('done',false),850);
   toast(userProfile?.has_purchased?(lang==='ar'?'تم تسجيل الدخول بنجاح':'Signed in successfully'):(lang==='ar'?`مرحبًا بك — لديك ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} توكين مجاني`:`Welcome — you have ${userProfile?.free_trial_tokens ?? userProfile?.trial_messages_remaining ?? 0} free tokens`));
   return true;
- }catch(e){console.error(e);$('profileState').textContent=lang==='ar'?'تعذر تسجيل الدخول':'Could not sign in';toast(friendlyClientError(e,lang==='ar'?'تعذر تسجيل الدخول بحساب Pi. أعد المحاولة داخل Pi Browser.':'Pi sign-in failed. Try again inside Pi Browser.').message);return false}
+ }catch(e){console.error(e);setAuthProgress('connect',false);$('profileState').textContent=lang==='ar'?'تعذر تسجيل الدخول':'Could not sign in';toast(friendlyClientError(e,lang==='ar'?'تعذر تسجيل الدخول بحساب Pi. أعد المحاولة داخل Pi Browser.':'Pi sign-in failed. Try again inside Pi Browser.').message);return false}
  finally{setLoginBusy(false);renderAccountState()}
 }
 const LOCAL_CACHE_DB='aiway-smart-cache',LOCAL_CACHE_VERSION=1,MAX_LOCAL_IMAGES=80,MAX_LOCAL_IMAGE_BYTES=150*1024*1024,MAX_LOCAL_CONVERSATIONS=40;
@@ -583,7 +602,18 @@ function prefetchConversationCore(id){
   const run=()=>fetchConversationCore(id).catch(()=>{});
   if('requestIdleCallback'in window)requestIdleCallback(run,{timeout:900});else setTimeout(run,120);
 }
-async function loadChats(){const d=await api('/api/conversations');$('chats').innerHTML=(d.conversations||[]).map(c=>{const imageChat=c.taskId==='image';const badge=imageChat?`<small class="chat-kind-badge">${lang==='ar'?'صور':'Images'}</small>`:'';return `<div class="chat-item ${imageChat?'image-chat':''} ${c.id===current?'active':''}" data-id="${esc(c.id)}" data-task="${esc(c.taskId||'')}"><span class="chat-kind-icon">${TASK_ICONS[c.taskId]||ICONS.chat}</span><span class="chat-title-wrap"><span>${esc(c.title)}</span>${badge}</span><button class="chat-delete" data-delete="${esc(c.id)}" title="${lang==='ar'?'حذف الدردشة':'Delete chat'}">×</button></div>`}).join('');$('chats').querySelectorAll('.chat-item').forEach(b=>{b.onclick=e=>{if(!e.target.closest('[data-delete]')){if(TASKS[b.dataset.task]){activeTask=b.dataset.task;storageSet('aiway_active_task',activeTask);updateTaskContext()}openChat(b.dataset.id)}};b.onpointerenter=()=>prefetchConversationCore(b.dataset.id)});$('chats').querySelectorAll('[data-delete]').forEach(b=>b.onclick=e=>{e.stopPropagation();deleteChat(b.dataset.delete)})}
+async function loadChats(){
+  showChatsSkeleton();
+  try{
+    const d=await api('/api/conversations');
+    const box=$('chats');
+    box.innerHTML=(d.conversations||[]).map(c=>{const imageChat=c.taskId==='image';const badge=imageChat?`<small class="chat-kind-badge">${lang==='ar'?'صور':'Images'}</small>`:'';return `<div class="chat-item ${imageChat?'image-chat':''} ${c.id===current?'active':''}" data-id="${esc(c.id)}" data-task="${esc(c.taskId||'')}"><span class="chat-kind-icon">${TASK_ICONS[c.taskId]||ICONS.chat}</span><span class="chat-title-wrap"><span>${esc(c.title)}</span>${badge}</span><button class="chat-delete" data-delete="${esc(c.id)}" title="${lang==='ar'?'حذف الدردشة':'Delete chat'}">×</button></div>`}).join('');
+    box.querySelectorAll('.chat-item').forEach(b=>{b.onclick=e=>{if(!e.target.closest('[data-delete]')){if(TASKS[b.dataset.task]){activeTask=b.dataset.task;storageSet('aiway_active_task',activeTask);updateTaskContext()}openChat(b.dataset.id)}};b.onpointerenter=()=>prefetchConversationCore(b.dataset.id)});
+    box.querySelectorAll('[data-delete]').forEach(b=>b.onclick=e=>{e.stopPropagation();deleteChat(b.dataset.delete)});
+  }catch(error){
+    const box=$('chats');if(box&&!box.querySelector('.chat-item'))box.innerHTML=`<div class="chat-load-error">${lang==='ar'?'تعذر تحميل المحادثات':'Could not load chats'}</div>`;throw error;
+  }finally{clearChatsLoading()}
+}
 async function newChat(){current=null;history=[];render();closeMenu();openTaskScreen();try{if(auth)await loadChats()}catch(e){toast(friendlyClientError(e,lang==='ar'?'تعذر تحديث قائمة الدردشات. يمكنك بدء المحادثة الآن.':'The chat list could not be refreshed. You can still start chatting.').message)}}
 let chatOpenSequence=0,deferHistoricalImages=false;
 function applyConversationCore(data,sequence){
@@ -1205,29 +1235,27 @@ async function exportChat(){if(!history.length)return toast(lang==='ar'?'لا ت
 function toggleWeb(){if(userProfile&&!userProfile.has_purchased)return toast(lang==='ar'?'بحث الويب متاح بعد أول عملية شراء.':'Web search unlocks after your first purchase.');webSearch=!webSearch;const webButton=$('webPill');webButton.classList.toggle('on',webSearch);webButton.setAttribute('aria-pressed',webSearch?'true':'false');toast(webSearch?(lang==='ar'?'تم تفعيل بحث الويب':'Web search enabled'):(lang==='ar'?'تم إيقاف بحث الويب':'Web search disabled'))}
 function relativeUsageTime(value){if(!value)return lang==='ar'?'لا يوجد استخدام بعد':'No usage yet';const seconds=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/1000));if(seconds<60)return lang==='ar'?'منذ لحظات':'Just now';const minutes=Math.floor(seconds/60);if(minutes<60)return lang==='ar'?`منذ ${minutes} دقيقة`:`${minutes} min ago`;const hours=Math.floor(minutes/60);if(hours<24)return lang==='ar'?`منذ ${hours} ساعة`:`${hours} hr ago`;const days=Math.floor(hours/24);return lang==='ar'?`منذ ${days} يوم`:`${days} d ago`}
 function renderUsageSummary(){const u=window.aiwayUsageSummary||{};const remaining=Math.max(0,Number(userProfile?.has_purchased?userProfile?.ai_tokens:(userProfile?.free_trial_tokens??userProfile?.trial_messages_remaining)||0));const consumed=Math.max(0,Number(u.consumedTokens||0));const last=Math.max(0,Number(u.lastRequestTokens||0));const total=remaining+consumed;const percent=total>0?Math.min(100,Math.round(consumed/total*100)):0;const set=(id,text)=>{const el=$(id);if(el)el.textContent=text};set('payUsageTitle',lang==='ar'?'تفاصيل الاستهلاك':'Usage details');set('payUsagePeriod',lang==='ar'?'آخر 30 يومًا':'Last 30 days');set('payRemainingLabel',lang==='ar'?'المتبقي':'Remaining');set('payConsumedLabel',lang==='ar'?'المستهلك':'Consumed');set('payLastLabel',lang==='ar'?'آخر رسالة / طلب':'Last message / request');set('payBalance',remaining.toLocaleString('en-US'));set('payConsumed',consumed.toLocaleString('en-US'));set('payLastUsage',last.toLocaleString('en-US'));set('payUsageProgressText',lang==='ar'?`${percent}% مستخدم`:`${percent}% used`);set('payLastUsageTime',relativeUsageTime(u.lastRequestAt));const bar=$('payUsageProgress');if(bar)bar.style.width=percent+'%'}
-function openPay(){if(!auth)return login();renderPackages();renderAccountState();renderUsageSummary();$('payModal').classList.add('open')}
+function openPay(){if(!auth)return login();resetPaymentFlow();renderPackages();renderAccountState();renderUsageSummary();$('payModal').classList.add('open')}
 function toggleValidityNote(id,button){const note=document.getElementById(`validity-note-${id}`);if(!note)return;const show=!note.classList.contains('show');document.querySelectorAll('.validity-note.show').forEach(x=>x.classList.remove('show'));document.querySelectorAll('.validity-help[aria-expanded="true"]').forEach(x=>x.setAttribute('aria-expanded','false'));note.classList.toggle('show',show);button?.setAttribute('aria-expanded',String(show))}
 function renderPackages(){const box=document.querySelector('.packs');if(!box||!window.aiwayPackages)return;const labels=lang==='ar'?{lite:'تجربة خفيفة',starter:'أساسية',plus:'الأكثر توفيرًا',pro:'احترافية'}:{lite:'Light use',starter:'Starter',plus:'Best value',pro:'Pro'};const validity=lang==='ar'?'الرصيد صالح لمدة 30 يومًا':'Balance valid for 30 days';box.innerHTML=Object.entries(window.aiwayPackages).map(([id,p])=>{const exactPi=Number(p.amountPi||0);const displayPi=exactPi>0?Math.floor(exactPi).toLocaleString('en-US'):'--';const exactTitle=exactPi>0?(lang==='ar'?`قيمة الدفع الدقيقة: ${exactPi.toLocaleString('en-US',{maximumFractionDigits:7})} Pi`:`Exact payment: ${exactPi.toLocaleString('en-US',{maximumFractionDigits:7})} Pi`):'';return `<div class="pack ${id==='plus'?'featured':''}"><small>${labels[id]||id}</small><span class="pi-estimate" data-exact-pi="${exactPi||''}" title="${exactTitle}">${displayPi} Pi</span><b>${Number(p.tokens).toLocaleString('en-US')}</b><span class="pack-token-label">AiWay Tokens</span><span class="pack-validity-simple">${validity}</span><button class="btn ${id==='plus'?'primary':'soft'}" data-buy-pack="${esc(id)}">${lang==='ar'?'شراء بـ Pi':'Buy with Pi'}</button></div>`}).join('');box.querySelectorAll('[data-buy-pack]').forEach(btn=>btn.onclick=()=>buy(btn.dataset.buyPack))}
 async function buy(packageId){
   if(!piReady||!window.Pi?.createPayment)return toast(lang==='ar'?'الدفع متاح داخل Pi Browser فقط':'Payments are available in Pi Browser only');
   let pkg=window.aiwayPackages?.[packageId];
   const quoteExpiry=new Date(pkg?.quoteExpiresAt||0).getTime();
-  if(!pkg?.quoteToken||!Number.isFinite(quoteExpiry)||quoteExpiry-Date.now()<30000){
-    try{await loadModels();pkg=window.aiwayPackages?.[packageId]}catch(e){console.warn('Secure quote refresh:',e)}
-  }
-  if(!pkg?.amountPi||!pkg?.quoteToken)return toast(lang==='ar'?'تعذر جلب سعر Pi الآمن الآن. حدّث الصفحة وحاول مرة أخرى.':'Could not retrieve a secure Pi quote. Refresh and try again.');
-  const btn=document.querySelector(`[data-buy-pack="${CSS.escape(String(packageId))}"]`);const original=btn?.textContent;
-  if(btn){btn.disabled=true;btn.classList.add('loading');btn.textContent=lang==='ar'?'جاري التحويل للدفع':'Opening payment'}
+  if(!pkg?.quoteToken||!Number.isFinite(quoteExpiry)||quoteExpiry-Date.now()<30000){try{setPaymentFlow('prepare');await loadModels();pkg=window.aiwayPackages?.[packageId]}catch(e){console.warn('Secure quote refresh:',e)}}
+  if(!pkg?.amountPi||!pkg?.quoteToken){resetPaymentFlow();return toast(lang==='ar'?'تعذر جلب سعر Pi الآمن الآن. حدّث الصفحة وحاول مرة أخرى.':'Could not retrieve a secure Pi quote. Refresh and try again.')}
+  const btn=document.querySelector(`[data-buy-pack="${CSS.escape(String(packageId))}"]`),original=btn?.textContent;
+  if(btn){btn.disabled=true;btn.classList.add('loading');btn.textContent=lang==='ar'?'جاري التجهيز':'Preparing'}
+  setPaymentFlow('prepare');
   try{
-    await authenticatePiForPayments({refreshSession:true,silentRecovery:false,requirePendingResolved:true});
-    $('payModal').classList.remove('open');
+    await authenticatePiForPayments({refreshSession:true,silentRecovery:false,requirePendingResolved:true});setPaymentFlow('pi');
     await Pi.createPayment({amount:Number(pkg.amountPi),memo:`${Number(pkg.tokens).toLocaleString('en-US')} AiWay Tokens`,metadata:{packageId,usd:pkg.usd,tokens:pkg.tokens,piUsd:pkg.piUsd,quoteToken:pkg.quoteToken}}, {
-      onReadyForServerApproval:paymentId=>api('/api/payment-approve',{method:'POST',body:JSON.stringify({paymentId,packageId,quoteToken:pkg.quoteToken})}),
-      onReadyForServerCompletion:async(paymentId,txid)=>{await api('/api/payment-complete',{method:'POST',body:JSON.stringify({paymentId,txid,packageId})});await Promise.all([refreshMe(),loadModels()]);toast(lang==='ar'?'تمت إضافة الرصيد وفتح جميع النماذج':'Balance added and all models unlocked')},
-      onCancel:()=>toast(lang==='ar'?'تم إلغاء الدفع':'Payment cancelled'),
-      onError:e=>toast(friendlyClientError(e,lang==='ar'?'تعذر إتمام الدفع عبر Pi. حاول مرة أخرى.':'The Pi payment could not be completed. Try again.').message)
+      onReadyForServerApproval:async paymentId=>{setPaymentFlow('verify');return api('/api/payment-approve',{method:'POST',body:JSON.stringify({paymentId,packageId,quoteToken:pkg.quoteToken})})},
+      onReadyForServerCompletion:async(paymentId,txid)=>{setPaymentFlow('credit');await api('/api/payment-complete',{method:'POST',body:JSON.stringify({paymentId,txid,packageId})});await Promise.all([refreshMe(),loadModels()]);const balanceButton=$('creditsButton');if(balanceButton){balanceButton.classList.remove('balance-pop');void balanceButton.offsetWidth;balanceButton.classList.add('balance-pop');setTimeout(()=>balanceButton.classList.remove('balance-pop'),700)}setPaymentFlow('success','success');toast(lang==='ar'?'تمت إضافة الرصيد وفتح جميع النماذج':'Balance added and all models unlocked');setTimeout(()=>{resetPaymentFlow();$('payModal')?.classList.remove('open')},1400)},
+      onCancel:()=>{setPaymentFlow('cancel','error');toast(lang==='ar'?'تم إلغاء الدفع':'Payment cancelled');setTimeout(resetPaymentFlow,1300)},
+      onError:e=>{setPaymentFlow('error','error');toast(friendlyClientError(e,lang==='ar'?'تعذر إتمام الدفع عبر Pi. حاول مرة أخرى.':'The Pi payment could not be completed. Try again.').message);setTimeout(resetPaymentFlow,1800)}
     })
-  }catch(e){toast(friendlyClientError(e,lang==='ar'?'تعذر بدء الدفع عبر Pi. حاول مرة أخرى.':'Could not start the Pi payment. Try again.').message)}
+  }catch(e){setPaymentFlow('error','error');toast(friendlyClientError(e,lang==='ar'?'تعذر بدء الدفع عبر Pi. حاول مرة أخرى.':'Could not start the Pi payment. Try again.').message);setTimeout(resetPaymentFlow,1800)}
   finally{if(btn){btn.disabled=false;btn.classList.remove('loading');btn.textContent=original}}
 }
 function autoSize(){const t=$('prompt');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,180)+'px'}function closeMenu(){$('sidebar').classList.remove('open');$('backdrop').classList.remove('open');$('menuBtn')?.setAttribute('aria-expanded','false')}
@@ -1274,7 +1302,7 @@ $('model').onchange=e=>selectModel(e.target.value);$('modelTrigger').removeAttri
 $('aiwayDialogConfirm').onclick=()=>closeAiwayDialog(true);
 $('aiwayDialogOverlay').addEventListener('click',event=>{if(event.target===$('aiwayDialogOverlay'))closeAiwayDialog(false)});
 document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if($('imagePreviewModal')?.classList.contains('open'))closeImagePreview();else if($('aiwayDialogOverlay')?.classList.contains('open'))closeAiwayDialog(false)});
-$('closePay').onclick=()=>$('payModal').classList.remove('open');$('payModal').onclick=e=>{if(e.target===$('payModal'))$('payModal').classList.remove('open')};document.querySelectorAll('.buy').forEach(b=>b.onclick=()=>buy(b.dataset.pack));$('closePreview').onclick=()=>{$('previewModal').classList.remove('open');$('previewFrame').srcdoc=''};$('previewModal').onclick=e=>{if(e.target===$('previewModal'))$('closePreview').click()};$('closeImagePreview').onclick=closeImagePreview;$('imagePreviewModal').onclick=e=>{if(e.target===$('imagePreviewModal'))closeImagePreview()};$('imageZoomIn').onclick=()=>setImagePreviewScale(imagePreviewScale+.25);$('imageZoomOut').onclick=()=>setImagePreviewScale(imagePreviewScale-.25);$('imageZoomReset').onclick=()=>setImagePreviewScale(1);$('imagePreviewStage').addEventListener('wheel',e=>{e.preventDefault();setImagePreviewScale(imagePreviewScale+(e.deltaY<0?.2:-.2))},{passive:false});$('imagePreviewStage').addEventListener('pointerdown',e=>{if(imagePreviewScale<=1)return;imagePreviewDragging=true;imagePreviewStartX=e.clientX;imagePreviewStartY=e.clientY;imagePreviewBaseX=imagePreviewX;imagePreviewBaseY=imagePreviewY;$('imagePreviewStage').setPointerCapture?.(e.pointerId)});$('imagePreviewStage').addEventListener('pointermove',e=>{if(!imagePreviewDragging)return;imagePreviewX=imagePreviewBaseX+(e.clientX-imagePreviewStartX);imagePreviewY=imagePreviewBaseY+(e.clientY-imagePreviewStartY);applyImagePreviewTransform()});['pointerup','pointercancel'].forEach(name=>$('imagePreviewStage').addEventListener(name,()=>imagePreviewDragging=false));$('imagePreviewStage').addEventListener('touchstart',e=>{if(e.touches.length===2){imagePreviewPinchDistance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);imagePreviewPinchScale=imagePreviewScale}},{passive:true});$('imagePreviewStage').addEventListener('touchmove',e=>{if(e.touches.length===2&&imagePreviewPinchDistance){const distance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setImagePreviewScale(imagePreviewPinchScale*distance/imagePreviewPinchDistance)}},{passive:true});function syncViewportHeight(){
+$('closePay').onclick=()=>{if(!$('payModal').classList.contains('payment-busy'))$('payModal').classList.remove('open')};$('payModal').onclick=e=>{if(e.target===$('payModal')&&!$('payModal').classList.contains('payment-busy'))$('payModal').classList.remove('open')};document.querySelectorAll('.buy').forEach(b=>b.onclick=()=>buy(b.dataset.pack));$('closePreview').onclick=()=>{$('previewModal').classList.remove('open');$('previewFrame').srcdoc=''};$('previewModal').onclick=e=>{if(e.target===$('previewModal'))$('closePreview').click()};$('closeImagePreview').onclick=closeImagePreview;$('imagePreviewModal').onclick=e=>{if(e.target===$('imagePreviewModal'))closeImagePreview()};$('imageZoomIn').onclick=()=>setImagePreviewScale(imagePreviewScale+.25);$('imageZoomOut').onclick=()=>setImagePreviewScale(imagePreviewScale-.25);$('imageZoomReset').onclick=()=>setImagePreviewScale(1);$('imagePreviewStage').addEventListener('wheel',e=>{e.preventDefault();setImagePreviewScale(imagePreviewScale+(e.deltaY<0?.2:-.2))},{passive:false});$('imagePreviewStage').addEventListener('pointerdown',e=>{if(imagePreviewScale<=1)return;imagePreviewDragging=true;imagePreviewStartX=e.clientX;imagePreviewStartY=e.clientY;imagePreviewBaseX=imagePreviewX;imagePreviewBaseY=imagePreviewY;$('imagePreviewStage').setPointerCapture?.(e.pointerId)});$('imagePreviewStage').addEventListener('pointermove',e=>{if(!imagePreviewDragging)return;imagePreviewX=imagePreviewBaseX+(e.clientX-imagePreviewStartX);imagePreviewY=imagePreviewBaseY+(e.clientY-imagePreviewStartY);applyImagePreviewTransform()});['pointerup','pointercancel'].forEach(name=>$('imagePreviewStage').addEventListener(name,()=>imagePreviewDragging=false));$('imagePreviewStage').addEventListener('touchstart',e=>{if(e.touches.length===2){imagePreviewPinchDistance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);imagePreviewPinchScale=imagePreviewScale}},{passive:true});$('imagePreviewStage').addEventListener('touchmove',e=>{if(e.touches.length===2&&imagePreviewPinchDistance){const distance=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);setImagePreviewScale(imagePreviewPinchScale*distance/imagePreviewPinchDistance)}},{passive:true});function syncViewportHeight(){
   const vv=window.visualViewport;
   const visualHeight=vv&&Number(vv.height)>320?Number(vv.height):0;
   const fallbackHeight=Math.max(Number(window.innerHeight)||0,Number(document.documentElement.clientHeight)||0,480);
