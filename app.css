@@ -1184,3 +1184,44 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 .pi-bridge-complete-title{font-size:26px;margin:18px 0 10px}
 .pi-bridge-complete-message{line-height:1.8;color:#6f6475;margin:0}
 .pi-bridge-complete-check{margin-top:18px;font-size:42px}
+
+/* aiway-message-stream-ux: lightweight, Pi Browser/mobile-safe states */
+.send{position:relative;isolation:isolate;transition:transform .16s ease,box-shadow .18s ease,opacity .16s ease!important}
+.send:not(:disabled):active{transform:scale(.94)}
+.send.preparing{opacity:1!important;cursor:wait;box-shadow:0 6px 18px rgba(111,45,189,.18)!important}
+.send.preparing svg{opacity:0}
+.send.preparing::before{content:"";position:absolute;width:18px;height:18px;border:2px solid rgba(255,255,255,.42);border-top-color:#fff;border-radius:50%;animation:aiwaySendSpin .68s linear infinite}
+.send.sending{opacity:1!important;box-shadow:0 7px 20px rgba(111,45,189,.24)!important}
+.send.sending svg{animation:aiwayStopIn .16s ease both}
+.status.stream-status{display:inline-flex;align-items:center;gap:6px;color:var(--pi);font-weight:800;animation:aiwayStatusIn .18s ease both}
+.status.stream-status::after{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:8px 0 0 currentColor,16px 0 0 currentColor;margin-inline-end:16px;animation:aiwayStatusDots 1.05s ease-in-out infinite}
+.response-progress{will-change:opacity,transform}
+.response-progress .progress-head span:last-child{transition:opacity .18s ease,transform .18s ease}
+.stage-chip{will-change:transform,opacity}
+.stage-chip.active{animation:aiwayStageFocus .3s ease both}
+.streaming-msg.first-chunk .bubble{animation:aiwayFirstChunk .28s cubic-bezier(.2,.8,.2,1) both}
+.streaming-msg.first-chunk .bubble-content{animation:aiwayTextReveal .26s ease both}
+.bubble-content.streaming{overflow-anchor:none}
+@keyframes aiwaySendSpin{to{transform:rotate(360deg)}}
+@keyframes aiwayStopIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+@keyframes aiwayStatusIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:none}}
+@keyframes aiwayStatusDots{0%,100%{opacity:.34}50%{opacity:1}}
+@keyframes aiwayStageFocus{from{opacity:.72;transform:translateY(1px)}to{opacity:1;transform:translateY(-1px)}}
+@keyframes aiwayFirstChunk{0%{box-shadow:0 5px 18px rgba(75,34,112,.035)}50%{box-shadow:0 8px 25px rgba(111,45,189,.10)}100%{box-shadow:0 5px 18px rgba(75,34,112,.035)}}
+@keyframes aiwayTextReveal{from{opacity:.55;transform:translateY(2px)}to{opacity:1;transform:none}}
+@media(max-width:700px){
+  .status.stream-status{font-size:10px!important;max-width:calc(100vw - 150px)}
+  .response-progress{gap:9px!important;min-width:0!important}
+  .stage-list{gap:5px!important;flex-wrap:nowrap!important;overflow:hidden}
+  .stage-chip{padding:5px 7px!important;font-size:10px!important;white-space:nowrap}
+  .answer-skeleton{gap:6px!important}.answer-skeleton i{height:8px!important}
+  .send.preparing::before{width:17px;height:17px}
+}
+@media(max-width:380px){
+  .status.stream-status{max-width:112px}
+  .stage-chip{padding:5px 6px!important;font-size:9px!important}
+  .stage-chip::before{width:6px!important;height:6px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .send,.send svg,.send::before,.status.stream-status,.status.stream-status::after,.stage-chip.active,.streaming-msg.first-chunk .bubble,.streaming-msg.first-chunk .bubble-content{animation:none!important;transition:none!important}
+}

@@ -915,7 +915,30 @@ function render(){
   bindMessageActions();cacheRenderedGeneratedImages();box.querySelectorAll('[data-download-image]').forEach(b=>b.onclick=()=>downloadGeneratedImage(Number(b.dataset.downloadImage)));box.querySelectorAll('[data-preview-image]').forEach(img=>{const open=()=>openImagePreview(Number(img.dataset.previewImage));img.onclick=open;img.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});box.querySelectorAll('[data-download-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.downloadAiFile.split(':').map(Number);downloadGeneratedFile(mi,fi)});box.querySelectorAll('[data-preview-ai-file]').forEach(b=>b.onclick=()=>{const [mi,fi]=b.dataset.previewAiFile.split(':').map(Number);previewGeneratedFile(mi,fi)});box.querySelectorAll('[data-download-project]').forEach(b=>b.onclick=()=>downloadGeneratedProject(Number(b.dataset.downloadProject)));
   requestAnimationFrame(()=>{if(stick)scrollToLatest('auto');else updateScrollLatestButton()});
 }
-let streamQueue='',streamTimer=0,streamDrainResolve=null;
+let streamQueue='',streamTimer=0,streamDrainResolve=null,firstStreamChunkSeen=false;
+function setSendButtonState(state='idle'){
+  const button=$('sendBtn');if(!button)return;
+  const isStop=state==='streaming';
+  button.dataset.state=state;
+  button.classList.toggle('sending',isStop);
+  button.classList.toggle('preparing',state==='preparing');
+  button.disabled=state==='preparing';
+  button.setAttribute('aria-busy',state==='preparing'?'true':'false');
+  button.setAttribute('aria-label',isStop?(lang==='ar'?'إيقاف الإجابة':'Stop response'):(state==='preparing'?(lang==='ar'?'جاري تجهيز الرسالة':'Preparing message'):(lang==='ar'?'إرسال':'Send')));
+  button.innerHTML=isStop?ICONS.stop:ICONS.send;
+}
+function streamStageLabel(message){
+  const l=progressLanguage(message),t=I18N[l]||I18N[lang],stage=message?.streamStage||'analyzing';
+  if(stage==='searching')return t.searching;
+  if(stage==='writing')return t.writing;
+  return t.analyzing;
+}
+function syncComposerStreamStatus(message){
+  const status=$('status');if(!status)return;
+  if(!streaming){status.textContent='';status.classList.remove('stream-status');return}
+  status.textContent=streamStageLabel(message);
+  status.classList.add('stream-status');
+}
 function scheduleStreamPaint(){
   if(streamTimer)return;
   streamTimer=requestAnimationFrame(()=>{
@@ -929,13 +952,22 @@ function scheduleStreamPaint(){
     if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}
   });
 }
-function enqueueStreamText(text){if(!text)return;streamQueue+=text;scheduleStreamPaint()}
+function enqueueStreamText(text){
+  if(!text)return;
+  const message=history[history.length-1];
+  if(!firstStreamChunkSeen&&message?.role==='assistant'&&!message.content){
+    firstStreamChunkSeen=true;message.content=text;message.streamStage='writing';updateStreamingBubble(true);return;
+  }
+  streamQueue+=text;scheduleStreamPaint();
+}
 function drainStreamQueue(){if(!streamQueue&&!streamTimer)return Promise.resolve();return new Promise(resolve=>{streamDrainResolve=resolve;scheduleStreamPaint()})}
-function updateStreamingBubble(){
+function updateStreamingBubble(firstChunk=false){
   const box=$('messages'),article=box.querySelector('.msg.assistant:last-of-type'),content=article?.querySelector('.bubble-content');
   if(!content)return;
   const message=history.at(-1),text=message?.content||'',stick=userPinnedToBottom||isNearBottom(180);
+  syncComposerStreamStatus(message);
   content.classList.toggle('streaming',Boolean(text)&&!message?.streamComplete);
+  if(firstChunk){article?.classList.add('first-chunk');setTimeout(()=>article?.classList.remove('first-chunk'),320)}
   if(text){
     const html=renderStreamingMarkdown(text);
     if(content.dataset.streamHtml!==html){content.innerHTML=html;content.dataset.streamHtml=html}
@@ -1046,8 +1078,11 @@ async function confirmEstimatedMessageCost(modelId,text,attachments){
 }
 
 
+let sendInteractionLocked=false;
 async function sendMessage(){
   if(streaming){controller?.abort();return}
+  if(sendInteractionLocked)return;
+  sendInteractionLocked=true;setSendButtonState('preparing');
   let stageTimer=0;
   try{
     if(!auth){await login();return}
@@ -1078,11 +1113,11 @@ async function sendMessage(){
       current=d.conversation.id;
     }
     const sentAttachments=pendingAttachments.map(({name,type,size,dataUrl})=>({name,type,size,dataUrl}));
-    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
+    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
     history.push({role:'user',content:text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files'),attachments:sentAttachments});
-    $('prompt').value='';autoSize();render();$('status').textContent='';$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
+    $('prompt').value='';autoSize();render();$('status').textContent='';setSendButtonState('streaming');
     if(selectedModel()?.type==='image'){await generateImageMessage(text,sentAttachments);return}
-    const requestLanguage=/[\u0600-\u06FF]/.test(text)?'ar':'en';history.push({role:'assistant',content:'',requestLanguage,usedWebSearch:effectiveWebSearch,streamStage:'analyzing'});render();stageTimer=setTimeout(()=>{const m=history.at(-1);if(streaming&&m?.role==='assistant'&&!m.content){m.streamStage=effectiveWebSearch?'searching':'writing';updateStreamingBubble()}},650);
+    const requestLanguage=/[\u0600-\u06FF]/.test(text)?'ar':'en';history.push({role:'assistant',content:'',requestLanguage,usedWebSearch:effectiveWebSearch,streamStage:'analyzing'});render();stageTimer=setTimeout(()=>{const m=history.at(-1);if(streaming&&m?.role==='assistant'&&!m.content){m.streamStage=effectiveWebSearch?'searching':'writing';updateStreamingBubble();syncComposerStreamStatus(m)}},650);
     let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history.slice(0,-1),temperature:.7,webSearch:effectiveWebSearch,attachments:sentAttachments,requestId:newRequestId(),locale:lang,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
     if(!r.body)throw makeUiError(lang==='ar'?'تعذر بدء بث الإجابة في هذا المتصفح. حدّث المتصفح وحاول مرة أخرى.':'Could not start response streaming in this browser. Update the browser and try again.','STREAM_INTERRUPTED');
@@ -1096,7 +1131,7 @@ async function sendMessage(){
     else{if(e?.code==='FREE_DAILY_LIMIT'){const requestLanguage=history.at(-1)?.requestLanguage||lang;history[history.length-1]={role:'assistant',content:'',generatedImage:null,uiCard:'free-daily-limit',requestLanguage};const t=I18N[requestLanguage]||I18N[lang];toast(t.freeLimitTitle)}else{const friendly=friendlyClientError(e,lang==='ar'?'حدث عطل مؤقت. حاول مرة أخرى؛ لم يتم خصم رصيدك.':'A temporary error occurred. Try again; your balance was not charged.');if(history.at(-1)?.role==='assistant'&&!history.at(-1)?.content)history.at(-1).content=friendly.message;toast(friendly.message);handleActionableError(friendly)}}
     render();
   }finally{
-    if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('sendBtn').classList.remove('sending');$('sendBtn').innerHTML=ICONS.send;
+    if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;sendInteractionLocked=false;$('status').textContent='';$('status').classList.remove('stream-status');setSendButtonState('idle');
   }
 }
 async function continueResponse(index){
@@ -1111,8 +1146,8 @@ async function continueResponse(index){
     if(userProfile&&Number(userProfile.has_purchased?userProfile.ai_tokens:(userProfile.free_trial_tokens??userProfile.trial_messages_remaining??0))<=0)throw makeUiError(lang==='ar'?'رصيدك انتهى. اشحن رصيدًا جديدًا ثم حاول مرة أخرى.':'Your balance has run out. Add more balance, then try again.','INSUFFICIENT_TOKENS',{availableTokens:0});
     if(!current||!target.id){toast(lang==='ar'?'احفظ المحادثة أولًا ثم حاول مرة أخرى':'Save the conversation first, then try again');return}
     const modelId=activeTask&&activeTask!=='all-models'?'aiway/auto':($('model').value||target.model_id||target.routedModelId||target.token_usage?.activeModelId||'openrouter/auto');
-    streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;streaming=true;controller=new AbortController();
-    target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;$('sendBtn').classList.add('sending');$('sendBtn').innerHTML=ICONS.stop;
+    streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
+    target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;setSendButtonState('streaming');
     let r;try{r=await fetch('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId()})})}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
     if(!r.body)throw makeUiError(lang==='ar'?'تعذر بدء استكمال الإجابة في هذا المتصفح.':'Could not start continuing the response in this browser.','STREAM_INTERRUPTED');
@@ -1123,7 +1158,7 @@ async function continueResponse(index){
   }catch(e){
     if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError')toast(lang==='ar'?'تم إيقاف الاستكمال':'Continuation stopped');else{const friendly=friendlyClientError(e,lang==='ar'?'تعذر استكمال الرد. حاول مرة أخرى.':'Could not continue the response. Try again.');toast(friendly.message);handleActionableError(friendly)}render();
-  }finally{if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('sendBtn').classList.remove('sending');$('sendBtn').innerHTML=ICONS.send}
+  }finally{if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('status').classList.remove('stream-status');setSendButtonState('idle')}
 }
 function regenerate(){if(streaming)return;const idx=[...history].map(x=>x.role).lastIndexOf('user');if(idx<0)return;const text=history[idx].content;history=history.slice(0,idx);$('prompt').value=text;sendMessage()}
 async function copyMsg(i){
