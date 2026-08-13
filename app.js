@@ -336,14 +336,17 @@ function shortModelName(name){
 
   return value.slice(0,40);
 }
+function applyFeatureFlags(flags={}){if(flags.images===false)delete TASKS.image;for(const id of ['creditsButton','introHeroPackagesBtn','introHeroPackages']){const el=document.getElementById(id);if(el){el.hidden=flags.payments===false;el.setAttribute('aria-disabled',flags.payments===false?'true':'false')}}for(const id of ['topLoginBtn','piSignInBtn','piBrowserLoginBtn']){const el=document.getElementById(id);if(el&&flags.login===false){el.setAttribute('aria-disabled','true');el.classList.add('feature-disabled')}else el?.classList.remove('feature-disabled')}document.body.classList.toggle('maintenance-active',Boolean(flags.maintenance))}
+function renderGlobalAnnouncement(value){let el=document.getElementById('aiwayAnnouncement');if(!value?.enabled){el?.remove();return}if(!el){el=document.createElement('div');el.id='aiwayAnnouncement';el.className='aiway-announcement';const text=document.createElement('span');text.className='announcement-text';const close=document.createElement('button');close.type='button';close.setAttribute('aria-label',lang==='ar'?'إغلاق الإعلان':'Close announcement');close.textContent='×';close.onclick=()=>el.remove();el.append(text,close);document.body.appendChild(el)}el.className='aiway-announcement '+(['warning','danger'].includes(value.level)?value.level:'info');const text=el.querySelector('.announcement-text');if(text)text.textContent=(lang==='ar'?value.text_ar:value.text_en)||value.text_ar||value.text_en||''}
 async function loadModels(){
   const selected=$('model').value;
   const data=await api('/api/models');
   window.aiwayPackages=data.packages||{};window.aiwayTokenUsd=Number(data.tokenUsd||0.00001);
+  window.aiwayFeatureFlags=data.featureFlags||{};window.aiwayGlobalAnnouncement=data.globalAnnouncement||{};applyFeatureFlags(window.aiwayFeatureFlags);renderGlobalAnnouncement(window.aiwayGlobalAnnouncement);
   window.aiwayModels=data.models||[];
   window.aiwayChatModelOrders=data.chatModelOrders||{};
   window.aiwayImageModels=(data.imageModels||[]).filter(m=>m&&m.id&&!isUnsupportedOpenRouterImageModel(m)).sort(compareCostAsc);
-  for(const tool of (data.tools||[])){
+  for(const tool of (data.tools||[]).filter(tool=>!(data.featureFlags?.images===false&&tool?.tool_type==='image'))){
     if(!tool?.id)continue;
     const cleanToolDescription=(value,type,locale)=>{if(type==='image')return locale==='ar'?'أنشئ صورًا احترافية من وصفك واختر الجودة والأبعاد المناسبة.':'Create professional images from your description and choose the preferred quality and dimensions.';let text=String(value||'');if(type==='live_audio')text=text.replace(/Gemini(?:\s+Live)?/gi,locale==='ar'?'الذكاء الاصطناعي':'AI');return text.trim()};
     const arDescription=cleanToolDescription(tool.description_ar,tool.tool_type,'ar');
