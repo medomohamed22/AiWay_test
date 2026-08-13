@@ -1,4 +1,4 @@
-import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, getOpenRouterImageModels, GEMINI_LIVE_MODELS, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd, getPaymentPackages, getFeatureFlags, getGlobalAnnouncement } from './_lib.js';
+import { allowMethods, db, fetchWithTimeout, handleError, json, localize, requestLocale, requireUser, requireAdmin, requireAdminToken, getAvailableModels, getToolModelSettings, getAiTools, getOpenRouterImageModels, MARKUP, TOKEN_USD, TRIAL_TOKENS, getPiUsd, getPaymentPackages, getFeatureFlags, getGlobalAnnouncement } from './_lib.js';
 
 const num=v=>{const n=Number(v||0);return Number.isFinite(n)?n:0};
 const isoDay=v=>new Date(v).toISOString().slice(0,10);
@@ -121,15 +121,13 @@ export default async function handler(req,res){
       await requireAdmin(adminUser);
       if(req.method==='GET'){
         const models=(await getAvailableModels()).sort((a,b)=>(a.pricing.prompt+a.pricing.completion)-(b.pricing.prompt+b.pricing.completion));
-        const liveModels=GEMINI_LIVE_MODELS.map(x=>({...x}));
         const imageModels=(await getOpenRouterImageModels()).sort((a,b)=>(a.pricing.request||0)-(b.pricing.request||0));
-        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,liveModels,pricingSource:'OpenRouter Models API pricing',pricingSourceUrl:'https://openrouter.ai/models',refreshedAt:new Date().toISOString(),catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
+        return json(res,200,{tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings(),models,imageModels,pricingSource:'OpenRouter Models API pricing',pricingSourceUrl:'https://openrouter.ai/models',refreshedAt:new Date().toISOString(),catalogNote:'يتم ترتيب النماذج حسب مجموع سعر الإدخال والإخراج القياسي لكل مليون توكين'});
       }
       const b=typeof req.body==='string'?JSON.parse(req.body||'{}'):(req.body||{});
       const action=String(b.action||'bulk-models');
       const validText=new Set((await getAvailableModels()).map(x=>x.id));
       const validImages=new Set((await getOpenRouterImageModels()).map(x=>x.id));
-      const validLive=new Set(GEMINI_LIVE_MODELS.map(x=>x.id));
       const clean=v=>String(v??'').trim();
       const safeId=v=>clean(v).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48);
       if(action==='delete'){
@@ -155,9 +153,9 @@ export default async function handler(req,res){
         if(!validText.has(model))return json(res,400,{error:'النموذج غير صالح للاختبار'});const pc=t.prompt_config&&typeof t.prompt_config==='object'?t.prompt_config:{};const system=clean(t.system_prompt||pc.system_prompt||'').slice(0,12000);const body={model,messages:[{role:'system',content:system||'You are testing an AiWay tool configuration.'},{role:'user',content:prompt}],temperature:Math.max(0,Math.min(2,Number(t.temperature??pc?._admin?.temperature??0.7))),max_tokens:Math.max(64,Math.min(2048,Number(t.max_tokens??pc?._admin?.max_tokens??512))),stream:false};const r=await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers,body:JSON.stringify(body)},60000);const data=await r.json().catch(()=>({}));if(!r.ok)return json(res,r.status,{error:data?.error?.message||'فشل اختبار النموذج'});return json(res,200,{ok:true,text:data?.choices?.[0]?.message?.content||'',model:data?.model||model,usage:data?.usage||{},latencyMs:Date.now()-testStarted});
       }
       if(action==='save-tool'){
-        const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image','live_audio','live_translate']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
+        const t=b.tool||{};const id=safeId(t.id);const allowedTypes=new Set(['text','image']);const type=allowedTypes.has(t.tool_type)?t.tool_type:'text';const model=clean(t.model_id);
         if(!id||!clean(t.name_ar)||!clean(t.name_en))return json(res,400,{error:localize(locale,'أدخل معرّفًا واسمًا عربيًا وإنجليزيًا.','Enter an id plus Arabic and English names.')});
-        if(!(type==='image'?validImages:(type==='live_audio'||type==='live_translate'?validLive:validText)).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
+        if(!(type==='image'?validImages:validText).has(model))return json(res,400,{error:localize(locale,'النموذج المختار غير صالح لنوع الأداة.','The selected model is invalid for this tool type.')});
         let promptConfig=t.prompt_config;
         if(typeof promptConfig==='string'){try{promptConfig=JSON.parse(promptConfig)}catch{return json(res,400,{error:localize(locale,'كود JSON الخاص بتعليمات الأداة غير صالح.','The tool instruction JSON is invalid.')})}}
         if(!promptConfig||typeof promptConfig!=='object'||Array.isArray(promptConfig))promptConfig={};
@@ -175,7 +173,7 @@ export default async function handler(req,res){
         return json(res,200,{ok:true,tool:row,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});
       }
       const tools=await getAiTools({includeInactive:true});const updates=[];
-      for(const tool of tools){const value=b.settings?.[tool.id];const valid=(tool.tool_type==='image'?validImages:(tool.tool_type==='live_audio'||tool.tool_type==='live_translate'?validLive:validText)).has(value);if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()})}
+      for(const tool of tools){const value=b.settings?.[tool.id];const valid=(tool.tool_type==='image'?validImages:validText).has(value);if(typeof value==='string'&&value.length<100&&valid)updates.push({...tool,model_id:value,updated_at:new Date().toISOString()})}
       if(!updates.length)return json(res,400,{error:localize(locale,'لم يتم إرسال إعدادات صالحة.','No valid settings were submitted.')});
       const {error}=await db().from('ai_tools').upsert(updates,{onConflict:'id'});if(error)throw error;
       return json(res,200,{ok:true,tools:await getAiTools({includeInactive:true}),settings:await getToolModelSettings()});

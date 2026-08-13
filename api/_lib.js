@@ -740,7 +740,6 @@ export const GEMINI_IMAGE_MODELS = [
   {id:'black-forest-labs/flux.2-pro',name:'FLUX.2 Pro',description:'جودة أعلى للصور والتعديل متعدد المراجع.',pricing:{request:0.03,image:0.03},inputModalities:['text','image'],outputModalities:['image'],supported_parameters:{resolution:{type:'enum',values:['1K','2K','4K']},aspect_ratio:{type:'enum',values:['1:1','16:9','9:16','4:3','3:4']},n:{type:'boolean'}},provider:'black-forest-labs'}
 ];
 
-export const GEMINI_LIVE_MODELS = [];
 
 
 export const DEFAULT_AI_TOOLS = [

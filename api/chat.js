@@ -367,9 +367,10 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
 
     res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.();
     const reader=response.body.getReader();const decoder=new TextDecoder();let upstreamBuffer='',answer='',generationId='',routedModelId=activeModelId,providerName=null;
+    const readUpstream=async()=>{let timer;try{return await Promise.race([reader.read(),new Promise((_,reject)=>{timer=setTimeout(()=>{const error=new Error('OpenRouter stream timed out');error.code='REQUEST_TIMEOUT';reject(error)},60000)})])}catch(error){if(error?.code==='REQUEST_TIMEOUT')try{await reader.cancel('idle-timeout')}catch{}throw error}finally{clearTimeout(timer)}};
     let usage={prompt_tokens:0,completion_tokens:0,total_tokens:0,cost:0};
     while(true){
-      const {done,value}=await reader.read();if(done)break;
+      const {done,value}=await readUpstream();if(done)break;
       upstreamBuffer+=decoder.decode(value,{stream:true});
       const lines=upstreamBuffer.split('\n');upstreamBuffer=lines.pop()||'';
       for(const rawLine of lines){

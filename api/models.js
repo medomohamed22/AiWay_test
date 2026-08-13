@@ -112,7 +112,7 @@ export default async function handler(req, res) {
     const normalizedModelName = model => String(model?.name || model?.id || '')
       .toLowerCase()
       .replace(/\([^)]*\)/g, ' ')
-      .replace(/(?:free|preview|experimental)/g, ' ')
+      .replace(/\b(?:free|preview|experimental)\b/g, ' ')
       .replace(/[^a-z0-9.]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
