@@ -17,6 +17,15 @@
 <script defer="" src="/_vercel/insights/script.js"></script>
 
 
+
+
+
+
+
+
+<!-- AIWAY CLASSIC REFINED THEME START -->
+
+<!-- AIWAY CLASSIC REFINED THEME END -->
 </head>
 <body>
 <div aria-label="Welcome to AiWay" aria-modal="true" class="intro-screen compact-landing" id="introScreen" role="dialog">
@@ -93,10 +102,10 @@
 <div class="backdrop" id="backdrop"></div>
 <main class="main">
 <header class="topbar">
-<button aria-expanded="false" aria-label="Menu" class="icon-btn mobile-menu" id="menuBtn"><span data-icon="menu"></span></button>
+<button aria-label="Back" class="icon-btn mobile-workspace-back" id="mobileWorkspaceBack" type="button">‹</button><button aria-expanded="false" aria-label="Menu" class="icon-btn mobile-menu" id="menuBtn"><span data-icon="menu"></span></button>
 <div class="mobile-header-center" id="mobileHeaderCenter">
 <div aria-live="polite" class="mobile-task-identity" id="mobileTaskIdentity"><span id="mobileTaskIcon"></span><b id="mobileTaskName">AiWay</b></div>
-
+<button aria-label="عرض كل الأدوات" class="mobile-all-tools-btn" id="mobileAllToolsBtn" title="عرض كل الأدوات" type="button"><svg aria-hidden="true" fill="none" viewbox="0 0 24 24"><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="3.5" y="3.5"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="14" y="3.5"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="3.5" y="14"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="14" y="14"></rect></svg><span id="mobileAllToolsLabel">كل الأدوات</span></button>
 </div>
 <button class="top-tools-btn" id="topToolsBtn" type="button"><span data-icon="apps"></span><span id="topToolsLabel">كل الأدوات</span></button>
 <button class="top-login-btn" id="topLoginBtn" type="button"><span data-icon="login"></span><span id="topLoginLabel">تسجيل الدخول</span></button>
@@ -133,27 +142,27 @@
 </nav>
 <section class="mobile-hub-layer" id="mobileHubLayer" aria-live="polite">
   <section class="mobile-hub-screen active" data-mobile-screen="tools">
-    <div class="mobile-screen-head"><div><small>AiWay</small><h1 id="mobileToolsHeading">الأدوات</h1></div></div>
-    <label class="mobile-tool-search"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="mobileToolSearch" type="search" placeholder="ابحث عن أداة" autocomplete="off"></label>
+    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileToolsHeading">الأدوات</h1></div></div>
+    <label class="mobile-tool-search"><span class="mobile-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.25" stroke="currentColor" stroke-width="1.8"/><path d="m15.6 15.6 4.1 4.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><input id="mobileToolSearch" type="search" placeholder="ابحث عن أداة" autocomplete="off"></label>
     <section class="mobile-tools-direct"><div class="mobile-section-title"><b id="mobileAllToolsTitle">كل الأدوات</b></div><div class="mobile-all-tools-grid" id="mobileAllToolsGrid"></div></section>
   </section>
   <section class="mobile-hub-screen" data-mobile-screen="chats">
-    <div class="mobile-screen-head"><div><small>AiWay</small><h1 id="mobileChatsHeading">المحادثات</h1></div><button class="mobile-inline-action" id="mobileNewChat" type="button">＋ <span>جديدة</span></button></div>
+    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileChatsHeading">المحادثات</h1></div><button class="mobile-primary-small" id="mobileNewChat" type="button">＋ <span>جديدة</span></button></div>
     <div class="mobile-chat-list" id="mobileChatList"><div class="mobile-skeleton-list"><i></i><i></i><i></i></div></div>
   </section>
   <section class="mobile-hub-screen" data-mobile-screen="images">
-    <div class="mobile-screen-head"><div><small>AiWay</small><h1 id="mobileImagesHeading">الصور</h1></div><button class="mobile-inline-action" id="mobileNewImage" type="button">＋ <span>إنشاء</span></button></div>
+    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileImagesHeading">الصور</h1></div><button class="mobile-primary-small" id="mobileNewImage" type="button">＋ <span>إنشاء</span></button></div>
     <div class="mobile-image-hero"><div><b id="mobileImageHeroTitle">حوّل فكرتك إلى صورة</b><small id="mobileImageHeroCopy">ابدأ وصفًا جديدًا أو افتح آخر الصور التي أنشأتها.</small></div><span>✦</span></div>
     <div class="mobile-image-history" id="mobileImageHistory"><div class="mobile-empty-state">لا توجد صور حديثة بعد.</div></div>
   </section>
   <section class="mobile-hub-screen" data-mobile-screen="credits">
-    <div class="mobile-screen-head"><div><small>AiWay</small><h1 id="mobileCreditsHeading">الرصيد والباقات</h1></div></div>
+    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileCreditsHeading">الرصيد والباقات</h1></div></div>
     <div class="mobile-balance-card"><small id="mobileBalanceLabel">رصيدك الحالي</small><strong id="mobileBalanceValue">0</strong><span>AiWay Tokens</span></div>
     <button class="mobile-wide-action" id="mobileOpenPackages" type="button">عرض وشراء الباقات</button>
     <p class="mobile-screen-note" id="mobileCreditsNote">الدفع يتم بأمان عبر Pi Network باستخدام نظام الدفع الحالي.</p>
   </section>
   <section class="mobile-hub-screen" data-mobile-screen="account">
-    <div class="mobile-screen-head"><div><small>AiWay</small><h1 id="mobileAccountHeading">الحساب</h1></div></div>
+    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileAccountHeading">الحساب</h1></div></div>
     <div class="mobile-profile-card"><span id="mobileProfileAvatar">π</span><div><b id="mobileProfileName">Guest</b><small id="mobileProfileState">Sign in with Pi</small></div></div>
     <div class="mobile-account-actions">
       <button id="mobileAccountLogin" type="button">تسجيل الدخول / الخروج</button>
@@ -165,7 +174,7 @@
         </div>
       </div>
       <button id="mobileAccountSupport" type="button">الدعم والمساعدة</button>
-      <a href="/privacy-policy.html" id="mobilePrivacyLink">Privacy Policy</a><a href="/terms-of-service.html" id="mobileTermsLink">Terms of Service</a>
+      <a href="/privacy-policy.html">Privacy Policy</a><a href="/terms-of-service.html">Terms of Service</a>
     </div>
   </section>
 </section>
@@ -196,6 +205,11 @@
 <script src="/desktop-ui.js"></script>
 <script src="/dropzone-ui.js"></script>
 <script src="/landing-ui.js"></script>
+
+
+
+
+
 <script id="aiway-mobile-ux-controller" src="/mobile-ux.js"></script>
 <script id="aiway-2026-microinteractions" src="/microinteractions.js"></script>
 <script src="/motion.js"></script>
