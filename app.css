@@ -1313,3 +1313,54 @@ button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible,
 }
 @media (max-width:380px){.mobile-all-tools-grid{gap:8px}.mobile-tool-card{min-height:132px;padding:11px}.mobile-bottom-nav button b{font-size:9px}}
 @media (prefers-reduced-motion:reduce){.mobile-hub-screen.active,.mobile-bottom-nav{animation:none!important;transition:none!important}}
+
+/* ===== AiWay mobile polish: direct tools, SVG nav, stable brand, language popover ===== */
+@media (max-width:768px){
+  :root{--mobile-nav-h:76px;--mobile-head-h:58px}
+
+  /* Header: brand stays AiWay everywhere. Hamburger becomes back inside a tool. */
+  .topbar{position:relative!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}
+  .topbar>.mobile-menu{display:grid!important;position:relative!important;inset:auto!important;transform:none!important;place-items:center!important;width:44px!important;min-width:44px!important;height:44px!important;margin:0!important;border:1px solid rgba(111,45,189,.10)!important;border-radius:14px!important;background:linear-gradient(145deg,#fff,#f4edf9)!important;color:var(--pi)!important;box-shadow:0 5px 16px rgba(72,34,98,.06)!important;order:0!important}
+  .topbar>.mobile-menu svg{width:21px!important;height:21px!important;display:block!important}
+  .topbar>.mobile-menu.mobile-back-mode{background:var(--pi3)!important;border-color:rgba(111,45,189,.16)!important}
+  html[dir="rtl"] .topbar>.mobile-menu.mobile-back-mode svg{transform:scaleX(-1)}
+  .mobile-workspace-back{display:none!important}
+  .topbar>.mobile-header-center{display:flex!important;position:absolute!important;left:50%!important;top:calc(env(safe-area-inset-top) + 7px)!important;transform:translateX(-50%)!important;align-items:center!important;justify-content:center!important;width:auto!important;max-width:42vw!important;height:44px!important;margin:0!important;z-index:2!important;pointer-events:none!important}
+  .topbar .mobile-header-center>.mobile-task-identity{display:flex!important;align-items:center!important;justify-content:center!important;width:auto!important;max-width:100%!important;height:40px!important;padding:0 12px!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--text)!important;pointer-events:none!important}
+  .topbar .mobile-header-center>.mobile-task-identity>span{display:none!important}
+  .topbar .mobile-header-center>.mobile-task-identity b{display:block!important;max-width:none!important;font-size:17px!important;font-weight:950!important;letter-spacing:-.25px!important;color:var(--pi)!important;overflow:visible!important;text-overflow:clip!important}
+  .topbar .mobile-all-tools-btn{display:none!important}
+  .topbar .model-wrap{display:none!important}
+  .topbar>.credits{margin-inline-start:auto!important;order:2!important;min-width:94px!important;justify-content:center!important;border-radius:14px!important;background:var(--pi3)!important;border:1px solid rgba(111,45,189,.13)!important;color:var(--pi)!important;box-shadow:none!important}
+
+  /* Tools start immediately: no Most Used strip. */
+  .mobile-tools-direct{margin-top:2px}
+  .mobile-tools-direct .mobile-section-title{margin-top:14px}
+  .mobile-all-tools-grid{gap:12px!important}
+  .mobile-tool-card{border-color:rgba(111,45,189,.12)!important;box-shadow:0 7px 22px rgba(65,31,87,.045)!important;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease!important}
+  .mobile-tool-card:active{transform:scale(.985);border-color:rgba(111,45,189,.24)!important;box-shadow:0 3px 12px rgba(65,31,87,.04)!important}
+
+  /* Refined five-item SVG bottom navigation. */
+  .mobile-bottom-nav{height:calc(var(--mobile-nav-h) + env(safe-area-inset-bottom))!important;padding:6px 8px calc(6px + env(safe-area-inset-bottom))!important;gap:3px!important;background:rgba(255,255,255,.965)!important;border-top:1px solid rgba(86,57,103,.10)!important;box-shadow:0 -10px 30px rgba(57,31,76,.055)!important}
+  .mobile-bottom-nav button{min-height:58px!important;gap:4px!important;border-radius:16px!important;color:#746c7a!important;transition:color .16s ease,background .16s ease,transform .16s ease!important}
+  .mobile-bottom-nav button:active{transform:scale(.96)}
+  .mobile-bottom-nav .mobile-nav-icon{width:30px!important;height:27px!important;display:grid!important;place-items:center!important;border-radius:10px!important;font-size:0!important;line-height:1!important;transition:background .16s ease,transform .16s ease!important}
+  .mobile-bottom-nav .mobile-nav-icon svg{width:21px!important;height:21px!important;display:block!important}
+  .mobile-bottom-nav button b{font-size:10.5px!important;font-weight:800!important;line-height:1.15!important}
+  .mobile-bottom-nav button.active{color:var(--pi)!important;background:rgba(111,45,189,.065)!important}
+  .mobile-bottom-nav button.active .mobile-nav-icon{background:rgba(111,45,189,.10)!important;transform:translateY(-1px)}
+  .mobile-bottom-nav button.active b{font-weight:950!important}
+
+  /* Language selector: compact popover above the account action. */
+  .mobile-account-actions>.mobile-language-control{position:relative!important;width:100%!important;min-height:0!important;margin-top:9px!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;display:block!important;overflow:visible!important}
+  .mobile-language-control>#mobileAccountLanguage{width:100%!important;min-height:52px!important;margin:0!important;padding-inline:15px!important;border:1px solid var(--line)!important;border-radius:16px!important;background:#fff!important;color:var(--text)!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;font:inherit!important;font-weight:850!important;text-align:inherit!important}
+  .mobile-language-control>#mobileAccountLanguage svg{width:18px;height:18px;color:var(--pi);transition:transform .16s ease}
+  .mobile-language-control>#mobileAccountLanguage[aria-expanded="true"] svg{transform:rotate(180deg)}
+  .mobile-language-popover{position:absolute;z-index:15;left:0;right:0;bottom:calc(100% + 8px);padding:7px;border:1px solid rgba(111,45,189,.13);border-radius:17px;background:rgba(255,255,255,.985);box-shadow:0 16px 42px rgba(50,25,67,.16);opacity:0;visibility:hidden;transform:translateY(7px) scale(.985);transform-origin:bottom center;transition:opacity .16s ease,transform .16s ease,visibility .16s ease}
+  .mobile-language-popover.open{opacity:1;visibility:visible;transform:none}
+  .mobile-language-popover button{width:100%;min-height:48px;border:0;border-radius:12px;background:transparent;color:var(--text);padding:0 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font:inherit;font-weight:800;text-align:inherit}
+  .mobile-language-popover button+button{margin-top:3px}
+  .mobile-language-popover button.active{background:var(--pi3);color:var(--pi)}
+  .mobile-language-popover button i{width:9px;height:9px;border-radius:50%;background:transparent;box-shadow:0 0 0 1.5px #c8bbd2 inset}
+  .mobile-language-popover button.active i{background:var(--pi);box-shadow:0 0 0 4px rgba(111,45,189,.10)}
+}

@@ -2,8 +2,8 @@
   const $=id=>document.getElementById(id);
   const mobile=()=>matchMedia('(max-width:768px)').matches;
   const labels={
-    ar:{tools:'الأدوات',chats:'المحادثات',images:'الصور',credits:'الرصيد',account:'الحساب',search:'ابحث عن أداة',most:'الأكثر استخدامًا',all:'كل الأدوات',newChat:'جديدة',newImage:'إنشاء',balance:'رصيدك الحالي',packs:'عرض وشراء الباقات',accountLogin:'تسجيل الدخول / الخروج',language:'اللغة',support:'الدعم والمساعدة',emptyImages:'لا توجد صور حديثة بعد.',imageTitle:'حوّل فكرتك إلى صورة',imageCopy:'ابدأ وصفًا جديدًا أو افتح آخر الصور التي أنشأتها.',piSign:'تسجيل الدخول بحساب Pi'},
-    en:{tools:'Tools',chats:'Chats',images:'Images',credits:'Credits',account:'Account',search:'Search tools',most:'Most Used',all:'All Tools',newChat:'New',newImage:'Create',balance:'Current balance',packs:'View & buy packages',accountLogin:'Sign in / out',language:'Language',support:'Support & Help',emptyImages:'No recent images yet.',imageTitle:'Turn your idea into an image',imageCopy:'Start a new prompt or open a recent image.',piSign:'Sign in with Pi'}
+    ar:{tools:'الأدوات',chats:'المحادثات',images:'الصور',credits:'الرصيد',account:'الحساب',search:'ابحث عن أداة',all:'كل الأدوات',newChat:'جديدة',newImage:'إنشاء',balance:'رصيدك الحالي',packs:'عرض وشراء الباقات',accountLogin:'تسجيل الدخول / الخروج',language:'اللغة',support:'الدعم والمساعدة',emptyImages:'لا توجد صور حديثة بعد.',imageTitle:'حوّل فكرتك إلى صورة',imageCopy:'ابدأ وصفًا جديدًا أو افتح آخر الصور التي أنشأتها.',piSign:'تسجيل الدخول بحساب Pi'},
+    en:{tools:'Tools',chats:'Chats',images:'Images',credits:'Credits',account:'Account',search:'Search tools',all:'All Tools',newChat:'New',newImage:'Create',balance:'Current balance',packs:'View & buy packages',accountLogin:'Sign in / out',language:'Language',support:'Support & Help',emptyImages:'No recent images yet.',imageTitle:'Turn your idea into an image',imageCopy:'Start a new prompt or open a recent image.',piSign:'Sign in with Pi'}
   };
   let activeTab='tools';
   const isAr=()=>document.documentElement.dir==='rtl'||document.documentElement.lang==='ar';
@@ -12,19 +12,39 @@
   function syncText(){
     const x=t();
     document.querySelectorAll('[data-mobile-label]').forEach(el=>{const k=el.dataset.mobileLabel;if(x[k])el.textContent=x[k]});
-    [['mobileToolsHeading','tools'],['mobileChatsHeading','chats'],['mobileImagesHeading','images'],['mobileCreditsHeading','credits'],['mobileAccountHeading','account'],['mobileMostUsedTitle','most'],['mobileAllToolsTitle','all'],['mobileBalanceLabel','balance'],['mobileImageHeroTitle','imageTitle'],['mobileImageHeroCopy','imageCopy'],['introHeroLoginText','piSign']].forEach(([id,k])=>{if($(id))$(id).textContent=x[k]});
+    [['mobileToolsHeading','tools'],['mobileChatsHeading','chats'],['mobileImagesHeading','images'],['mobileCreditsHeading','credits'],['mobileAccountHeading','account'],['mobileAllToolsTitle','all'],['mobileBalanceLabel','balance'],['mobileImageHeroTitle','imageTitle'],['mobileImageHeroCopy','imageCopy'],['introHeroLoginText','piSign']].forEach(([id,k])=>{if($(id))$(id).textContent=x[k]});
     if($('mobileToolSearch'))$('mobileToolSearch').placeholder=x.search;
     if($('mobileNewChat')?.querySelector('span'))$('mobileNewChat').querySelector('span').textContent=x.newChat;
     if($('mobileNewImage')?.querySelector('span'))$('mobileNewImage').querySelector('span').textContent=x.newImage;
     if($('mobileOpenPackages'))$('mobileOpenPackages').textContent=x.packs;
     if($('mobileAccountLogin'))$('mobileAccountLogin').textContent=x.accountLogin;
-    if($('mobileAccountLanguage'))$('mobileAccountLanguage').textContent=x.language;
+    if($('mobileLanguageButtonText'))$('mobileLanguageButtonText').textContent=x.language;
+    else if($('mobileAccountLanguage'))$('mobileAccountLanguage').textContent=x.language;
+    syncLanguagePopover();
+    syncMobileHeader();
     if($('mobileAccountSupport'))$('mobileAccountSupport').textContent=x.support;
+  }
+
+  const menuIconSvg='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const backIconSvg='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function syncMobileHeader(){
+    if(!mobile())return;
+    const name=$('mobileTaskName');
+    if(name) name.textContent='AiWay';
+    const menu=$('menuBtn');
+    const inWorkspace=document.body.classList.contains('mobile-workspace');
+    if(menu){
+      menu.innerHTML=inWorkspace?backIconSvg:menuIconSvg;
+      menu.setAttribute('aria-label',inWorkspace?(isAr()?'الرجوع إلى الأدوات':'Back to tools'):(isAr()?'القائمة':'Menu'));
+      menu.classList.toggle('mobile-back-mode',inWorkspace);
+    }
   }
 
   function setWorkspace(on){
     document.body.classList.toggle('mobile-workspace',Boolean(on&&mobile()));
     if(on) document.querySelectorAll('.mobile-hub-screen').forEach(s=>s.classList.remove('active'));
+    syncMobileHeader();
   }
   function showTab(tab){
     if(!mobile())return;
@@ -61,11 +81,9 @@
   function renderTools(){
     try{typeof window.renderTaskScreen==='function'&&window.renderTaskScreen()}catch{}
     const source=[...document.querySelectorAll('#taskGrid [data-task]')];
-    const all=$('mobileAllToolsGrid'),most=$('mobileMostUsed');if(!all||!most)return;
-    all.innerHTML='';most.innerHTML='';
+    const all=$('mobileAllToolsGrid');if(!all)return;
+    all.innerHTML='';
     source.forEach(btn=>all.appendChild(toolCardFrom(btn)));
-    const preferred=['writing','summary','image','coding'];
-    preferred.forEach(id=>{const src=source.find(b=>b.dataset.task===id);if(src)most.appendChild(toolCardFrom(src))});
     filterTools();
   }
   function filterTools(){
@@ -112,6 +130,41 @@
     const vv=window.visualViewport;const h=vv?.height||innerHeight;document.documentElement.style.setProperty('--mobile-vvh',`${h}px`);
   }
 
+  function syncLanguagePopover(){
+    const pop=$('mobileLanguagePopover');if(!pop)return;
+    const current=isAr()?'ar':'en';
+    pop.querySelectorAll('[data-mobile-language]').forEach(btn=>{
+      const active=btn.dataset.mobileLanguage===current;
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-current',active?'true':'false');
+    });
+  }
+  function closeLanguagePopover(){
+    const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');
+    pop?.classList.remove('open');pop?.setAttribute('aria-hidden','true');btn?.setAttribute('aria-expanded','false');
+  }
+  function toggleLanguagePopover(){
+    const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');if(!pop||!btn)return;
+    const open=!pop.classList.contains('open');
+    pop.classList.toggle('open',open);pop.setAttribute('aria-hidden',open?'false':'true');btn.setAttribute('aria-expanded',open?'true':'false');
+    if(open)syncLanguagePopover();
+  }
+  function chooseLanguage(lang){
+    const current=isAr()?'ar':'en';
+    closeLanguagePopover();
+    if(lang===current)return;
+    $('languageBtn')?.click();
+    setTimeout(()=>{syncText();syncMobileHeader();syncLanguagePopover()},0);
+  }
+
+  // On mobile the existing hamburger becomes the actual back control inside a tool.
+  document.addEventListener('click',e=>{
+    if(!mobile()||!document.body.classList.contains('mobile-workspace'))return;
+    const menu=e.target.closest?.('#menuBtn');if(!menu)return;
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+    closeLanguagePopover();showTab('tools');
+  },true);
+
   // Existing message-tools bottom sheet
   const sheet=$('mobileToolsSheet'),more=$('composerMoreBtn');
   const syncSheet=()=>{const ar=isAr(),web=$('webPill'),estimate=$('costEstimateQuickToggle');
@@ -128,9 +181,11 @@
   $('mobileNewImage')?.addEventListener('click',()=>openTool('image'));
   $('mobileOpenPackages')?.addEventListener('click',()=>$('creditsButton')?.click());
   $('mobileAccountLogin')?.addEventListener('click',()=>$('loginBtn')?.click());
-  $('mobileAccountLanguage')?.addEventListener('click',()=>$('languageBtn')?.click());
+  $('mobileAccountLanguage')?.addEventListener('click',e=>{e.stopPropagation();toggleLanguagePopover()});
   $('mobileAccountSupport')?.addEventListener('click',()=>$('supportBtn')?.click());
-  $('mobileWorkspaceBack')?.addEventListener('click',()=>showTab(activeTab==='images'?'images':'tools'));
+  document.querySelectorAll('[data-mobile-language]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseLanguage(btn.dataset.mobileLanguage)}));
+  document.addEventListener('click',e=>{if(!e.target.closest?.('#mobileLanguageControl'))closeLanguagePopover()});
+  $('mobileWorkspaceBack')?.addEventListener('click',()=>showTab('tools'));
   $('introHeroLogin')?.addEventListener('click',()=>$('introLoginBtn')?.click());
   more?.addEventListener('click',openSheet);$('mobileToolsClose')?.addEventListener('click',closeSheet);$('mobileToolsScrim')?.addEventListener('click',closeSheet);
   $('mobileAttachAction')?.addEventListener('click',()=>{closeSheet();setTimeout(()=>$('attachBtn')?.click(),20)});
@@ -141,6 +196,7 @@
   const chatsObs=new MutationObserver(()=>{if(activeTab==='chats')renderChats()});if($('chats'))chatsObs.observe($('chats'),{childList:true,subtree:true});
   const msgObs=new MutationObserver(()=>{if(activeTab==='images')renderImages()});if($('messages'))msgObs.observe($('messages'),{childList:true,subtree:true});
   const accountObs=new MutationObserver(syncAccount);['credits','profileName','profileState','userAvatar'].forEach(id=>{if($(id))accountObs.observe($(id),{childList:true,subtree:true,characterData:true})});
+  const mobileBrandObs=new MutationObserver(()=>{const n=$('mobileTaskName');if(mobile()&&n&&n.textContent!=='AiWay')n.textContent='AiWay'});if($('mobileTaskName'))mobileBrandObs.observe($('mobileTaskName'),{childList:true,subtree:true,characterData:true});
   const langObs=new MutationObserver(()=>{syncText();renderTools();renderChats();renderImages()});langObs.observe(document.documentElement,{attributes:true,attributeFilter:['dir','lang']});
   window.addEventListener('resize',()=>{syncViewport();if(!mobile())closeSheet()},{passive:true});window.visualViewport?.addEventListener('resize',syncViewport,{passive:true});
 

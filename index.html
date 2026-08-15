@@ -134,18 +134,17 @@
 </div>
 
 <nav aria-label="Mobile primary navigation" class="mobile-bottom-nav" id="mobileBottomNav">
-<button class="active" data-mobile-tab="tools" type="button"><span>⌂</span><b data-mobile-label="tools">الأدوات</b></button>
-<button data-mobile-tab="chats" type="button"><span>◌</span><b data-mobile-label="chats">المحادثات</b></button>
-<button data-mobile-tab="images" type="button"><span>▧</span><b data-mobile-label="images">الصور</b></button>
-<button data-mobile-tab="credits" type="button"><span>◈</span><b data-mobile-label="credits">الرصيد</b></button>
-<button data-mobile-tab="account" type="button"><span>◎</span><b data-mobile-label="account">الحساب</b></button>
+<button class="active" data-mobile-tab="tools" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4.5 10.5 12 4l7.5 6.5v8a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 20v-6h6v6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><b data-mobile-label="tools">الأدوات</b></button>
+<button data-mobile-tab="chats" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 17.5 3.8 20.2l3.3-1.1c1.4.6 3 .9 4.9.9 5 0 9-3.5 9-8s-4-8-9-8-9 3.5-9 8c0 2 .7 3.9 2 5.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="chats">المحادثات</b></button>
+<button data-mobile-tab="images" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="m5.5 17 4.2-4 3.1 2.7 2.4-2.2 3.3 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b data-mobile-label="images">الصور</b></button>
+<button data-mobile-tab="credits" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M9 9.5h4.4a2.1 2.1 0 0 1 0 4.2H10.6a2.1 2.1 0 0 0 0 4.2H15M12 7v2.5M12 17.9V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="credits">الرصيد</b></button>
+<button data-mobile-tab="account" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.3" r="3.3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.5-4 2.9-6 6.5-6s6 2 6.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="account">الحساب</b></button>
 </nav>
 <section class="mobile-hub-layer" id="mobileHubLayer" aria-live="polite">
   <section class="mobile-hub-screen active" data-mobile-screen="tools">
     <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileToolsHeading">الأدوات</h1></div></div>
     <label class="mobile-tool-search"><span>⌕</span><input id="mobileToolSearch" type="search" placeholder="ابحث عن أداة" autocomplete="off"></label>
-    <section><div class="mobile-section-title"><b id="mobileMostUsedTitle">الأكثر استخدامًا</b></div><div class="mobile-most-used" id="mobileMostUsed"></div></section>
-    <section><div class="mobile-section-title"><b id="mobileAllToolsTitle">كل الأدوات</b></div><div class="mobile-all-tools-grid" id="mobileAllToolsGrid"></div></section>
+    <section class="mobile-tools-direct"><div class="mobile-section-title"><b id="mobileAllToolsTitle">كل الأدوات</b></div><div class="mobile-all-tools-grid" id="mobileAllToolsGrid"></div></section>
   </section>
   <section class="mobile-hub-screen" data-mobile-screen="chats">
     <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileChatsHeading">المحادثات</h1></div><button class="mobile-primary-small" id="mobileNewChat" type="button">＋ <span>جديدة</span></button></div>
@@ -166,7 +165,15 @@
     <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileAccountHeading">الحساب</h1></div></div>
     <div class="mobile-profile-card"><span id="mobileProfileAvatar">π</span><div><b id="mobileProfileName">Guest</b><small id="mobileProfileState">Sign in with Pi</small></div></div>
     <div class="mobile-account-actions">
-      <button id="mobileAccountLogin" type="button">تسجيل الدخول / الخروج</button><button id="mobileAccountLanguage" type="button">اللغة</button><button id="mobileAccountSupport" type="button">الدعم والمساعدة</button>
+      <button id="mobileAccountLogin" type="button">تسجيل الدخول / الخروج</button>
+      <div class="mobile-language-control" id="mobileLanguageControl">
+        <button id="mobileAccountLanguage" type="button" aria-haspopup="menu" aria-expanded="false"><span id="mobileLanguageButtonText">اللغة</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m8 10 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="mobile-language-popover" id="mobileLanguagePopover" role="menu" aria-hidden="true">
+          <button type="button" data-mobile-language="ar" role="menuitem"><span>العربية</span><i aria-hidden="true"></i></button>
+          <button type="button" data-mobile-language="en" role="menuitem"><span>English</span><i aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <button id="mobileAccountSupport" type="button">الدعم والمساعدة</button>
       <a href="/privacy-policy.html">Privacy Policy</a><a href="/terms-of-service.html">Terms of Service</a>
     </div>
   </section>
