@@ -48,7 +48,7 @@
 <p class="intro-copy" id="introCopy">ابدأ بما تريد إنجازه — دردشة، صور، ملفات، ترجمة أو برمجة — ودع AiWay يحول فكرتك إلى نتيجة بسرعة.</p>
 <div class="intro-actions compact-hero-actions">
 <button class="intro-start" id="introStart" type="button"><span id="introStartText">استعراض الأدوات</span><span aria-hidden="true">←</span></button>
-<button class="intro-login-secondary" id="introHeroLogin" type="button"><span id="introHeroLoginText">تسجيل الدخول بحساب Pi</span></button><button class="intro-packages-btn" id="introHeroPackages" type="button"><span id="introHeroPackagesText">عرض الباقات</span></button>
+<button class="intro-packages-btn" id="introHeroPackages" type="button"><span id="introHeroPackagesText">عرض الباقات</span></button>
 </div>
 <p class="intro-note compact-free-note" id="introFreeNote">10 استخدامات مجانية عند تسجيل الدخول لأول مرة — بدون دفع</p>
 </div>
@@ -102,7 +102,7 @@
 <div class="backdrop" id="backdrop"></div>
 <main class="main">
 <header class="topbar">
-<button aria-label="Back" class="icon-btn mobile-workspace-back" id="mobileWorkspaceBack" type="button">‹</button><button aria-expanded="false" aria-label="Menu" class="icon-btn mobile-menu" id="menuBtn"><span data-icon="menu"></span></button>
+<button aria-expanded="false" aria-label="Menu" class="icon-btn mobile-menu" id="menuBtn"><span data-icon="menu"></span></button>
 <div class="mobile-header-center" id="mobileHeaderCenter">
 <div aria-live="polite" class="mobile-task-identity" id="mobileTaskIdentity"><span id="mobileTaskIcon"></span><b id="mobileTaskName">AiWay</b></div>
 <button aria-label="عرض كل الأدوات" class="mobile-all-tools-btn" id="mobileAllToolsBtn" title="عرض كل الأدوات" type="button"><svg aria-hidden="true" fill="none" viewbox="0 0 24 24"><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="3.5" y="3.5"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="14" y="3.5"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="3.5" y="14"></rect><rect height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8" width="6.5" x="14" y="14"></rect></svg><span id="mobileAllToolsLabel">كل الأدوات</span></button>
@@ -132,52 +132,6 @@
 <div class="composer-zone"><div class="composer"><div class="attachment-strip" id="attachmentStrip"></div><textarea id="prompt" placeholder="Ask anything..." rows="1"></textarea><div class="composer-foot"><button aria-expanded="false" aria-label="More tools" class="composer-more" id="composerMoreBtn" type="button"><span data-icon="plus"></span></button><button aria-pressed="true" class="estimate-toggle active" id="costEstimateQuickToggle" title="إظهار الحساب التقريبي قبل الإرسال" type="button"><svg aria-hidden="true" fill="none" viewbox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h2m3 0h3M8 16h2m3 0h3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg><span class="estimate-label">الحساب التقريبي</span></button><button aria-pressed="false" class="pill" id="webPill" type="button"><span data-icon="globe"></span><span class="pill-text" data-i18n="webSearch">Web search</span></button><button aria-label="Attach image or file" class="pill attach-pill" id="attachBtn" title="Attach image or file"><span data-icon="camera"></span></button><span class="ratio-wrap" id="ratioWrap"><select aria-label="Image aspect ratio" class="ratio-select" id="aspectRatio"><option value="1:1">1:1</option><option value="16:9">16:9</option><option value="9:16">9:16</option><option value="4:3">4:3</option><option value="3:4">3:4</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></span><span class="ratio-wrap" id="resolutionWrap"><select aria-label="Image resolution" class="ratio-select" id="imageResolution"></select></span><input accept="*/*" hidden="" id="fileInput" multiple="" type="file"/><span class="status" id="status"></span><button aria-label="Send" class="send" id="sendBtn" type="button"><span data-icon="send"></span></button></div></div></div>
 </main>
 </div>
-
-<nav aria-label="Mobile primary navigation" class="mobile-bottom-nav" id="mobileBottomNav">
-<button class="active" data-mobile-tab="tools" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4.5 10.5 12 4l7.5 6.5v8a1.5 1.5 0 0 1-1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 20v-6h6v6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><b data-mobile-label="tools">الأدوات</b></button>
-<button data-mobile-tab="chats" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 17.5 3.8 20.2l3.3-1.1c1.4.6 3 .9 4.9.9 5 0 9-3.5 9-8s-4-8-9-8-9 3.5-9 8c0 2 .7 3.9 2 5.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="chats">المحادثات</b></button>
-<button data-mobile-tab="images" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="17" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="1.5" stroke="currentColor" stroke-width="1.6"/><path d="m5.5 17 4.2-4 3.1 2.7 2.4-2.2 3.3 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><b data-mobile-label="images">الصور</b></button>
-<button data-mobile-tab="credits" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.8"/><path d="M9 9.5h4.4a2.1 2.1 0 0 1 0 4.2H10.6a2.1 2.1 0 0 0 0 4.2H15M12 7v2.5M12 17.9V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="credits">الرصيد</b></button>
-<button data-mobile-tab="account" type="button"><span class="mobile-nav-icon"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.3" r="3.3" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 20c.5-4 2.9-6 6.5-6s6 2 6.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><b data-mobile-label="account">الحساب</b></button>
-</nav>
-<section class="mobile-hub-layer" id="mobileHubLayer" aria-live="polite">
-  <section class="mobile-hub-screen active" data-mobile-screen="tools">
-    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileToolsHeading">الأدوات</h1></div></div>
-    <label class="mobile-tool-search"><span class="mobile-search-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.25" stroke="currentColor" stroke-width="1.8"/><path d="m15.6 15.6 4.1 4.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span><input id="mobileToolSearch" type="search" placeholder="ابحث عن أداة" autocomplete="off"></label>
-    <section class="mobile-tools-direct"><div class="mobile-section-title"><b id="mobileAllToolsTitle">كل الأدوات</b></div><div class="mobile-all-tools-grid" id="mobileAllToolsGrid"></div></section>
-  </section>
-  <section class="mobile-hub-screen" data-mobile-screen="chats">
-    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileChatsHeading">المحادثات</h1></div><button class="mobile-primary-small" id="mobileNewChat" type="button">＋ <span>جديدة</span></button></div>
-    <div class="mobile-chat-list" id="mobileChatList"><div class="mobile-skeleton-list"><i></i><i></i><i></i></div></div>
-  </section>
-  <section class="mobile-hub-screen" data-mobile-screen="images">
-    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileImagesHeading">الصور</h1></div><button class="mobile-primary-small" id="mobileNewImage" type="button">＋ <span>إنشاء</span></button></div>
-    <div class="mobile-image-hero"><div><b id="mobileImageHeroTitle">حوّل فكرتك إلى صورة</b><small id="mobileImageHeroCopy">ابدأ وصفًا جديدًا أو افتح آخر الصور التي أنشأتها.</small></div><span>✦</span></div>
-    <div class="mobile-image-history" id="mobileImageHistory"><div class="mobile-empty-state">لا توجد صور حديثة بعد.</div></div>
-  </section>
-  <section class="mobile-hub-screen" data-mobile-screen="credits">
-    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileCreditsHeading">الرصيد والباقات</h1></div></div>
-    <div class="mobile-balance-card"><small id="mobileBalanceLabel">رصيدك الحالي</small><strong id="mobileBalanceValue">0</strong><span>AiWay Tokens</span></div>
-    <button class="mobile-wide-action" id="mobileOpenPackages" type="button">عرض وشراء الباقات</button>
-    <p class="mobile-screen-note" id="mobileCreditsNote">الدفع يتم بأمان عبر Pi Network باستخدام نظام الدفع الحالي.</p>
-  </section>
-  <section class="mobile-hub-screen" data-mobile-screen="account">
-    <div class="mobile-hub-heading"><div><small>AiWay</small><h1 id="mobileAccountHeading">الحساب</h1></div></div>
-    <div class="mobile-profile-card"><span id="mobileProfileAvatar">π</span><div><b id="mobileProfileName">Guest</b><small id="mobileProfileState">Sign in with Pi</small></div></div>
-    <div class="mobile-account-actions">
-      <button id="mobileAccountLogin" type="button">تسجيل الدخول / الخروج</button>
-      <div class="mobile-language-control" id="mobileLanguageControl">
-        <button id="mobileAccountLanguage" type="button" aria-haspopup="menu" aria-expanded="false"><span id="mobileLanguageButtonText">اللغة</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m8 10 4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="mobile-language-popover" id="mobileLanguagePopover" role="menu" aria-hidden="true">
-          <button type="button" data-mobile-language="ar" role="menuitem"><span>العربية</span><i aria-hidden="true"></i></button>
-          <button type="button" data-mobile-language="en" role="menuitem"><span>English</span><i aria-hidden="true"></i></button>
-        </div>
-      </div>
-      <button id="mobileAccountSupport" type="button">الدعم والمساعدة</button>
-      <a href="/privacy-policy.html">Privacy Policy</a><a href="/terms-of-service.html">Terms of Service</a>
-    </div>
-  </section>
-</section>
 <div aria-hidden="true" class="mobile-tools-sheet" id="mobileToolsSheet"><button aria-label="Close tools" class="mobile-tools-scrim" id="mobileToolsScrim" type="button"></button><section aria-labelledby="mobileToolsTitle" aria-modal="true" class="mobile-tools-panel" role="dialog"><div aria-hidden="true" class="sheet-handle"></div><div class="mobile-tools-head"><div><b id="mobileToolsTitle">أدوات الرسالة</b><small id="mobileToolsSubtitle">أظهر فقط ما تحتاجه الآن</small></div><button aria-label="Close" class="icon-btn" id="mobileToolsClose" type="button">×</button></div><div class="mobile-tools-grid"><button id="mobileAttachAction" type="button"><span data-icon="camera"></span><b id="mobileAttachLabel">إرفاق ملف</b></button><button id="mobileWebAction" type="button"><span data-icon="globe"></span><b id="mobileWebLabel">بحث الويب</b><i id="mobileWebState"></i></button><button id="mobileEstimateAction" type="button"><span>≈</span><b id="mobileEstimateLabel">تقدير التكلفة</b><i id="mobileEstimateState"></i></button><button id="mobileTaskAction" type="button"><span class="tool-change-svg"><svg aria-hidden="true" fill="none" viewbox="0 0 24 24"><rect height="7" rx="2" stroke="currentColor" stroke-width="1.8" width="7" x="3.5" y="4"></rect><rect height="7" rx="2" stroke="currentColor" stroke-width="1.8" width="7" x="13.5" y="13"></rect><path d="M14 6h4.5a2 2 0 0 1 2 2v2M10 18H5.5a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"></path><path d="m18 8 2.5 2.5L23 8M6 16l-2.5-2.5L1 16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg></span><b id="mobileTaskActionLabel">تغيير الأداة</b></button></div></section></div>
 <div class="desktop-drop-zone" id="desktopDropZone"><span id="desktopDropText">اسحب الملفات هنا لإضافتها إلى المحادثة</span></div>
 <div class="command-palette" id="commandPalette"><div class="command-box"><input autocomplete="off" id="commandInput" placeholder="ابحث عن أمر أو محادثة..." type="search"/><div class="command-results" id="commandResults"></div></div></div>
