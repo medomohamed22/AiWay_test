@@ -172,18 +172,17 @@ export default async function handler(req,res){
         .select('id,title,model_id,updated_at,created_at')
         .eq('user_id',user.id).order('updated_at',{ascending:false});
       if(error)throw appError('DATABASE_ERROR',{},error);
-      const ids=(data||[]).map(item=>item.id);let taskMap=new Map(),lastMap=new Map();
+      const ids=(data||[]).map(item=>item.id);let taskMap=new Map();
       if(ids.length){
         const {data:taskMessages,error:taskError}=await s.from('messages')
-          .select('conversation_id,content,token_usage,created_at').eq('user_id',user.id).eq('role','user')
+          .select('conversation_id,token_usage,created_at').eq('user_id',user.id).eq('role','user')
           .in('conversation_id',ids).order('created_at',{ascending:true});
         if(taskError)throw appError('DATABASE_ERROR',{},taskError);
         for(const message of taskMessages||[]){
           if(!taskMap.has(message.conversation_id)&&message.token_usage?.taskId)taskMap.set(message.conversation_id,String(message.token_usage.taskId));
-          lastMap.set(message.conversation_id,{preview:cleanText(message.content||'',120),lastMessageAt:message.created_at||null});
         }
       }
-      return json(res,200,{conversations:(data||[]).map(item=>({...item,taskId:taskMap.get(item.id)||null,...(lastMap.get(item.id)||{})}))});
+      return json(res,200,{conversations:(data||[]).map(item=>({...item,taskId:taskMap.get(item.id)||null}))});
     }
 
     if(req.method==='POST'){
