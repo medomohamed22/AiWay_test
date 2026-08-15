@@ -1,205 +1,166 @@
 (()=>{
+  'use strict';
   const $=id=>document.getElementById(id);
   const mobile=()=>matchMedia('(max-width:768px)').matches;
+  const app=()=>window.AiWayApp||{};
   const labels={
-    ar:{tools:'الأدوات',chats:'المحادثات',images:'الصور',credits:'الرصيد',account:'الحساب',search:'ابحث عن أداة',all:'كل الأدوات',newChat:'جديدة',newImage:'إنشاء',balance:'رصيدك الحالي',packs:'عرض وشراء الباقات',accountLogin:'تسجيل الدخول / الخروج',language:'اللغة',support:'الدعم والمساعدة',emptyImages:'لا توجد صور حديثة بعد.',imageTitle:'حوّل فكرتك إلى صورة',imageCopy:'ابدأ وصفًا جديدًا أو افتح آخر الصور التي أنشأتها.',piSign:'تسجيل الدخول بحساب Pi'},
-    en:{tools:'Tools',chats:'Chats',images:'Images',credits:'Credits',account:'Account',search:'Search tools',all:'All Tools',newChat:'New',newImage:'Create',balance:'Current balance',packs:'View & buy packages',accountLogin:'Sign in / out',language:'Language',support:'Support & Help',emptyImages:'No recent images yet.',imageTitle:'Turn your idea into an image',imageCopy:'Start a new prompt or open a recent image.',piSign:'Sign in with Pi'}
+    ar:{tools:'الأدوات',chats:'المحادثات',images:'الصور',credits:'الرصيد',account:'الحساب',search:'ابحث عن أداة',all:'كل الأدوات',newChat:'محادثة جديدة',newImage:'إنشاء صورة',balance:'رصيدك الحالي',packs:'عرض وشراء الباقات',login:'تسجيل الدخول بحساب Pi',logout:'تسجيل الخروج',language:'اللغة',support:'الدعم والمساعدة',emptyChats:'لا توجد محادثات بعد.',emptyImages:'لا توجد صور بعد.',imageTitle:'صورك',imageCopy:'أنشئ صورة جديدة أو افتح صورك السابقة.',loading:'جارٍ التحميل…',loadError:'تعذر تحميل المحتوى. حاول مرة أخرى.',privacy:'سياسة الخصوصية',terms:'شروط الاستخدام',creditsNote:'الدفع يتم بأمان عبر Pi Network باستخدام نظام الدفع الحالي.'},
+    en:{tools:'Tools',chats:'Chats',images:'Images',credits:'Credits',account:'Account',search:'Search tools',all:'All Tools',newChat:'New chat',newImage:'Create image',balance:'Current balance',packs:'View & buy packages',login:'Sign in with Pi',logout:'Sign out',language:'Language',support:'Support & Help',emptyChats:'No conversations yet.',emptyImages:'No images yet.',imageTitle:'Your images',imageCopy:'Create a new image or open one from your history.',loading:'Loading…',loadError:'Could not load content. Try again.',privacy:'Privacy Policy',terms:'Terms of Service',creditsNote:'Payments are securely handled through Pi Network.'}
   };
   let activeTab='tools';
-  const isAr=()=>document.documentElement.dir==='rtl'||document.documentElement.lang==='ar';
+  let imageLoadToken=0;
+  const isAr=()=>document.documentElement.lang==='ar'||document.documentElement.dir==='rtl';
   const t=()=>labels[isAr()?'ar':'en'];
+  const escapeHtml=value=>String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  const menuIcon='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const backIcon='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+  function syncHeader(){
+    if(!mobile())return;
+    if($('mobileTaskName'))$('mobileTaskName').textContent='AiWay';
+    const button=$('menuBtn');if(!button)return;
+    const workspace=document.body.classList.contains('mobile-workspace');
+    button.innerHTML=workspace?backIcon:menuIcon;
+    button.classList.toggle('mobile-back-mode',workspace);
+    button.setAttribute('aria-label',workspace?(isAr()?'الرجوع إلى الأدوات':'Back to tools'):(isAr()?'القائمة':'Menu'));
+  }
   function syncText(){
     const x=t();
-    document.querySelectorAll('[data-mobile-label]').forEach(el=>{const k=el.dataset.mobileLabel;if(x[k])el.textContent=x[k]});
-    [['mobileToolsHeading','tools'],['mobileChatsHeading','chats'],['mobileImagesHeading','images'],['mobileCreditsHeading','credits'],['mobileAccountHeading','account'],['mobileAllToolsTitle','all'],['mobileBalanceLabel','balance'],['mobileImageHeroTitle','imageTitle'],['mobileImageHeroCopy','imageCopy'],['introHeroLoginText','piSign']].forEach(([id,k])=>{if($(id))$(id).textContent=x[k]});
+    document.querySelectorAll('[data-mobile-label]').forEach(el=>{const key=el.dataset.mobileLabel;if(x[key])el.textContent=x[key]});
+    [['mobileToolsHeading','tools'],['mobileChatsHeading','chats'],['mobileImagesHeading','images'],['mobileCreditsHeading','credits'],['mobileAccountHeading','account'],['mobileAllToolsTitle','all'],['mobileBalanceLabel','balance'],['mobileImageHeroTitle','imageTitle'],['mobileImageHeroCopy','imageCopy']].forEach(([id,key])=>{if($(id))$(id).textContent=x[key]});
     if($('mobileToolSearch'))$('mobileToolSearch').placeholder=x.search;
     if($('mobileNewChat')?.querySelector('span'))$('mobileNewChat').querySelector('span').textContent=x.newChat;
     if($('mobileNewImage')?.querySelector('span'))$('mobileNewImage').querySelector('span').textContent=x.newImage;
     if($('mobileOpenPackages'))$('mobileOpenPackages').textContent=x.packs;
-    if($('mobileAccountLogin'))$('mobileAccountLogin').textContent=x.accountLogin;
     if($('mobileLanguageButtonText'))$('mobileLanguageButtonText').textContent=x.language;
-    else if($('mobileAccountLanguage'))$('mobileAccountLanguage').textContent=x.language;
-    syncLanguagePopover();
-    syncMobileHeader();
     if($('mobileAccountSupport'))$('mobileAccountSupport').textContent=x.support;
+    if($('mobilePrivacyLink'))$('mobilePrivacyLink').textContent=x.privacy;if($('mobileTermsLink'))$('mobileTermsLink').textContent=x.terms;if($('mobileCreditsNote'))$('mobileCreditsNote').textContent=x.creditsNote;
+    syncAccount();syncLanguagePopover();syncHeader();
   }
-
-  const menuIconSvg='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  const backIconSvg='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m14.5 5-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
-  function syncMobileHeader(){
-    if(!mobile())return;
-    const name=$('mobileTaskName');
-    if(name) name.textContent='AiWay';
-    const menu=$('menuBtn');
-    const inWorkspace=document.body.classList.contains('mobile-workspace');
-    if(menu){
-      menu.innerHTML=inWorkspace?backIconSvg:menuIconSvg;
-      menu.setAttribute('aria-label',inWorkspace?(isAr()?'الرجوع إلى الأدوات':'Back to tools'):(isAr()?'القائمة':'Menu'));
-      menu.classList.toggle('mobile-back-mode',inWorkspace);
-    }
-  }
-
   function setWorkspace(on){
     document.body.classList.toggle('mobile-workspace',Boolean(on&&mobile()));
-    if(on) document.querySelectorAll('.mobile-hub-screen').forEach(s=>s.classList.remove('active'));
-    syncMobileHeader();
+    if(on)document.querySelectorAll('.mobile-hub-screen').forEach(screen=>screen.classList.remove('active'));
+    syncHeader();
   }
   function showTab(tab){
     if(!mobile())return;
-    activeTab=tab;
-    setWorkspace(false);
-    document.querySelectorAll('[data-mobile-tab]').forEach(b=>b.classList.toggle('active',b.dataset.mobileTab===tab));
-    document.querySelectorAll('[data-mobile-screen]').forEach(s=>s.classList.toggle('active',s.dataset.mobileScreen===tab));
+    activeTab=tab;setWorkspace(false);closeLanguagePopover();
+    document.querySelectorAll('[data-mobile-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.mobileTab===tab));
+    document.querySelectorAll('[data-mobile-screen]').forEach(screen=>screen.classList.toggle('active',screen.dataset.mobileScreen===tab));
     if(tab==='tools')renderTools();
-    if(tab==='chats')renderChats();
-    if(tab==='images')renderImages();
-    if(tab==='credits')syncAccount();
-    if(tab==='account')syncAccount();
+    else if(tab==='chats')renderChats();
+    else if(tab==='images')renderImages();
+    else syncAccount();
   }
-
   function openTool(id){
-    if(typeof window.selectTask==='function')window.selectTask(id);
-    else document.querySelector(`#taskGrid [data-task="${CSS.escape(id)}"]`)?.click();
+    const action=app().selectTask;
+    const opened=typeof action==='function'?action(id):false;
+    if(opened===false)return;
     setWorkspace(true);
     requestAnimationFrame(()=>$('prompt')?.focus({preventScroll:true}));
   }
-
-  function toolCardFrom(btn){
-    const id=btn.dataset.task;
-    const icon=btn.querySelector('.task-card-icon')?.innerHTML||'✦';
-    const name=btn.querySelector('b')?.textContent||id;
-    const desc=btn.querySelector('small')?.textContent||'';
-    const card=document.createElement('button');
-    card.type='button';card.className='mobile-tool-card';card.dataset.mobileTool=id;card.dataset.search=(name+' '+desc).toLowerCase();
-    card.innerHTML=`<span class="task-card-icon">${icon}</span><b></b><small></small>`;
-    card.querySelector('b').textContent=name;card.querySelector('small').textContent=desc;
-    card.addEventListener('click',()=>openTool(id));
-    return card;
+  function toolCardFrom(source){
+    const id=source.dataset.task,name=source.querySelector('b')?.textContent||id,desc=source.querySelector('small')?.textContent||'';
+    const card=document.createElement('button');card.type='button';card.className='mobile-tool-card';card.dataset.mobileTool=id;card.dataset.search=(name+' '+desc).toLocaleLowerCase();
+    card.innerHTML=`<span class="task-card-icon">${source.querySelector('.task-card-icon')?.innerHTML||'✦'}</span><b></b><small></small>`;
+    card.querySelector('b').textContent=name;card.querySelector('small').textContent=desc;card.addEventListener('click',()=>openTool(id));return card;
   }
   function renderTools(){
-    try{typeof window.renderTaskScreen==='function'&&window.renderTaskScreen()}catch{}
-    const source=[...document.querySelectorAll('#taskGrid [data-task]')];
-    const all=$('mobileAllToolsGrid');if(!all)return;
-    all.innerHTML='';
-    source.forEach(btn=>all.appendChild(toolCardFrom(btn)));
-    filterTools();
+    try{window.renderTaskScreen?.()}catch{}
+    const target=$('mobileAllToolsGrid');if(!target)return;target.replaceChildren();
+    document.querySelectorAll('#taskGrid [data-task]').forEach(source=>target.appendChild(toolCardFrom(source)));filterTools();
   }
   function filterTools(){
-    const q=($('mobileToolSearch')?.value||'').trim().toLowerCase();
-    document.querySelectorAll('#mobileAllToolsGrid .mobile-tool-card').forEach(c=>c.hidden=Boolean(q&&!c.dataset.search.includes(q)));
+    const query=($('mobileToolSearch')?.value||'').trim().toLocaleLowerCase();
+    document.querySelectorAll('#mobileAllToolsGrid .mobile-tool-card').forEach(card=>card.hidden=Boolean(query&&!card.dataset.search.includes(query)));
   }
-
+  function formatChatTime(raw){
+    if(!raw)return '';const d=new Date(raw);if(Number.isNaN(d.getTime()))return '';
+    const now=new Date(),sameDay=d.toDateString()===now.toDateString();const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
+    if(sameDay)return d.toLocaleTimeString(isAr()?'ar-EG':'en-US',{hour:'numeric',minute:'2-digit'});
+    if(d.toDateString()===yesterday.toDateString())return isAr()?'أمس':'Yesterday';
+    if(now-d<6*86400000)return d.toLocaleDateString(isAr()?'ar-EG':'en-US',{weekday:'short'});
+    return d.toLocaleDateString(isAr()?'ar-EG':'en-US',{day:'numeric',month:'short'});
+  }
   function renderChats(){
-    const target=$('mobileChatList'),src=$('chats');if(!target||!src)return;
-    const rows=[...src.querySelectorAll('.chat-item')];
-    if(!rows.length){target.innerHTML=src.querySelector('.chat-load-error')?`<div class="mobile-empty-state">${src.textContent}</div>`:'<div class="mobile-skeleton-list"><i></i><i></i><i></i></div>';return}
-    target.innerHTML='';
-    rows.forEach((row,index)=>{
-      const item=document.createElement('button');item.type='button';item.className='mobile-chat-row';item.dataset.id=row.dataset.id;
-      const icon=row.querySelector('.chat-kind-icon')?.innerHTML||'◌';
+    const target=$('mobileChatList'),source=$('chats');if(!target||!source)return;
+    const rows=[...source.querySelectorAll('.chat-item')];
+    if(!rows.length){target.innerHTML=source.querySelector('.chat-load-error')?`<div class="mobile-empty-state">${escapeHtml(source.textContent.trim()||t().loadError)}</div>`:`<div class="mobile-empty-state">${t().emptyChats}</div>`;return}
+    target.replaceChildren();
+    rows.forEach(row=>{
+      const wrap=document.createElement('div');wrap.className='mobile-chat-row';wrap.dataset.id=row.dataset.id;
+      const open=document.createElement('button');open.type='button';open.className='mobile-chat-open';
       const title=row.querySelector('.chat-title-wrap > span')?.textContent||row.textContent.trim();
-      const preview=row.dataset.preview|| (row.dataset.task==='image'?(isAr()?'محادثة صور':'Image chat'):(isAr()?'محادثة AiWay':'AiWay chat'));const rawTime=row.dataset.updated;let when='';try{if(rawTime){const d=new Date(rawTime);when=d.toLocaleTimeString(isAr()?'ar-EG':'en-US',{hour:'numeric',minute:'2-digit'});}}catch{}
-      item.innerHTML=`<span class="chat-kind-icon">${icon}</span><span class="mobile-chat-copy"><b></b><small>${preview}${when?' · '+when:''}</small></span><span class="mobile-chat-delete" role="button" aria-label="Delete">×</span>`;
-      item.querySelector('b').textContent=title;
-      item.addEventListener('click',e=>{if(e.target.closest('.mobile-chat-delete')){row.querySelector('[data-delete]')?.click();return}row.click();setWorkspace(true)});
-      target.appendChild(item);
+      const preview=row.dataset.preview||(row.dataset.task==='image'?(isAr()?'محادثة صور':'Image chat'):(isAr()?'محادثة AiWay':'AiWay chat'));
+      const when=formatChatTime(row.dataset.updated);
+      open.innerHTML=`<span class="chat-kind-icon">${row.querySelector('.chat-kind-icon')?.innerHTML||'◌'}</span><span class="mobile-chat-copy"><b></b><small>${escapeHtml(preview)}</small></span><time>${escapeHtml(when)}</time>`;open.querySelector('b').textContent=title;
+      open.addEventListener('click',()=>{const action=app().openConversation;if(typeof action==='function')action(row.dataset.id);else row.click();setWorkspace(true)});
+      const menu=document.createElement('button');menu.type='button';menu.className='mobile-chat-options';menu.setAttribute('aria-label',isAr()?'خيارات المحادثة':'Chat options');menu.textContent='⋮';
+      menu.addEventListener('click',()=>row.querySelector('[data-delete]')?.click());
+      wrap.append(open,menu);target.appendChild(wrap);
     });
   }
-
-  function renderImages(){
-    const box=$('mobileImageHistory');if(!box)return;
-    const imgs=[...document.querySelectorAll('#messages .generated-image-card img')];
-    if(!imgs.length){box.innerHTML=`<div class="mobile-empty-state">${t().emptyImages}</div>`;return}
-    box.innerHTML='';imgs.slice().reverse().slice(0,12).forEach(img=>{
-      const b=document.createElement('button');b.type='button';b.className='mobile-image-item';
-      const clone=img.cloneNode();clone.removeAttribute('tabindex');b.appendChild(clone);b.addEventListener('click',()=>img.click());box.appendChild(b)
-    });
+  async function renderImages(){
+    const target=$('mobileImageHistory');if(!target)return;const token=++imageLoadToken;
+    target.innerHTML='<div class="mobile-skeleton-grid"><i></i><i></i><i></i><i></i></div>';
+    try{
+      const images=await app().loadRecentImages?.(24);if(token!==imageLoadToken)return;
+      if(!images?.length){target.innerHTML=`<div class="mobile-empty-state">${t().emptyImages}</div>`;return}
+      target.replaceChildren();images.forEach(image=>{
+        const src=image.display_url||image.thumbnail_data||image.source_url;if(!src)return;
+        const button=document.createElement('button');button.type='button';button.className='mobile-image-item';button.innerHTML=`<img loading="lazy" decoding="async" alt="${isAr()?'صورة مولدة':'Generated image'}">`;button.querySelector('img').src=src;
+        button.addEventListener('click',()=>app().openImageUrlPreview?.(src,isAr()?'معاينة الصورة المولدة':'Generated image preview'));target.appendChild(button);
+      });
+    }catch(error){if(token===imageLoadToken)target.innerHTML=`<div class="mobile-empty-state">${t().loadError}</div>`}
   }
-
   function syncAccount(){
-    const credits=$('credits')?.textContent||'0';if($('mobileBalanceValue'))$('mobileBalanceValue').textContent=credits;
+    if($('mobileBalanceValue'))$('mobileBalanceValue').textContent=$('credits')?.textContent||'0';
     if($('mobileProfileName'))$('mobileProfileName').textContent=$('profileName')?.textContent||'Guest';
     if($('mobileProfileState'))$('mobileProfileState').textContent=$('profileState')?.textContent||'';
     if($('mobileProfileAvatar'))$('mobileProfileAvatar').textContent=$('userAvatar')?.textContent||'π';
+    if($('mobileAccountLogin'))$('mobileAccountLogin').textContent=app().isAuthenticated?.()?t().logout:t().login;
   }
-
   function syncViewport(){
     if(!mobile()){document.body.classList.remove('mobile-workspace');return}
-    const vv=window.visualViewport;const h=vv?.height||innerHeight;document.documentElement.style.setProperty('--mobile-vvh',`${h}px`);
+    document.documentElement.style.setProperty('--mobile-vvh',`${window.visualViewport?.height||innerHeight}px`);
   }
-
   function syncLanguagePopover(){
-    const pop=$('mobileLanguagePopover');if(!pop)return;
-    const current=isAr()?'ar':'en';
-    pop.querySelectorAll('[data-mobile-language]').forEach(btn=>{
-      const active=btn.dataset.mobileLanguage===current;
-      btn.classList.toggle('active',active);
-      btn.setAttribute('aria-current',active?'true':'false');
-    });
+    const current=isAr()?'ar':'en';$('mobileLanguagePopover')?.querySelectorAll('[data-mobile-language]').forEach(btn=>{const active=btn.dataset.mobileLanguage===current;btn.classList.toggle('active',active);btn.setAttribute('aria-current',active?'true':'false')});
   }
-  function closeLanguagePopover(){
-    const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');
-    pop?.classList.remove('open');pop?.setAttribute('aria-hidden','true');btn?.setAttribute('aria-expanded','false');
-  }
-  function toggleLanguagePopover(){
-    const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');if(!pop||!btn)return;
-    const open=!pop.classList.contains('open');
-    pop.classList.toggle('open',open);pop.setAttribute('aria-hidden',open?'false':'true');btn.setAttribute('aria-expanded',open?'true':'false');
-    if(open)syncLanguagePopover();
-  }
-  function chooseLanguage(lang){
-    const current=isAr()?'ar':'en';
-    closeLanguagePopover();
-    if(lang===current)return;
-    $('languageBtn')?.click();
-    setTimeout(()=>{syncText();syncMobileHeader();syncLanguagePopover()},0);
-  }
+  function closeLanguagePopover(){const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');pop?.classList.remove('open');pop?.setAttribute('aria-hidden','true');btn?.setAttribute('aria-expanded','false')}
+  function toggleLanguagePopover(){const pop=$('mobileLanguagePopover'),btn=$('mobileAccountLanguage');if(!pop||!btn)return;const open=!pop.classList.contains('open');pop.classList.toggle('open',open);pop.setAttribute('aria-hidden',open?'false':'true');btn.setAttribute('aria-expanded',open?'true':'false');if(open)syncLanguagePopover()}
+  function chooseLanguage(value){closeLanguagePopover();app().setLanguage?.(value)}
 
-  // On mobile the existing hamburger becomes the actual back control inside a tool.
-  document.addEventListener('click',e=>{
-    if(!mobile()||!document.body.classList.contains('mobile-workspace'))return;
-    const menu=e.target.closest?.('#menuBtn');if(!menu)return;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    closeLanguagePopover();showTab('tools');
-  },true);
+  // The main header button is a real back control inside a tool; on hub screens it keeps the legacy menu available.
+  document.addEventListener('click',event=>{if(!mobile()||!document.body.classList.contains('mobile-workspace'))return;const button=event.target.closest?.('#menuBtn');if(!button)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();showTab('tools')},true);
 
-  // Existing message-tools bottom sheet
   const sheet=$('mobileToolsSheet'),more=$('composerMoreBtn');
-  const syncSheet=()=>{const ar=isAr(),web=$('webPill'),estimate=$('costEstimateQuickToggle');
-    if($('mobileToolsTitle'))$('mobileToolsTitle').textContent=ar?'أدوات الرسالة':'Message tools';if($('mobileToolsSubtitle'))$('mobileToolsSubtitle').textContent=ar?'أظهر فقط ما تحتاجه الآن':'Only show what you need now';
-    [['mobileAttachLabel',ar?'إرفاق ملف':'Attach file'],['mobileWebLabel',ar?'بحث الويب':'Web search'],['mobileEstimateLabel',ar?'تقدير التكلفة':'Cost estimate'],['mobileTaskActionLabel',ar?'تغيير الأداة':'Change tool']].forEach(([id,v])=>{if($(id))$(id).textContent=v});
-    $('mobileWebState')?.classList.toggle('on',Boolean(web?.classList.contains('on')||web?.classList.contains('active')||web?.getAttribute('aria-pressed')==='true'));$('mobileEstimateState')?.classList.toggle('on',Boolean(estimate?.classList.contains('active')||estimate?.getAttribute('aria-pressed')==='true'));
-  };
-  const openSheet=()=>{if(!sheet)return;sheet.classList.add('open');sheet.setAttribute('aria-hidden','false');more?.setAttribute('aria-expanded','true');syncSheet()};
-  const closeSheet=()=>{if(!sheet)return;sheet.classList.remove('open');sheet.setAttribute('aria-hidden','true');more?.setAttribute('aria-expanded','false')};
+  const syncSheet=()=>{const ar=isAr(),web=$('webPill'),estimate=$('costEstimateQuickToggle');[['mobileToolsTitle',ar?'أدوات الرسالة':'Message tools'],['mobileToolsSubtitle',ar?'أظهر فقط ما تحتاجه الآن':'Only show what you need now'],['mobileAttachLabel',ar?'إرفاق ملف':'Attach file'],['mobileWebLabel',ar?'بحث الويب':'Web search'],['mobileEstimateLabel',ar?'تقدير التكلفة':'Cost estimate'],['mobileTaskActionLabel',ar?'تغيير الأداة':'Change tool']].forEach(([id,value])=>{if($(id))$(id).textContent=value});$('mobileWebState')?.classList.toggle('on',Boolean(web?.classList.contains('on')||web?.classList.contains('active')||web?.getAttribute('aria-pressed')==='true'));$('mobileEstimateState')?.classList.toggle('on',Boolean(estimate?.classList.contains('active')||estimate?.getAttribute('aria-pressed')==='true'))};
+  const openSheet=()=>{sheet?.classList.add('open');sheet?.setAttribute('aria-hidden','false');more?.setAttribute('aria-expanded','true');syncSheet()};
+  const closeSheet=()=>{sheet?.classList.remove('open');sheet?.setAttribute('aria-hidden','true');more?.setAttribute('aria-expanded','false')};
 
-  document.querySelectorAll('[data-mobile-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.mobileTab)));
+  document.querySelectorAll('[data-mobile-tab]').forEach(btn=>btn.addEventListener('click',()=>showTab(btn.dataset.mobileTab)));
   $('mobileToolSearch')?.addEventListener('input',filterTools);
-  $('mobileNewChat')?.addEventListener('click',()=>{ $('newChatBtn')?.click(); setTimeout(()=>showTab('tools'),0)});
+  $('mobileNewChat')?.addEventListener('click',async()=>{await app().newChat?.({openPicker:false});showTab('tools')});
   $('mobileNewImage')?.addEventListener('click',()=>openTool('image'));
-  $('mobileOpenPackages')?.addEventListener('click',()=>$('creditsButton')?.click());
-  $('mobileAccountLogin')?.addEventListener('click',()=>$('loginBtn')?.click());
-  $('mobileAccountLanguage')?.addEventListener('click',e=>{e.stopPropagation();toggleLanguagePopover()});
-  $('mobileAccountSupport')?.addEventListener('click',()=>$('supportBtn')?.click());
-  document.querySelectorAll('[data-mobile-language]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();chooseLanguage(btn.dataset.mobileLanguage)}));
-  document.addEventListener('click',e=>{if(!e.target.closest?.('#mobileLanguageControl'))closeLanguagePopover()});
-  $('mobileWorkspaceBack')?.addEventListener('click',()=>showTab('tools'));
-  $('introHeroLogin')?.addEventListener('click',()=>$('introLoginBtn')?.click());
+  $('mobileOpenPackages')?.addEventListener('click',()=>app().openPayments?.());
+  $('mobileAccountLogin')?.addEventListener('click',()=>app().toggleAuth?.());
+  $('mobileAccountLanguage')?.addEventListener('click',event=>{event.stopPropagation();toggleLanguagePopover()});
+  $('mobileAccountSupport')?.addEventListener('click',()=>app().openSupport?.());
+  document.querySelectorAll('[data-mobile-language]').forEach(btn=>btn.addEventListener('click',event=>{event.stopPropagation();chooseLanguage(btn.dataset.mobileLanguage)}));
+  document.addEventListener('click',event=>{if(!event.target.closest?.('#mobileLanguageControl'))closeLanguagePopover()});
+  $('introHeroLogin')?.addEventListener('click',()=>app().signIn?.());
   more?.addEventListener('click',openSheet);$('mobileToolsClose')?.addEventListener('click',closeSheet);$('mobileToolsScrim')?.addEventListener('click',closeSheet);
-  $('mobileAttachAction')?.addEventListener('click',()=>{closeSheet();setTimeout(()=>$('attachBtn')?.click(),20)});
-  $('mobileWebAction')?.addEventListener('click',()=>{$('webPill')?.click();syncSheet()});$('mobileEstimateAction')?.addEventListener('click',()=>{$('costEstimateQuickToggle')?.click();syncSheet()});
-  $('mobileTaskAction')?.addEventListener('click',()=>{closeSheet();showTab('tools')});$('mobileAllToolsBtn')?.addEventListener('click',()=>showTab('tools'));
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet?.classList.contains('open'))closeSheet()});
+  $('mobileAttachAction')?.addEventListener('click',()=>{closeSheet();setTimeout(()=>app().openAttachmentPicker?.(),20)});
+  $('mobileWebAction')?.addEventListener('click',()=>{app().toggleWebSearch?.();syncSheet()});$('mobileEstimateAction')?.addEventListener('click',()=>{app().toggleCostEstimate?.();syncSheet()});
+  $('mobileTaskAction')?.addEventListener('click',()=>{closeSheet();showTab('tools')});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeLanguagePopover();if(sheet?.classList.contains('open'))closeSheet()}});
 
-  const chatsObs=new MutationObserver(()=>{if(activeTab==='chats')renderChats()});if($('chats'))chatsObs.observe($('chats'),{childList:true,subtree:true});
-  const msgObs=new MutationObserver(()=>{if(activeTab==='images')renderImages()});if($('messages'))msgObs.observe($('messages'),{childList:true,subtree:true});
-  const accountObs=new MutationObserver(syncAccount);['credits','profileName','profileState','userAvatar'].forEach(id=>{if($(id))accountObs.observe($(id),{childList:true,subtree:true,characterData:true})});
-  const mobileBrandObs=new MutationObserver(()=>{const n=$('mobileTaskName');if(mobile()&&n&&n.textContent!=='AiWay')n.textContent='AiWay'});if($('mobileTaskName'))mobileBrandObs.observe($('mobileTaskName'),{childList:true,subtree:true,characterData:true});
-  const langObs=new MutationObserver(()=>{syncText();renderTools();renderChats();renderImages()});langObs.observe(document.documentElement,{attributes:true,attributeFilter:['dir','lang']});
+  const chatsObserver=new MutationObserver(()=>{if(activeTab==='chats')renderChats()});if($('chats'))chatsObserver.observe($('chats'),{childList:true,subtree:true});
+  const accountObserver=new MutationObserver(syncAccount);['credits','profileName','profileState','userAvatar'].forEach(id=>{if($(id))accountObserver.observe($(id),{childList:true,subtree:true,characterData:true})});
+  const langObserver=new MutationObserver(()=>{syncText();renderTools();renderChats();if(activeTab==='images')renderImages()});langObserver.observe(document.documentElement,{attributes:true,attributeFilter:['dir','lang']});
   window.addEventListener('resize',()=>{syncViewport();if(!mobile())closeSheet()},{passive:true});window.visualViewport?.addEventListener('resize',syncViewport,{passive:true});
 
-  function init(){syncText();syncViewport();syncAccount();setTimeout(()=>{renderTools();renderChats();renderImages();if(mobile()&&!document.body.classList.contains('intro-mode')&&!$('introScreen')?.classList.contains('open'))showTab('tools')},250)}
+  function init(){syncText();syncViewport();syncAccount();setTimeout(()=>{renderTools();renderChats();if(mobile()&&!document.body.classList.contains('intro-mode')&&!$('introScreen')?.classList.contains('open'))showTab('tools')},100)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
