@@ -102,6 +102,22 @@ export default async function handler(req,res){
     const announcementHandled=await handleAnnouncements(req,res,user,s,locale);if(announcementHandled!==false)return announcementHandled;const supportHandled=await handleSupport(req,res,user,s,locale);if(supportHandled!==false)return supportHandled;
 
     if(req.method==='GET'){
+      const mode=String(req.query?.mode||'');
+      if(mode==='images'){
+        const limit=Math.min(48,Math.max(1,Number(req.query?.limit||24)));
+        const {data:images,error}=await s.from('generated_images').select('*')
+          .eq('user_id',user.id).order('created_at',{ascending:false}).limit(limit);
+        if(error)throw appError('DATABASE_ERROR',{},error);
+        const hydrated=await Promise.all((images||[]).map(async image=>{
+          const output={...image};
+          if(output.storage_path||output.thumbnail_data||output.source_url){
+            const ticket=await createDownloadTicket({sub:user.id,imageId:output.id,kind:'image-view'},'2h');
+            output.display_url=`/api/image?action=view&ticket=${encodeURIComponent(ticket)}`;
+          }
+          return output;
+        }));
+        return json(res,200,{images:hydrated});
+      }
       const id=String(req.query?.id||'');
       if(id){
         const imagesOnly=String(req.query?.imagesOnly||'')==='1';
@@ -174,13 +190,14 @@ export default async function handler(req,res){
       if(error)throw appError('DATABASE_ERROR',{},error);
       const ids=(data||[]).map(item=>item.id);let taskMap=new Map(),lastMap=new Map();
       if(ids.length){
-        const {data:taskMessages,error:taskError}=await s.from('messages')
-          .select('conversation_id,content,token_usage,created_at').eq('user_id',user.id).eq('role','user')
+        const {data:listMessages,error:taskError}=await s.from('messages')
+          .select('conversation_id,role,content,token_usage,created_at').eq('user_id',user.id)
           .in('conversation_id',ids).order('created_at',{ascending:true});
         if(taskError)throw appError('DATABASE_ERROR',{},taskError);
-        for(const message of taskMessages||[]){
+        for(const message of listMessages||[]){
           if(!taskMap.has(message.conversation_id)&&message.token_usage?.taskId)taskMap.set(message.conversation_id,String(message.token_usage.taskId));
-          lastMap.set(message.conversation_id,{preview:cleanText(message.content||'',120),lastMessageAt:message.created_at||null});
+          const preview=cleanText(message.content||'',120);
+          if(preview)lastMap.set(message.conversation_id,{preview,lastMessageAt:message.created_at||null});
         }
       }
       return json(res,200,{conversations:(data||[]).map(item=>({...item,taskId:taskMap.get(item.id)||null,...(lastMap.get(item.id)||{})}))});
