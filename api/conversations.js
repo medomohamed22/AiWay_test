@@ -126,14 +126,19 @@ export default async function handler(req,res){
           .select('*').eq('id',id).eq('user_id',user.id).single();
         if(conversationError)throw appError('DATABASE_ERROR',{},conversationError);
 
-        const {data:messages,error:messagesError}=await s.from('messages')
+        const messageOffset=Math.max(0,Math.floor(Number(req.query?.messageOffset||0)));
+        const PAGE_FETCH=24,RESPONSE_BUDGET=3_350_000;
+        const {data:messageBatch,error:messagesError}=await s.from('messages')
           .select('*').eq('conversation_id',id).eq('user_id',user.id)
-          .order('created_at',{ascending:true});
+          .order('created_at',{ascending:true}).range(messageOffset,messageOffset+PAGE_FETCH-1);
         if(messagesError)throw appError('DATABASE_ERROR',{},messagesError);
+        const batch=messageBatch||[];let messages=[],responseBytes=0;
+        for(const message of batch){const bytes=Buffer.byteLength(JSON.stringify(message),'utf8');if(messages.length&&responseBytes+bytes>RESPONSE_BUDGET)break;messages.push(message);responseBytes+=bytes;}
+        const nextMessageOffset=(messages.length<batch.length||batch.length===PAGE_FETCH)?messageOffset+messages.length:null;
 
         if(!includeImages){
           conversation.messages=(messages||[]).map(message=>({...message,generated_images:[]}));
-          return json(res,200,{conversation});
+          return json(res,200,{conversation,nextMessageOffset});
         }
 
         const messageIds=(messages||[]).map(message=>message.id);
@@ -165,7 +170,7 @@ export default async function handler(req,res){
           ...message,
           generated_images:imagesByMessage.get(message.id)||[]
         }));
-        return json(res,200,{conversation});
+        return json(res,200,{conversation,nextMessageOffset});
       }
 
       const {data,error}=await s.from('conversations')

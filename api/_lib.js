@@ -873,14 +873,31 @@ function modelValueScore(model, profile, options = {}) {
   return quality * qualityWeight + cheapBonus - costPenalty - qualityFloorPenalty;
 }
 
-export async function chooseTaskModel(taskId, text = '', { webSearch = false, hasAttachments = false } = {}) {
+function modelInputModalities(model) {
+  const raw = model?.architecture?.input_modalities || model?.input_modalities || [];
+  return Array.isArray(raw) ? raw.map(value => String(value).toLowerCase()) : [];
+}
+
+export function modelSupportsAttachmentTypes(model, attachmentTypes = []) {
+  const types = Array.isArray(attachmentTypes) ? attachmentTypes.map(value => String(value || '').toLowerCase()).filter(Boolean) : [];
+  if (!types.length) return true;
+  const modalities = modelInputModalities(model);
+  // Text/code attachments are embedded as UTF-8 text before routing, so every text-chat model can consume them.
+  const needsImage = types.some(type => type.startsWith('image/'));
+  const needsFile = types.some(type => !type.startsWith('image/') && !type.startsWith('text/') && type !== 'text');
+  if (needsImage && !modalities.includes('image')) return false;
+  if (needsFile && !modalities.includes('file')) return false;
+  return true;
+}
+
+export async function chooseTaskModel(taskId, text = '', { webSearch = false, hasAttachments = false, attachmentTypes = [] } = {}) {
   const configured=(await getToolModelSettings())[taskId];
-  if(configured){const exact=(await getAvailableModels()).find(model=>model.id===configured);if(exact)return exact;}
+  if(configured){const exact=(await getAvailableModels()).find(model=>model.id===configured);if(exact && modelSupportsAttachmentTypes(exact, attachmentTypes))return exact;}
   const profile = TASK_MODEL_PROFILES[taskId];
   if (!profile) return chooseAutoModel(text, { webSearch, hasAttachments });
 
   const models = (await getAvailableModels())
-    .filter(model => isTextChatModel(model) && !model.locked && !isFreeModel(model));
+    .filter(model => isTextChatModel(model) && !model.locked && !isFreeModel(model) && modelSupportsAttachmentTypes(model, attachmentTypes));
   if (!models.length) return null;
 
   const label = model => `${model.id || ''} ${model.name || ''}`;
@@ -912,12 +929,12 @@ export async function chooseTaskModel(taskId, text = '', { webSearch = false, ha
     const costDiff = modelBlendedCost(a) - modelBlendedCost(b);
     if (Math.abs(costDiff) > 0.000001) return costDiff;
     return Number(b.contextLength || 0) - Number(a.contextLength || 0);
-  })[0] || chooseAutoModel(text, { webSearch, hasAttachments });
+  })[0] || chooseAutoModel(text, { webSearch, hasAttachments, attachmentTypes });
 }
 
-export async function chooseAutoModel(text = '', { webSearch = false, hasAttachments = false } = {}) {
+export async function chooseAutoModel(text = '', { webSearch = false, hasAttachments = false, attachmentTypes = [] } = {}) {
   const models = await getAvailableModels();
-  const available = models.filter(m => isTextChatModel(m) && !isFreeModel(m));
+  const available = models.filter(m => isTextChatModel(m) && !isFreeModel(m) && modelSupportsAttachmentTypes(m, attachmentTypes));
   const q = String(text || '').toLowerCase();
   const complex = q.length > 1400 || /(?:حلل|تحليل عميق|برمجة|كود|debug|architecture|security|رياضيات|reason|research|compare)/i.test(q);
   const coding = /(?:كود|برمجة|خطأ|بايثون|جافاسكربت|sql|code|debug|function|api)/i.test(q);
@@ -1096,6 +1113,36 @@ function expectedOutputTokens(text, inputTokens, attachmentCount, imageCount, we
   let predicted = 48 + latestTokens * ratio + Math.sqrt(Math.max(1, inputTokens)) * 5.5;
   predicted += attachmentCount * 45 + imageCount * 75 + (webSearch ? 120 : 0);
   return Math.max(64, Math.min(32768, Math.ceil(predicted)));
+}
+
+export function fitMessagesToModelContext(messages = [], contextLength = 0, outputReserve = 4096, locale = 'en') {
+  const source = Array.isArray(messages) ? messages : [];
+  const context = Math.max(0, Number(contextLength || 0));
+  if (!context) return { messages: source, omittedMessages: 0, inputTokens: Math.max(1, estimatedContentTokens(source) + 14 * source.length + 8) };
+  const reserve = Math.max(512, Math.min(32768, Number(outputReserve || 4096)));
+  const maxInput = Math.max(1024, context - reserve - 256);
+  const system = source.filter(message => message?.role === 'system');
+  const conversational = source.filter(message => message?.role !== 'system');
+  const systemTokens = estimatedContentTokens(system) + 14 * system.length + 8;
+  let used = systemTokens;
+  const kept = [];
+  for (let i = conversational.length - 1; i >= 0; i--) {
+    const message = conversational[i];
+    const cost = estimatedContentTokens(message) + 14;
+    // Always keep the newest conversational message. If it alone is too large, fail explicitly upstream.
+    if (!kept.length || used + cost <= maxInput) { kept.unshift(message); used += cost; }
+    else break;
+  }
+  const omittedMessages = Math.max(0, conversational.length - kept.length);
+  if (used > maxInput && kept.length <= 1) return { messages:[...system,...kept], omittedMessages, inputTokens:used, tooLarge:true, maxInputTokens:maxInput };
+  const notice = omittedMessages ? {
+    role:'system',
+    content: locale === 'ar'
+      ? `ملاحظة نقل سياق: تم استبعاد ${omittedMessages} رسالة أقدم من هذا الطلب فقط للحفاظ على سعة سياق النموذج. لم يتم حذفها من المحادثة المحفوظة. إذا احتجت تفاصيل منها فاطلبها من المستخدم بوضوح.`
+      : `Context transport note: ${omittedMessages} older message(s) were excluded from this request only to stay within the model context window. They remain saved in the conversation. Ask the user clearly if details from them are needed.`
+  } : null;
+  const fitted = notice ? [...system, notice, ...kept] : [...system, ...kept];
+  return { messages:fitted, omittedMessages, inputTokens:Math.max(1, estimatedContentTokens(fitted) + 14 * fitted.length + 8), maxInputTokens:maxInput };
 }
 
 export function estimateChatCharge(price, messages = [], webSearch = false, outputReserve = 0) {

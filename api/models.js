@@ -1,7 +1,7 @@
 import {
   allowMethods, json, requestLocale, localize, requireUser, db,
   getAvailableModels, getTrialModelId, packageQuote, getPaymentPackages, getFeatureFlags, getGlobalAnnouncement,
-  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints
+  TOKEN_USD, estimateChatCharge, getToolModelSettings, getAiTools, getOpenRouterImageModels, getOpenRouterImageModelEndpoints, chooseAutoModel, chooseTaskModel, modelSupportsAttachmentTypes, fitMessagesToModelContext
 } from './_lib.js';
 
 
@@ -73,13 +73,23 @@ export default async function handler(req, res) {
         const estimate=await imageEstimate(image,body.resolution,body.aspectRatio,Boolean(body.hasReferenceImage));
         return json(res, 200, { type:'image', modelId:image.id, routedModelId:image.id, modelName:image.name, ...(estimatePurchased?estimate:{providerUsd:0,chargedTokens:1}), approximate:true, freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial', resolution:String(body.resolution||''), aspectRatio:String(body.aspectRatio||''), megapixels:estimate.megapixels, pricingBasis:estimate.pricingBasis, unitPrice:estimate.unitPrice });
       }
-      const id = (routingTaskId ? settings[routingTaskId] : '') || body.modelId;
-      const model = models.find(item => item.id === id) || models[0];
-      const estimate = estimateChatCharge(model.pricing, Array.isArray(body.messages) ? body.messages : [], Boolean(body.webSearch), Number(body.outputReserve || 0));
+      const estimateMessages = Array.isArray(body.messages) ? body.messages : [];
+      const estimateAttachments = Array.isArray(body.attachments) ? body.attachments : [];
+      const attachmentTypes = estimateAttachments.map(a=>a?.text?'text':String(a?.type||'')).filter(Boolean);
+      const latest = [...estimateMessages].reverse().find(message=>message?.role==='user');
+      const latestText = typeof latest?.content === 'string' ? latest.content : (Array.isArray(latest?.content)?latest.content.find(part=>part?.type==='text')?.text||'':'');
+      let model = null;
+      if (routingTaskId) model = await chooseTaskModel(routingTaskId, latestText, {webSearch:Boolean(body.webSearch),hasAttachments:estimateAttachments.length>0,attachmentTypes});
+      else if (body.modelId === 'aiway/auto') model = await chooseAutoModel(latestText, {webSearch:Boolean(body.webSearch),hasAttachments:estimateAttachments.length>0,attachmentTypes});
+      if (!model) { const id = (routingTaskId ? settings[routingTaskId] : '') || body.modelId; model = models.find(item => item.id === id && modelSupportsAttachmentTypes(item,attachmentTypes)) || models.find(item=>modelSupportsAttachmentTypes(item,attachmentTypes)) || models[0]; }
+      const reserveForServer = estimatePurchased ? 32768 : 16384;
+      const fittedEstimateContext = fitMessagesToModelContext(estimateMessages, Number(model.contextLength || model.context_length || 0), reserveForServer, locale);
+      if (fittedEstimateContext.tooLarge) return json(res, 413, { error:localize(locale,'المحتوى أكبر من سعة النموذج المختار.','The content exceeds the selected model context capacity.'), code:'CONTEXT_TOO_LONG' });
+      const estimate = estimateChatCharge(model.pricing, fittedEstimateContext.messages, Boolean(body.webSearch), reserveForServer);
       return json(res, 200, {
         type:'chat', modelId:model.id, routedModelId:model.id, modelName:model.name,
         ...(estimatePurchased ? estimate : { ...estimate, providerUsd:0, chargedTokens:1 }),
-        approximate:true,
+        approximate:true, omittedContextMessages:Number(body.clientOmittedContextMessages||0)+Number(fittedEstimateContext.omittedMessages||0),
         freeTrial:!estimatePurchased, billingMode:estimatePurchased?'paid':'free_trial'
       });
     }
