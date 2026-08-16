@@ -12,6 +12,17 @@ function extractDownloadableFiles(text) {
   return files;
 }
 
+
+function hasUnclosedFencedBlock(text) {
+  const matches = String(text || '').match(/```/g);
+  return Boolean(matches && matches.length % 2 === 1);
+}
+
+function isOutputLimitFinishReason(reason) {
+  const value = String(reason || '').toLowerCase();
+  return value === 'length' || value === 'max_tokens' || value === 'max_output_tokens';
+}
+
 function safeDownloadFilename(value) {
   return String(value || 'aiway-file.txt')
     .replace(/[\r\n\0]/g, '')
@@ -139,6 +150,7 @@ Maintain full continuity with all earlier messages in this conversation. Never i
 Return polished Markdown only. Keep links valid and code syntactically complete. Do not expose partial markup or unfinished code.
 For a downloadable code/text file, use a fenced block whose language is file-FILENAME, for example: \`\`\`file-index.html. Put only the complete file contents inside it.
 When the user asks for a long code file, prefer a downloadable file block rather than an excessively long inline explanation.
+Never abbreviate requested code with placeholders such as "rest of code here", "same as above", or omitted sections. If an answer must continue across generations, resume exactly where it stopped without repeating prior content. Always close every fenced code/file block before treating the answer as complete.
 For a PowerPoint, return one fenced pptx-json block containing valid JSON shaped as {"filename":"presentation.pptx","slides":[{"title":"...","bullets":["..."]}]}. Keep slide text concise and valid JSON with no comments.
 Use short headings only when useful, fenced code blocks with a language, and tables only for real comparisons.`;
 
@@ -389,7 +401,7 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
     if(!response.body)throw appError('EMPTY_RESPONSE');
 
     res.statusCode=200;res.setHeader('Content-Type','text/event-stream; charset=utf-8');res.setHeader('Cache-Control','no-cache, no-transform');res.setHeader('Connection','keep-alive');res.setHeader('X-Accel-Buffering','no');res.flushHeaders?.();
-    const reader=response.body.getReader();const decoder=new TextDecoder();let upstreamBuffer='',answer='',generationId='',routedModelId=activeModelId,providerName=null;
+    const reader=response.body.getReader();const decoder=new TextDecoder();let upstreamBuffer='',answer='',generationId='',routedModelId=activeModelId,providerName=null,finishReason='';
     const readUpstream=async()=>{let timer;try{return await Promise.race([reader.read(),new Promise((_,reject)=>{timer=setTimeout(()=>{const error=new Error('OpenRouter stream timed out');error.code='REQUEST_TIMEOUT';reject(error)},60000)})])}catch(error){if(error?.code==='REQUEST_TIMEOUT')try{await reader.cancel('idle-timeout')}catch{}throw error}finally{clearTimeout(timer)}};
     let usage={prompt_tokens:0,completion_tokens:0,total_tokens:0,cost:0};
     while(true){
@@ -403,7 +415,9 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
         if(chunk?.error)throw openRouterError(Number(chunk.error?.code||500),chunk,{webSearch});
         generationId=chunk.id||generationId;routedModelId=chunk.model||routedModelId;providerName=chunk.provider||providerName;
         if(chunk.usage)usage={prompt_tokens:Number(chunk.usage.prompt_tokens||usage.prompt_tokens||0),completion_tokens:Number(chunk.usage.completion_tokens||usage.completion_tokens||0),total_tokens:Number(chunk.usage.total_tokens||usage.total_tokens||0),cost:Number(chunk.usage.cost||usage.cost||0)};
-        const delta=chunk?.choices?.[0]?.delta?.content;
+        const choice=chunk?.choices?.[0];
+        if(choice?.finish_reason)finishReason=String(choice.finish_reason);
+        const delta=choice?.delta?.content;
         const text=typeof delta==='string'?delta:(Array.isArray(delta)?delta.map(part=>part?.text||part?.content||'').join(''):'');
         if(text){answer+=text;res.write(`data: ${JSON.stringify({type:'delta',text})}\n\n`);}
       }
@@ -430,12 +444,14 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       generationId: generationId || null,
       routerMetadata: routerMetadata || {},
       webSearch: Boolean(webSearch),
-      taskId: taskId || previousUsage.taskId || null
+      taskId: taskId || previousUsage.taskId || null,
+      finishReason: finishReason || null,
+      incomplete: isOutputLimitFinishReason(finishReason) || hasUnclosedFencedBlock(answer)
     };
     let savedAssistant;
     let saveAssistantError;
     if (continuationTarget) {
-      const combinedContent = `${String(continuationTarget.content || '').replace(/\s+$/, '')}\n\n${answer.trim()}`;
+      const combinedContent = `${String(continuationTarget.content || '')}${answer}`;
       const result = await supabase.from('messages').update({
         content: combinedContent,
         model_id: activeModelId,
@@ -470,8 +486,13 @@ ${JSON.stringify(toolInstructionPayload)}` : '';
       .eq('user_id', user.id);
     if (conversationUpdate.error) console.warn('Conversation timestamp update failed:', conversationUpdate.error.message);
 
+    const incompleteReason = isOutputLimitFinishReason(finishReason)
+      ? 'max_output_tokens'
+      : (hasUnclosedFencedBlock(answer) ? 'unfinished_fenced_block' : '');
     res.write(`data: ${JSON.stringify({
-      type: 'done',
+      type: incompleteReason ? 'incomplete' : 'done',
+      reason: incompleteReason || undefined,
+      finishReason: finishReason || undefined,
       usage,
       chargedTokens: purchased ? charge.chargedTokens : 1,
       remainingTokens,
