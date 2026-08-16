@@ -780,7 +780,7 @@ async function handleCodeAction(button){
 }
 function extractGeneratedFiles(text){
   const files=[];const re=/```file-([^\n`]+)\n([\s\S]*?)```/g;let match;
-  while((match=re.exec(String(text||'')))&&files.length<8){files.push({name:match[1].trim(),content:match[2].replace(/\n$/,'')})}
+  while((match=re.exec(String(text||'')))&&files.length<12){files.push({name:match[1].trim(),content:match[2].replace(/\n$/,'')})}
   return files;
 }
 function generatedFilesMarkup(m,i){
@@ -1116,7 +1116,7 @@ function formatApproximateCost(estimate){
  const formatted=tokens.toLocaleString(lang==='ar'?'ar-EG':'en-US');
  const names=Array.isArray(estimate?.attachmentNames)?estimate.attachmentNames.filter(Boolean):[];
  const fileLine=names.length?(lang==='ar'?`\n\nالملف المتضمن: ${names.join('، ')}`:`\n\nIncluded file${names.length>1?'s':''}: ${names.join(', ')}`):'';
- const billing=estimate?.billingMode||(isFreeTrial?'free_trial':'paid');const costLine=billing==='free_trial'?(lang==='ar'?'سيُستخدم طلب مجاني واحد من التجربة، ولن يُخصم من الرصيد المدفوع.':'One free-trial request will be used; no paid balance will be deducted.'):(lang==='ar'?`الخصم التقريبي: ${formatted} توكن AiWay`:`Estimated deduction: ${formatted} AiWay tokens`);const detail=estimate?.type==='image'?(lang==='ar'?`\nالدقة: ${estimate.resolution||$('imageResolution').value||'تلقائي'} — الأبعاد: ${estimate.aspectRatio||$('aspectRatio').value||'تلقائي'}${estimate.pricingBasis==='per_megapixel'?`\nالحساب حسب ${Number(estimate.megapixels||0).toFixed(2)} ميجابكسل × $${Number(estimate.unitPrice||0).toFixed(4)} لكل ميجابكسل`:estimate.pricingBasis==='per_image'?`\nالسعر المعلن: $${Number(estimate.unitPrice||0).toFixed(4)} لكل صورة`:''}`:`\nResolution: ${estimate.resolution||$('imageResolution').value||'Auto'} — Aspect ratio: ${estimate.aspectRatio||$('aspectRatio').value||'Auto'}${estimate.pricingBasis==='per_megapixel'?`\nCalculated as ${Number(estimate.megapixels||0).toFixed(2)} MP × $${Number(estimate.unitPrice||0).toFixed(4)} per MP`:estimate.pricingBasis==='per_image'?`\nPublished price: $${Number(estimate.unitPrice||0).toFixed(4)} per image`:''}`):'';return lang==='ar'?`النموذج الذي سينفذ المهمة: ${model}\n\n${costLine}${detail}${fileLine}`:`Model selected for this task: ${model}\n\n${costLine}${detail}${fileLine}`;
+ const billing=estimate?.billingMode||(isFreeTrial?'free_trial':'paid');const costLine=billing==='free_trial'?(lang==='ar'?'سيُستخدم طلب مجاني واحد من التجربة، ولن يُخصم من الرصيد المدفوع.':'One free-trial request will be used; no paid balance will be deducted.'):(lang==='ar'?`الخصم التقريبي: ${formatted} توكن AiWay`:`Estimated deduction: ${formatted} AiWay tokens`);const ioDetail=estimate?.type==='chat'?(lang==='ar'?`\nالمدخل المتوقع: ${Math.max(1,Number(estimate.inputTokens||0)).toLocaleString('ar-EG')} توكن — المخرج المتوقع: ${Math.max(64,Number(estimate.reservedOutputTokens||0)).toLocaleString('ar-EG')} توكن`:`\nEstimated input: ${Math.max(1,Number(estimate.inputTokens||0)).toLocaleString('en-US')} tokens — expected output: ${Math.max(64,Number(estimate.reservedOutputTokens||0)).toLocaleString('en-US')} tokens`):'';const detail=estimate?.type==='image'?(lang==='ar'?`\nالدقة: ${estimate.resolution||$('imageResolution').value||'تلقائي'} — الأبعاد: ${estimate.aspectRatio||$('aspectRatio').value||'تلقائي'}${estimate.pricingBasis==='per_megapixel'?`\nالحساب حسب ${Number(estimate.megapixels||0).toFixed(2)} ميجابكسل × $${Number(estimate.unitPrice||0).toFixed(4)} لكل ميجابكسل`:estimate.pricingBasis==='per_image'?`\nالسعر المعلن: $${Number(estimate.unitPrice||0).toFixed(4)} لكل صورة`:''}`:`\nResolution: ${estimate.resolution||$('imageResolution').value||'Auto'} — Aspect ratio: ${estimate.aspectRatio||$('aspectRatio').value||'Auto'}${estimate.pricingBasis==='per_megapixel'?`\nCalculated as ${Number(estimate.megapixels||0).toFixed(2)} MP × $${Number(estimate.unitPrice||0).toFixed(4)} per MP`:estimate.pricingBasis==='per_image'?`\nPublished price: $${Number(estimate.unitPrice||0).toFixed(4)} per image`:''}`):'';return lang==='ar'?`النموذج الذي سينفذ المهمة: ${model}\n\n${costLine}${ioDetail}${detail}${fileLine}`:`Model selected for this task: ${model}\n\n${costLine}${ioDetail}${detail}${fileLine}`;
 }
 async function confirmEstimatedMessageCost(modelId,text,attachments){
  if(!costEstimateEnabled())return true;
@@ -1247,73 +1247,35 @@ async function copyMsg(i){
 let pptxLoaderPromise=null;
 function ensurePptxLibrary(){if(window.PptxGenJS)return Promise.resolve();if(pptxLoaderPromise)return pptxLoaderPromise;pptxLoaderPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';script.async=true;script.onload=()=>window.PptxGenJS?resolve():reject(Error('PowerPoint library unavailable'));script.onerror=()=>reject(Error('PowerPoint library unavailable'));document.head.appendChild(script)});return pptxLoaderPromise}
 async function downloadPptx(jsonText){try{await ensurePptxLibrary();const data=JSON.parse(jsonText),pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.author='AiWay';for(const item of (data.slides||[])){const slide=pptx.addSlide();slide.addText(String(item.title||''),{x:.6,y:.45,w:12.1,h:.55,fontSize:26,bold:true,margin:0});const bullets=Array.isArray(item.bullets)?item.bullets:[];slide.addText(bullets.map(x=>({text:String(x),options:{bullet:{indent:18}}})),{x:.8,y:1.35,w:11.7,h:5.3,fontSize:18,breakLine:true,margin:.08,valign:'top'})}await pptx.writeFile({fileName:String(data.filename||'AiWay-presentation.pptx').replace(/[^\w.() -]/g,'_')})}catch(e){console.error(e);toast(lang==='ar'?'تعذر إنشاء ملف PowerPoint. تحقق من صيغة المحتوى وحاول مرة أخرى.':'Could not create the PowerPoint file. Check the content format and try again.')}}
-function buildHtmlProject(files,entry){let html=entry.content;for(const f of files){if(/\.css$/i.test(f.name))html=html.replace(new RegExp(`<link[^>]+href=["']${f.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}["'][^>]*>`,'i'),`<style>${f.content}
-/* AiWay introduction experience */
-.intro-screen{position:fixed;inset:0;z-index:2147483640;overflow:auto;background:radial-gradient(circle at 12% 15%,rgba(244,185,66,.16),transparent 24%),radial-gradient(circle at 88% 12%,rgba(143,82,214,.22),transparent 32%),linear-gradient(145deg,#fbf8fe 0%,#f4eafa 52%,#fff 100%);display:grid;place-items:center;padding:28px 18px;transition:opacity .55s ease,visibility .55s ease}.intro-screen.hide{opacity:0;visibility:hidden;pointer-events:none}
-.intro-lang{position:fixed;z-index:3;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));width:44px;height:44px;border:1px solid rgba(111,45,189,.22);border-radius:50%;background:rgba(255,255,255,.9);color:var(--pi);font-weight:900;cursor:pointer;box-shadow:0 10px 28px rgba(74,34,104,.14);backdrop-filter:blur(12px);transition:.2s ease}.intro-lang:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(74,34,104,.2)}.intro-orb{position:absolute;border-radius:50%;filter:blur(2px);opacity:.55;animation:introFloat 7s ease-in-out infinite}.intro-orb.one{width:190px;height:190px;background:linear-gradient(145deg,#6f2dbd,#a76be6);top:-65px;right:-45px}.intro-orb.two{width:140px;height:140px;background:linear-gradient(145deg,#f4b942,#ffe5a3);bottom:7%;left:-45px;animation-delay:-2.2s}.intro-card{position:relative;width:min(1040px,100%);border:1px solid rgba(255,255,255,.86);border-radius:34px;padding:clamp(26px,5vw,58px);background:rgba(255,255,255,.78);backdrop-filter:blur(22px);box-shadow:0 32px 90px rgba(67,31,93,.18);overflow:hidden}.intro-grid{display:grid;grid-template-columns:1.08fr .92fr;align-items:center;gap:clamp(28px,5vw,68px)}.intro-logo{width:78px;height:78px;border-radius:25px;box-shadow:0 18px 38px rgba(111,45,189,.22);margin-bottom:22px}.intro-eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid #e4d1f1;background:#f6effb;color:var(--pi);border-radius:999px;padding:8px 13px;font-weight:800;font-size:13px}.intro-title{font-size:clamp(37px,6vw,68px);line-height:1.05;margin:18px 0 16px;letter-spacing:-1.7px}.intro-title span{background:linear-gradient(135deg,var(--pi),#a65ce8);-webkit-background-clip:text;background-clip:text;color:transparent}.intro-copy{font-size:clamp(15px,2vw,18px);line-height:1.95;color:var(--muted);max-width:650px}.intro-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:27px}.intro-start{border:0;border-radius:17px;padding:14px 24px;color:#fff;background:linear-gradient(135deg,var(--pi),var(--pi2));font-weight:900;cursor:pointer;box-shadow:0 14px 32px rgba(111,45,189,.28);display:flex;align-items:center;gap:10px;transition:.22s ease}.intro-start:hover{transform:translateY(-3px);box-shadow:0 19px 38px rgba(111,45,189,.34)}.intro-note{font-size:12px;color:var(--muted)}.intro-features{display:grid;grid-template-columns:1fr 1fr;gap:13px}.intro-feature{min-height:145px;padding:19px;border-radius:23px;background:rgba(255,255,255,.86);border:1px solid #eadff1;box-shadow:0 12px 28px rgba(76,39,102,.07);transition:.22s ease}.intro-feature:hover{transform:translateY(-4px) rotate(-.3deg);border-color:#d5bbe7}.intro-feature-icon{width:43px;height:43px;border-radius:14px;background:var(--pi3);color:var(--pi);display:grid;place-items:center;font-size:21px;margin-bottom:13px}.intro-feature b{display:block;margin-bottom:7px;font-size:15px}.intro-feature small{color:var(--muted);line-height:1.65}.signin-guide{position:fixed;z-index:45;top:78px;left:18px;display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(-8px);pointer-events:none;transition:.35s ease}.signin-guide.show{opacity:1;transform:translateY(0)}.signin-guide-text{position:relative;background:#2b1d34;color:#fff;padding:10px 13px;border-radius:13px;font-size:13px;font-weight:800;box-shadow:0 12px 28px rgba(43,29,52,.24);white-space:nowrap}.signin-guide-text:before{content:"";position:absolute;left:18px;top:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:8px solid #2b1d34}.mobile-menu.signin-pulse{animation:menuSigninPulse 1.5s ease-in-out infinite;box-shadow:0 0 0 0 rgba(111,45,189,.35)}@keyframes menuSigninPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(111,45,189,.34)}50%{transform:scale(1.07);box-shadow:0 0 0 12px rgba(111,45,189,0)}}@keyframes introFloat{0%,100%{transform:translate3d(0,0,0) rotate(0)}50%{transform:translate3d(12px,18px,0) rotate(7deg)}}@media(max-width:780px){.intro-screen{padding:12px}.intro-card{border-radius:26px;padding:25px 19px}.intro-grid{grid-template-columns:1fr}.intro-features{grid-template-columns:1fr 1fr}.intro-feature{min-height:125px}.intro-logo{width:64px;height:64px}.signin-guide{top:68px;left:8px}.signin-guide-text{font-size:12px;padding:9px 11px}}@media(max-width:440px){.intro-features{grid-template-columns:1fr}.intro-feature{min-height:auto}.intro-title{font-size:40px}.intro-actions{align-items:stretch}.intro-start{width:100%;justify-content:center}.intro-note{text-align:center;width:100%}}
+function buildHtmlProject(files,entry){
+  const list=Array.isArray(files)?files:[];
+  let html=String(entry?.content||'');
+  const normalizePath=value=>String(value||'').trim().replace(/[?#].*$/,'').replace(/^\.\//,'').replace(/^\//,'');
+  const basename=value=>normalizePath(value).split('/').pop();
+  const findFile=ref=>{const target=normalizePath(ref),base=basename(ref);return list.find(f=>{const name=normalizePath(f?.name);return name===target||basename(name)===base})||null};
+  const used=new Set();
 
-/* All-models mobile header: menu, model picker, balance — no overlap */
-@media(max-width:620px){
- body.all-models-active .topbar{
-  display:grid!important;
-  grid-template-columns:72px minmax(0,1fr) 44px!important;
-  grid-template-areas:"credits model menu"!important;
-  align-items:center!important;
-  gap:7px!important;
-  padding:7px 9px!important;
-  height:64px!important;min-height:64px!important;
- }
- body.all-models-active .mobile-menu{grid-area:menu!important;display:grid!important;width:44px!important;min-width:44px!important;height:48px!important;margin:0!important}
- body.all-models-active .model-wrap{grid-area:model!important;position:static!important;transform:none!important;width:100%!important;max-width:none!important;min-width:0!important;margin:0!important}
- body.all-models-active .model-trigger{width:100%!important;min-width:0!important;height:48px!important;padding:6px 9px!important;border-radius:15px!important}
- body.all-models-active .model-trigger-icon{display:none!important}
- body.all-models-active .model-trigger-copy{min-width:0!important}
- body.all-models-active .model-trigger-copy b{font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
- body.all-models-active .credits{grid-area:credits!important;width:72px!important;max-width:72px!important;min-width:0!important;height:48px!important;padding:7px 6px!important;justify-content:center!important;gap:4px!important;margin:0!important;overflow:hidden!important}
- body.all-models-active .credits .credit-coin,body.all-models-active .credits .label,body.all-models-active .credits .credit-buy-label{display:none!important}
- body.all-models-active .top-tools-btn,body.all-models-active .top-login-btn,body.all-models-active .task-context,body.all-models-active .spacer,body.all-models-active .export{display:none!important}
-}
-@media(max-width:350px){
- body.all-models-active .topbar{grid-template-columns:58px minmax(0,1fr) 42px!important;padding-inline:6px!important;gap:5px!important}
- body.all-models-active .credits{width:58px!important;max-width:58px!important;font-size:12px!important}
- body.all-models-active .mobile-menu{width:42px!important;min-width:42px!important}
- body.all-models-active .model-trigger-copy b{font-size:11px!important}
-}
+  // Inline local stylesheets referenced by the generated HTML.
+  html=html.replace(/<link\b([^>]*?)href=["']([^"']+)["']([^>]*)>/gi,(tag,before,href,after)=>{
+    const file=findFile(href);if(!file||!/\.css$/i.test(file.name))return tag;
+    used.add(file.name);return `<style data-aiway-source="${esc(file.name)}">\n${file.content}\n</style>`;
+  });
 
-/* Final compact mobile headers and visible sign-in progress */
-.login-busy{position:relative!important;pointer-events:none!important;opacity:.78!important}
-.login-busy svg,.login-busy [data-icon]{visibility:hidden!important}
-.login-busy::before{content:"";width:17px;height:17px;flex:0 0 17px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
-.intro-login-btn{min-width:112px;justify-content:center}.intro-login-btn.login-busy{display:inline-flex!important;align-items:center!important;gap:8px!important;min-width:176px}.intro-login-btn.login-busy::before{width:16px;height:16px;flex-basis:16px}.intro-login-btn.login-busy #introLoginLabel{white-space:nowrap}
-@media(max-width:620px){
-  body.all-models-active .topbar{display:grid!important;grid-template-columns:64px minmax(0,1fr) 44px!important;grid-template-areas:"credits model menu"!important;padding:7px 8px!important;gap:6px!important;overflow:visible!important}
-  body.all-models-active .topbar>:not(.mobile-menu):not(.model-wrap):not(.credits){display:none!important}
-  body.all-models-active .model-wrap{grid-area:model!important;display:block!important;position:static!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important}
-  body.all-models-active .model-trigger{width:100%!important;min-width:0!important;max-width:none!important;height:48px!important;padding:6px 9px!important}
-  body.all-models-active .model-trigger-copy b{font-size:12px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-  body.all-models-active .mobile-menu{grid-area:menu!important;position:static!important;width:44px!important;min-width:44px!important;height:48px!important}
-  body.all-models-active .credits{grid-area:credits!important;position:static!important;width:64px!important;min-width:64px!important;max-width:64px!important;height:48px!important;margin:0!important;padding:6px!important;justify-content:center!important;overflow:hidden!important}
-  body.all-models-active .credits .credit-coin,body.all-models-active .credits .label,body.all-models-active .credits .credit-buy-label{display:none!important}
+  // Inline local scripts, preserving module/classic type when possible so JS actually runs in srcdoc.
+  html=html.replace(/<script\b([^>]*?)src=["']([^"']+)["']([^>]*)>\s*<\/script>/gi,(tag,before,src,after)=>{
+    const file=findFile(src);if(!file||!/\.(?:m?js|cjs)$/i.test(file.name))return tag;
+    used.add(file.name);const attrs=`${before||''} ${after||''}`.replace(/\bsrc\s*=\s*["'][^"']+["']/i,'').trim();
+    return `<script ${attrs} data-aiway-source="${esc(file.name)}">\n${String(file.content||'').replace(/<\/script/gi,'<\\/script')}\n<\/script>`;
+  });
 
-  body:not(.all-models-active) .topbar{display:grid!important;grid-template-columns:74px minmax(0,1fr) 44px!important;grid-template-areas:"credits task menu"!important;padding:7px 8px!important;gap:7px!important}
-  body:not(.all-models-active) .mobile-menu{grid-area:menu!important;position:static!important;width:44px!important;min-width:44px!important;height:48px!important}
-  body:not(.all-models-active) .task-context{grid-area:task!important;position:static!important;transform:none!important;display:flex!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;justify-content:center!important;gap:8px!important}
-  body:not(.all-models-active) .task-context-copy{display:block!important;min-width:0!important;max-width:calc(100% - 48px)!important}
-  body:not(.all-models-active) .task-context-copy b{display:block!important;font-size:13px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-  body:not(.all-models-active) .task-context-copy small,body:not(.all-models-active) .task-change{display:none!important}
-  body:not(.all-models-active) .task-context-icon{width:40px!important;height:40px!important;flex:0 0 40px!important}
-  body:not(.all-models-active) .credits{grid-area:credits!important;position:static!important;width:74px!important;min-width:74px!important;max-width:74px!important;height:48px!important;margin:0!important;padding:7px 6px!important;justify-content:center!important}
-  body:not(.all-models-active) .credits .credit-coin,body:not(.all-models-active) .credits .label,body:not(.all-models-active) .credits .credit-buy-label{display:none!important}
-  body:not(.all-models-active) .top-tools-btn,body:not(.all-models-active) .top-login-btn,body:not(.all-models-active) .model-wrap,body:not(.all-models-active) .spacer,body:not(.all-models-active) .export{display:none!important}
+  // If the assistant produced CSS/JS project files but forgot to link them from index.html,
+  // include them automatically in the preview. This keeps the preview faithful and useful.
+  const extraCss=list.filter(f=>/\.css$/i.test(f.name)&&!used.has(f.name)).map(f=>`<style data-aiway-source="${esc(f.name)}">\n${f.content}\n</style>`).join('\n');
+  const extraJs=list.filter(f=>/\.(?:m?js|cjs)$/i.test(f.name)&&!used.has(f.name)).map(f=>`<script data-aiway-source="${esc(f.name)}">\n${String(f.content||'').replace(/<\/script/gi,'<\\/script')}\n<\/script>`).join('\n');
+  if(extraCss)html=/<\/head>/i.test(html)?html.replace(/<\/head>/i,`${extraCss}\n</head>`):`${extraCss}\n${html}`;
+  if(extraJs)html=/<\/body>/i.test(html)?html.replace(/<\/body>/i,`${extraJs}\n</body>`):`${html}\n${extraJs}`;
+  return html;
 }
-@media(max-width:350px){
- body.all-models-active .topbar{grid-template-columns:56px minmax(0,1fr) 42px!important;padding-inline:5px!important;gap:5px!important}
- body.all-models-active .credits{width:56px!important;min-width:56px!important;max-width:56px!important;font-size:12px!important}
- body:not(.all-models-active) .topbar{grid-template-columns:60px minmax(0,1fr) 42px!important;padding-inline:5px!important;gap:5px!important}
- body:not(.all-models-active) .credits{width:60px!important;min-width:60px!important;max-width:60px!important;font-size:12px!important}
- body:not(.all-models-active) .task-context-copy b{font-size:12px!important}
-}
-</style>`);if(/\.js$/i.test(f.name))html=html.replace(new RegExp(`<script[^>]+src=["']${f.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}["'][^>]*><\\/script>`,'i'),`<script>${f.content}<\\/script>`)}return html}
 function previewGeneratedFile(messageIndex,fileIndex){const files=extractGeneratedFiles(history[messageIndex]?.content),file=files[fileIndex];if(!file||!/\.html?$/i.test(file.name))return;const html=buildHtmlProject(files,file);$('previewTitle').textContent=file.name;$('previewFrame').srcdoc=html;$('previewModal').classList.add('open')}
 async function downloadGeneratedProject(messageIndex){const message=history[messageIndex],files=extractGeneratedFiles(message?.content);if(!files.length)return;if(!message?.id||!auth?.token)return toast(lang==='ar'?'احفظ المحادثة ثم حاول مرة أخرى':'Save the conversation and try again');try{await startNativeFileDownload({kind:'project',messageId:message.id})}catch(e){console.error(e);toast(e.message|| (lang==='ar'?'تعذر تنزيل المشروع':'Could not download the project'))}}
 async function downloadGeneratedFile(messageIndex,fileIndex){const message=history[messageIndex],file=extractGeneratedFiles(message?.content)[fileIndex];if(!file)return toast(lang==='ar'?'الملف غير متاح':'File is unavailable');if(!message?.id||!auth?.token)return toast(lang==='ar'?'احفظ المحادثة ثم حاول مرة أخرى':'Save the conversation and try again');try{await startNativeFileDownload({kind:'file',messageId:message.id,fileIndex})}catch(e){console.error(e);toast(e.message|| (lang==='ar'?'تعذر تنزيل الملف':'Could not download the file'))}}
