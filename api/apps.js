@@ -1,4 +1,4 @@
-import { allowMethods, appError, cleanText, db, errorDetails, handleError, json, localize, requestLocale, requireUser, enforceRateLimit, requestIp, safeHttpUrl } from './_lib.js';
+import { allowMethods, appError, cleanText, db, errorDetails, handleError, json, localize, maybeRefreshToken, requestLocale, requireUser, enforceRateLimit, requestIp, safeHttpUrl } from './_lib.js';
 
 
 const APP_FIELDS = 'id,name,slug,category,network,short_description,website_url,icon_url,screenshot_urls,rating,ratings_count,views_count,get_clicks_count,is_verified,is_featured,featured_until,developer_name,created_at';
@@ -11,6 +11,7 @@ export default async function handler(req, res) {
     if(route==='me'){
       if(req.method!=='GET')return json(res,405,{error:localize(locale,'الطريقة غير مسموحة.','Method not allowed.'),code:'METHOD_NOT_ALLOWED'});
       const user=await requireUser(req),supabase=db();
+      const refreshedToken=await maybeRefreshToken(req,user);
       const expired=await supabase.rpc('expire_paid_tokens',{p_user_id:user.id});if(expired.error)throw appError('DATABASE_ERROR',{},expired.error);
       const {data,error}=await supabase.from('users').select('id,username,role,ai_tokens,paid_ai_tokens,paid_tokens_expires_at,trial_messages_remaining,free_trial_tokens,has_purchased,created_at').eq('id',user.id).single();
       if(error||!data)throw appError('DATABASE_ERROR',{},error);
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
         const latest=[...messageRows.map(row=>({...row,type:'message'})),...imageRows.map(row=>({...row,type:'image'}))].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())[0];
         usageSummary={periodDays:30,consumedTokens,lastRequestTokens:latest?charged(latest.token_usage):0,lastRequestAt:latest?.created_at||null,lastRequestType:latest?.type||null};
       }catch{}
-      return json(res,200,{user:data,usageSummary});
+      return json(res,200,{user:data,usageSummary,...(refreshedToken?{refreshedToken}:{})});
     }
     if(route==='interactions'){
       const supabase=db(),appId=String(req.query?.appId||req.body?.appId||'');

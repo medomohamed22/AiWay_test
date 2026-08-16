@@ -183,6 +183,26 @@ export async function verifyDownloadTicket(token) {
   }
 }
 
+// Sliding-session helper: every successful authenticated /api/me visit mints a
+// fresh 24h token. requireUser() runs first and rejects expired/invalid tokens, so
+// users who return before their current 24h window ends get another full 24h from
+// that visit; users who stay away for 24h still have to sign in again.
+export async function maybeRefreshToken(req, user) {
+  requireEnv();
+  const authorization = req.headers.authorization || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!token) return null;
+  try {
+    await jwtVerify(token, new TextEncoder().encode(jwtSecret), {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: APP_TOKEN_AUDIENCE
+    });
+    return await signAppToken(user);
+  } catch {}
+  return null;
+}
+
 export async function requireUser(req) {
   requireEnv();
   const authorization = req.headers.authorization || '';
