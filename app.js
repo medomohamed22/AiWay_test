@@ -144,7 +144,7 @@ function renderAccountState(){
   if($('topLoginBtn')){$('topLoginBtn').classList.toggle('authenticated',Boolean(auth));$('topLoginLabel').textContent=auth?(lang==='ar'?'متصل':'Connected'):(lang==='ar'?'تسجيل الدخول':'Sign in')}
   if($('introLoginLabel'))$('introLoginLabel').textContent=auth?(lang==='ar'?'متصل بحساب Pi':'Pi connected'):(lang==='ar'?'تسجيل الدخول':'Sign in');
 }
-function applyLanguage(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.querySelector('[data-legal="privacy"]')&&(document.querySelector('[data-legal="privacy"]').textContent=lang==='ar'?'سياسة الخصوصية':'Privacy Policy');document.querySelector('[data-legal="terms"]')&&(document.querySelector('[data-legal="terms"]').textContent=lang==='ar'?'شروط الاستخدام':'Terms of Service');document.querySelectorAll('[data-i18n]').forEach(el=>{if(!['profileName','profileState'].includes(el.id))el.textContent=I18N[lang][el.dataset.i18n]||el.textContent});$('languageLabel').textContent=lang==='en'?'العربية':'English';$('prompt').placeholder=lang==='ar'?'اسأل أي شيء...':'Ask anything...';if($('attachBtn')){$('attachBtn').setAttribute('aria-label',lang==='ar'?'إرفاق صورة أو ملف':'Attach image or file');$('attachBtn').title=$('attachBtn').getAttribute('aria-label')}renderUsageSummary();if($('creditBuyLabel'))$('creditBuyLabel').textContent=lang==='ar'?'اشتري رصيد':'Buy balance';if($('creditsButton')){$('creditsButton').title=lang==='ar'?'فتح باقات الرصيد':'Open balance packages';$('creditsButton').setAttribute('aria-label',$('creditsButton').title)}if($('piBrowserLoginLabel'))$('piBrowserLoginLabel').textContent=auth?I18N[lang].connected:(lang==='ar'?'تسجيل Pi Browser':'Sign in with Pi Browser');if($('piSignInLabel'))$('piSignInLabel').textContent=lang==='ar'?'تسجيل Pi':'Pi Sign In';renderTaskScreen();updateTaskContext();updatePiSigninModal();renderPackages();if(window.aiwayModels)renderModelSelect($('model').value);renderAccountState();updateSupportLabels();updateIntroLanguage();refreshGlobalAnnouncement();render()}
+function applyLanguage(){document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.querySelector('[data-legal="privacy"]')&&(document.querySelector('[data-legal="privacy"]').textContent=lang==='ar'?'سياسة الخصوصية':'Privacy Policy');document.querySelector('[data-legal="terms"]')&&(document.querySelector('[data-legal="terms"]').textContent=lang==='ar'?'شروط الاستخدام':'Terms of Service');document.querySelectorAll('[data-i18n]').forEach(el=>{if(!['profileName','profileState'].includes(el.id))el.textContent=I18N[lang][el.dataset.i18n]||el.textContent});$('languageLabel').textContent=lang==='en'?'العربية':'English';$('prompt').placeholder=lang==='ar'?'اسأل أي شيء...':'Ask anything...';if($('attachBtn')){$('attachBtn').setAttribute('aria-label',lang==='ar'?'إرفاق صورة أو ملف':'Attach image or file');$('attachBtn').title=$('attachBtn').getAttribute('aria-label')}renderUsageSummary();if($('creditBuyLabel'))$('creditBuyLabel').textContent=lang==='ar'?'اشتري رصيد':'Buy balance';if($('creditsButton')){$('creditsButton').title=lang==='ar'?'فتح باقات الرصيد':'Open balance packages';$('creditsButton').setAttribute('aria-label',$('creditsButton').title)}if($('piBrowserLoginLabel'))$('piBrowserLoginLabel').textContent=auth?I18N[lang].connected:(lang==='ar'?'تسجيل Pi Browser':'Sign in with Pi Browser');if($('piSignInLabel'))$('piSignInLabel').textContent=lang==='ar'?'تسجيل Pi':'Pi Sign In';renderTaskScreen();updateTaskContext();updatePiSigninModal();renderPackages();if(window.aiwayModels)renderModelSelect($('model').value);renderAccountState();updateSupportLabels();updateIntroLanguage();render()}
 function toggleLanguage(){
  lang=lang==='en'?'ar':'en';
  storageSet('aiway_lang',lang);
@@ -347,10 +347,9 @@ function shortModelName(name){
   return value.slice(0,40);
 }
 function applyFeatureFlags(flags={}){window.aiwayFeatureFlags=flags||{};if(activeTask&&!isTaskVisible(activeTask)){activeTask='';storageRemove('aiway_active_task');updateTaskContext?.()}if($('taskScreen')?.classList.contains('open'))renderTaskScreen();for(const id of ['creditsButton','introHeroPackagesBtn','introHeroPackages']){const el=document.getElementById(id);if(el){el.hidden=flags.payments===false;el.setAttribute('aria-disabled',flags.payments===false?'true':'false')}}for(const id of ['topLoginBtn','piSignInBtn','piBrowserLoginBtn']){const el=document.getElementById(id);if(el&&flags.login===false){el.setAttribute('aria-disabled','true');el.classList.add('feature-disabled')}else el?.classList.remove('feature-disabled')}document.body.classList.toggle('maintenance-active',Boolean(flags.maintenance))}
-function globalAnnouncementContext(){if($('payModal')?.classList.contains('open'))return 'payments';const intro=$('introScreen');if(intro&&!intro.classList.contains('hide'))return 'home';if(activeTask==='image'&&!$('taskScreen')?.classList.contains('open'))return 'images';if($('taskScreen')?.classList.contains('open'))return 'tools';return 'chat'}
+function globalAnnouncementContext(){if($('payModal')?.classList.contains('open'))return 'payments';if($('taskScreen')?.classList.contains('open'))return 'tools';const intro=$('introScreen');if(intro&&!intro.classList.contains('hide'))return 'home';if(activeTask==='image')return 'images';return 'chat'}
 function shouldShowGlobalAnnouncement(value){if(!value?.enabled)return false;const now=Date.now(),starts=value.starts_at?Date.parse(value.starts_at):0,ends=value.ends_at?Date.parse(value.ends_at):0;if(starts&&Number.isFinite(starts)&&now<starts)return false;if(ends&&Number.isFinite(ends)&&now>=ends)return false;const pages=Array.isArray(value.pages)?value.pages.filter(Boolean):[];return !pages.length||pages.includes(globalAnnouncementContext())}
-function leaveAnnouncementContext(context){if(context==='images'||context==='chat'){openTaskScreen();return}if(context==='payments'){$('payModal')?.classList.remove('open');refreshGlobalAnnouncement();return}if(context==='tools'){closeTaskScreen();return}if(context==='home'){document.getElementById('aiwayAnnouncement')?.remove()}}
-function renderGlobalAnnouncement(value){let el=document.getElementById('aiwayAnnouncement');if(!shouldShowGlobalAnnouncement(value)){el?.remove();document.body.classList.remove('announcement-blocked');return}const pages=Array.isArray(value.pages)?value.pages.filter(Boolean):[],siteWide=!pages.length,context=globalAnnouncementContext(),level=['warning','danger'].includes(value.level)?value.level:'info',message=(lang==='ar'?value.text_ar:value.text_en)||value.text_ar||value.text_en||'';if(!el){el=document.createElement('div');el.id='aiwayAnnouncement';el.setAttribute('role','alertdialog');el.setAttribute('aria-modal','true');el.innerHTML='<div class="announcement-backdrop" aria-hidden="true"></div><section class="announcement-panel"><div class="announcement-mark" aria-hidden="true">!</div><div class="announcement-copy"><span class="announcement-kicker"></span><h2 class="announcement-title"></h2><p class="announcement-text"></p></div><button class="announcement-action" type="button"></button></section>';document.body.appendChild(el)}el.className=`aiway-announcement ${level} ${siteWide?'site-wide':'scoped'}`;document.body.classList.add('announcement-blocked');el.querySelector('.announcement-kicker').textContent=lang==='ar'?(siteWide?'تنبيه مهم من AiWay':'الخدمة غير متاحة مؤقتًا'):(siteWide?'Important AiWay notice':'Service temporarily unavailable');el.querySelector('.announcement-title').textContent=lang==='ar'?(level==='danger'?'صيانة مؤقتة':'تحديث للخدمة'):(level==='danger'?'Temporary maintenance':'Service update');el.querySelector('.announcement-text').textContent=message;const action=el.querySelector('.announcement-action');if(siteWide){action.hidden=true;action.onclick=null}else{action.hidden=false;action.textContent=lang==='ar'?'العودة':'Go back';action.onclick=()=>leaveAnnouncementContext(context)}}
+function renderGlobalAnnouncement(value){let el=document.getElementById('aiwayAnnouncement');if(!shouldShowGlobalAnnouncement(value)){el?.remove();return}if(!el){el=document.createElement('div');el.id='aiwayAnnouncement';el.className='aiway-announcement';const text=document.createElement('span');text.className='announcement-text';const close=document.createElement('button');close.type='button';close.setAttribute('aria-label',lang==='ar'?'إغلاق الإعلان':'Close announcement');close.textContent='×';close.onclick=()=>el.remove();el.append(text,close);document.body.appendChild(el)}el.className='aiway-announcement '+(['warning','danger'].includes(value.level)?value.level:'info');const text=el.querySelector('.announcement-text');if(text)text.textContent=(lang==='ar'?value.text_ar:value.text_en)||value.text_ar||value.text_en||''}
 function refreshGlobalAnnouncement(){if(window.aiwayGlobalAnnouncement)renderGlobalAnnouncement(window.aiwayGlobalAnnouncement)}
 async function loadModels(){
   const selected=$('model').value;
@@ -598,7 +597,7 @@ const conversationCoreCache=new Map(),conversationCoreRequests=new Map();
 function fetchConversationCore(id,{force=false}={}){
   if(!force&&conversationCoreCache.has(id))return Promise.resolve(conversationCoreCache.get(id));
   if(!force&&conversationCoreRequests.has(id))return conversationCoreRequests.get(id);
-  const request=api('/api/conversations?id='+encodeURIComponent(id)+'&includeImages=0').then(data=>{conversationCoreCache.set(id,data);saveLocalConversation(id,data);return data}).finally(()=>conversationCoreRequests.delete(id));
+  const request=(async()=>{let offset=0,allMessages=[],base=null,pages=0;do{const data=await api('/api/conversations?id='+encodeURIComponent(id)+'&includeImages=0&messageOffset='+offset);if(!base)base=data;allMessages.push(...(data.conversation?.messages||[]));const next=data.nextMessageOffset;if(next===null||next===undefined||next<=offset)break;offset=next;pages++;}while(pages<500);if(!base)throw new Error('Conversation unavailable');base.conversation.messages=allMessages;base.nextMessageOffset=null;conversationCoreCache.set(id,base);saveLocalConversation(id,base);return base})().finally(()=>conversationCoreRequests.delete(id));
   conversationCoreRequests.set(id,request);return request;
 }
 function prefetchConversationCore(id){
@@ -919,6 +918,7 @@ function render(){
   requestAnimationFrame(()=>{if(stick)scrollToLatest('auto');else updateScrollLatestButton()});
 }
 let streamQueue='',streamTimer=0,streamDrainResolve=null,firstStreamChunkSeen=false;
+const STREAM_PAINT_MS=72;
 function setSendButtonState(state='idle'){
   const button=$('sendBtn');if(!button)return;
   const isStop=state==='streaming';
@@ -944,16 +944,18 @@ function syncComposerStreamStatus(message){
 }
 function scheduleStreamPaint(){
   if(streamTimer)return;
-  streamTimer=requestAnimationFrame(()=>{
+  // Batch tiny provider deltas. Re-parsing markdown on every animation frame caused visible
+  // flashing, especially while a fenced code block was still being written.
+  streamTimer=setTimeout(()=>{
     streamTimer=0;
     if(streamQueue){
       const message=history[history.length-1];
       if(message)message.content=(message.content||'')+streamQueue;
       streamQueue='';
-      updateStreamingBubble();
+      requestAnimationFrame(()=>updateStreamingBubble());
     }
     if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}
-  });
+  },STREAM_PAINT_MS);
 }
 function enqueueStreamText(text){
   if(!text)return;
@@ -964,29 +966,59 @@ function enqueueStreamText(text){
   streamQueue+=text;scheduleStreamPaint();
 }
 function drainStreamQueue(){if(!streamQueue&&!streamTimer)return Promise.resolve();return new Promise(resolve=>{streamDrainResolve=resolve;scheduleStreamPaint()})}
+function activeOpenCodeFence(text){
+ const value=String(text||''),matches=[...value.matchAll(/```/g)];if(matches.length%2===0)return null;
+ const start=matches[matches.length-1].index,tail=value.slice(start+3),lineEnd=tail.indexOf('\n');
+ if(lineEnd<0)return null;
+ return {prefix:value.slice(0,start+3+lineEnd+1),code:tail.slice(lineEnd+1)};
+}
 function updateStreamingBubble(firstChunk=false){
   const box=$('messages'),article=box.querySelector('.msg.assistant:last-of-type'),content=article?.querySelector('.bubble-content');
   if(!content)return;
   const message=history.at(-1),text=message?.content||'',stick=userPinnedToBottom||isNearBottom(180);
   syncComposerStreamStatus(message);
   content.classList.toggle('streaming',Boolean(text)&&!message?.streamComplete);
-  if(firstChunk){article?.classList.add('first-chunk');setTimeout(()=>article?.classList.remove('first-chunk'),320)}
+  // Do not animate the whole bubble on the first token; it reads as a flash during streaming.
   if(text){
-    const html=renderStreamingMarkdown(text);
-    if(content.dataset.streamHtml!==html){content.innerHTML=html;content.dataset.streamHtml=html}
+    const openFence=activeOpenCodeFence(text),liveCode=content.querySelector('pre.raw-stream-code code');
+    if(openFence&&liveCode&&content.dataset.openFencePrefix===openFence.prefix){
+      if(liveCode.textContent!==openFence.code)liveCode.textContent=openFence.code;
+    }else{
+      const html=renderStreamingMarkdown(text);
+      if(content.dataset.streamHtml!==html){content.innerHTML=html;content.dataset.streamHtml=html}
+      if(openFence)content.dataset.openFencePrefix=openFence.prefix;else delete content.dataset.openFencePrefix;
+    }
   }else content.innerHTML=progressMarkup(message);
   if(stick){box.scrollTo({top:box.scrollHeight,behavior:'auto'});userPinnedToBottom=true}
   else{userPinnedToBottom=false;updateScrollLatestButton()}
 }
 
 let pendingAttachments=[];
-const MAX_FILE_BYTES=2*1024*1024,MAX_TOTAL_BYTES=Math.floor(2.5*1024*1024),MAX_ATTACHMENTS=3;
+const MAX_BINARY_FILE_BYTES=Math.floor(2.7*1024*1024),MAX_TEXT_FILE_BYTES=Math.floor(3.2*1024*1024),MAX_TOTAL_BYTES=Math.floor(3.6*1024*1024),MAX_ATTACHMENTS=12;
+function isTextLikeFile(file){const type=String(file?.type||'').toLowerCase(),name=String(file?.name||'').toLowerCase();return type.startsWith('text/')||/(json|javascript|typescript|xml|yaml|csv|markdown|sql|shell|python|php|ruby|go|rust|java|c\+\+|x-sh)/.test(type)||/\.(txt|md|markdown|json|jsonl|js|mjs|cjs|jsx|ts|tsx|css|scss|sass|less|html?|xml|svg|yml|yaml|toml|ini|conf|env|csv|tsv|sql|py|rb|php|java|kt|kts|c|h|cc|cpp|cxx|hpp|cs|go|rs|swift|dart|sh|bash|zsh|fish|ps1|bat|cmd|vue|svelte|astro|graphql|gql|proto|dockerfile)$/i.test(name)||/(^|\/)dockerfile$/i.test(name);}
+function fileToText(file){return file.text?file.text():new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(r.error);r.readAsText(file)})}
 function dbOpen(){return new Promise((resolve,reject)=>{const q=indexedDB.open('aiway-local-files',1);q.onupgradeneeded=()=>q.result.createObjectStore('files',{keyPath:'id'});q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
 async function saveLocalAttachment(a){try{const d=await dbOpen(),tx=d.transaction('files','readwrite');tx.objectStore('files').put(a);await new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=()=>j(tx.error)});d.close()}catch{}}
 function fileToDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(file)})}
 async function compressImage(file){const url=await fileToDataUrl(file);return new Promise(resolve=>{const img=new Image();img.onload=()=>{const max=1600,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.82))};img.onerror=()=>resolve(url);img.src=url})}
-async function addFiles(files){for(const file of [...files]){if(pendingAttachments.length>=MAX_ATTACHMENTS){toast(lang==='ar'?'الحد الأقصى 3 ملفات في الرسالة.':'A message can contain up to 3 files.');break}if(file.size>MAX_FILE_BYTES){toast(lang==='ar'?`الملف ${file.name} أكبر من 2 ميجابايت.`:`${file.name} is larger than 2 MB.`);continue}const current=pendingAttachments.reduce((n,a)=>n+(a.size||0),0);if(current+file.size>MAX_TOTAL_BYTES){toast(lang==='ar'?'إجمالي الملفات يجب ألا يتجاوز 2.5 ميجابايت.':'The combined file size must not exceed 2.5 MB.');break}try{const isImage=file.type.startsWith('image/');const dataUrl=isImage?await compressImage(file):await fileToDataUrl(file);if(typeof dataUrl!=='string'||!dataUrl.startsWith('data:'))throw Error('Invalid file data');const item={id:crypto.randomUUID(),name:file.name,type:file.type||'application/octet-stream',size:file.size,dataUrl,createdAt:Date.now()};pendingAttachments.push(item);saveLocalAttachment(item)}catch(error){console.error('Attachment read failed',error);toast(lang==='ar'?`تعذر قراءة الملف ${file.name}. اختر ملفًا آخر أو أعد المحاولة.`:`Could not read ${file.name}. Choose another file or try again.`)}}renderAttachmentStrip();$('fileInput').value=''}
-function renderAttachmentStrip(){const box=$('attachmentStrip');box.classList.toggle('show',pendingAttachments.length>0);box.innerHTML=pendingAttachments.map((a,i)=>`<div class="attachment-chip">${a.type.startsWith('image/')?`<img src="${a.dataUrl}" alt="">`:ICONS.chat}<span>${esc(a.name)}</span><button class="remove-attachment" data-remove-attachment="${i}">×</button></div>`).join('');box.querySelectorAll('[data-remove-attachment]').forEach(b=>b.onclick=()=>{pendingAttachments.splice(Number(b.dataset.removeAttachment),1);renderAttachmentStrip()})}
+async function addFiles(files){
+  for(const file of [...files]){
+    if(pendingAttachments.length>=MAX_ATTACHMENTS){toast(lang==='ar'?`يمكن إرفاق حتى ${MAX_ATTACHMENTS} ملفًا في الرسالة الواحدة.`:`You can attach up to ${MAX_ATTACHMENTS} files per message.`);break}
+    const textLike=isTextLikeFile(file),perFileLimit=textLike?MAX_TEXT_FILE_BYTES:MAX_BINARY_FILE_BYTES;
+    if(file.size>perFileLimit){toast(lang==='ar'?`الملف ${file.name} كبير جدًا لهذا الطلب. الملفات النصية/الكود حتى ${(MAX_TEXT_FILE_BYTES/1048576).toFixed(1)} MB والملفات الثنائية حتى ${(MAX_BINARY_FILE_BYTES/1048576).toFixed(1)} MB.`:`${file.name} is too large for one request. Text/code files support up to ${(MAX_TEXT_FILE_BYTES/1048576).toFixed(1)} MB and binary files up to ${(MAX_BINARY_FILE_BYTES/1048576).toFixed(1)} MB.`);continue}
+    const current=pendingAttachments.reduce((n,a)=>n+(a.size||0),0);
+    if(current+file.size>MAX_TOTAL_BYTES){toast(lang==='ar'?'إجمالي المرفقات تجاوز سعة طلب Vercel الآمنة. قسّم الملفات على أكثر من رسالة حتى لا يتم حذف أي محتوى.':'Attachments exceed the safe Vercel request capacity. Split them across messages so no content is dropped.');break}
+    try{
+      const isImage=file.type.startsWith('image/');
+      let item;
+      if(textLike&&!isImage){const text=await fileToText(file);item={id:crypto.randomUUID(),name:file.name,type:file.type||'text/plain',size:file.size,text,createdAt:Date.now()}}
+      else{const dataUrl=isImage?await compressImage(file):await fileToDataUrl(file);if(typeof dataUrl!=='string'||!dataUrl.startsWith('data:'))throw Error('Invalid file data');item={id:crypto.randomUUID(),name:file.name,type:file.type||'application/octet-stream',size:file.size,dataUrl,createdAt:Date.now()}}
+      pendingAttachments.push(item);saveLocalAttachment(item)
+    }catch(error){console.error('Attachment read failed',error);toast(lang==='ar'?`تعذر قراءة الملف ${file.name}. اختر ملفًا آخر أو أعد المحاولة.`:`Could not read ${file.name}. Choose another file or try again.`)}
+  }
+  renderAttachmentStrip();$('fileInput').value=''
+}
+function renderAttachmentStrip(){const box=$('attachmentStrip');box.classList.toggle('show',pendingAttachments.length>0);box.innerHTML=pendingAttachments.map((a,i)=>`<div class="attachment-chip">${a.type.startsWith('image/')&&a.dataUrl?`<img src="${a.dataUrl}" alt="">`:ICONS.chat}<span>${esc(a.name)}</span><button class="remove-attachment" data-remove-attachment="${i}">×</button></div>`).join('');box.querySelectorAll('[data-remove-attachment]').forEach(b=>b.onclick=()=>{pendingAttachments.splice(Number(b.dataset.removeAttachment),1);renderAttachmentStrip()})}
 function isImageRequest(text){return /(?:اعمل|أنشئ|ارسم|ولد|صمم|generate|create|draw)\s+(?:لي\s+)?(?:صورة|image|photo|poster|logo)/i.test(text)}
 function imageModelGuidance(text){const useArabic=/[\u0600-\u06FF]/.test(text)||lang==='ar';return useArabic?'طلبك يبدو طلب توليد صورة. من فضلك افتح قائمة النماذج واختر نموذجًا من قسم AI Images ثم أرسل الطلب مرة أخرى.':'Your request looks like an image-generation request. Please open the model list, choose a model from AI Images, then send your request again.'}
 function safeDownloadName(name,fallback='AiWay-download'){try{return decodeURIComponent(String(name||fallback)).split(/[\/]/).pop().replace(/[\u0000-\u001f<>:\"|?*]/g,'_').slice(0,160)||fallback}catch{return fallback}}
@@ -1045,12 +1077,33 @@ function syncImageOptions(){
 }
 function syncModelMode(){const isImage=selectedImageModelForTask()?.type==='image';updateModelTrigger();syncImageOptions();$('webPill').style.display=isImage?'none':'';$('prompt').placeholder=isImage?(lang==='ar'?'صف الصورة التي تريد إنشاءها...':'Describe the image you want to create...'):(lang==='ar'?'اسأل أي شيء...':'Ask anything...')}
 async function persistGeneratedImage(image){if(!image?.id||!image?.thumbnail_data)return;try{const result=await api('/api/image',{method:'POST',body:JSON.stringify({action:'persist',imageId:image.id,imageData:image.thumbnail_data})});image.storage_status=result?.storageStatus||(result?.fallback?'client_only':'ready');image.fallback_reason=result?.reason||null;if(result?.fallback)toast(I18N[lang].storageFallbackNotice);render()}catch(e){console.error('Background image save failed',e);image.storage_status='failed';render()}}
-async function generateImageMessage(text,attachments,overrideModelId='',overrideTaskId=''){const modelId=overrideModelId||taskRoutedModelId();const previewModel=(window.aiwayImageModels||[]).find(m=>m.id===modelId);history.push({role:'assistant',content:'',generatedImage:null,imageGenerating:true,selectedModelName:previewModel?.name||previewModel?.shortName||'',requestLanguage:/[\u0600-\u06FF]/.test(text)?'ar':'en'});render();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const r=await api('/api/image',{method:'POST',timeoutMs:180000,body:JSON.stringify({conversationId:current,prompt:text,referenceImage:attachments.find(a=>a.type.startsWith('image/'))?.dataUrl||null,modelId,aspectRatio:$('aspectRatio').value,resolution:$('imageResolution').value,requestId:newRequestId(),locale:lang,taskId:overrideTaskId||routedTaskId()})});const actualModelId=r.routedModelId||r.modelId||modelId;history[history.length-1]={role:'assistant',content:lang==='ar'?'تم إنشاء الصورة المطلوبة.':'The requested image has been generated.',generatedImage:r.image,model_id:actualModelId,routedModelId:actualModelId,chargedTokens:Number(r.chargedTokens||0),providerUsd:Number(r.providerUsd||0),selectedModelName:r.selectedModelName||actualModelId,token_usage:{chargedTokens:Number(r.chargedTokens||0),routedModelId:actualModelId,providerUsd:Number(r.providerUsd||0),selectedModelName:r.selectedModelName||actualModelId}};render();persistGeneratedImage(r.image);await Promise.all([refreshMe(),loadChats()]);if(r.lowBalance)showLowBalance(r.remainingTokens)}
+async function generateImageMessage(text,attachments,overrideModelId='',overrideTaskId=''){const modelId=overrideModelId||taskRoutedModelId();const previewModel=(window.aiwayImageModels||[]).find(m=>m.id===modelId);history.push({role:'assistant',content:'',generatedImage:null,imageGenerating:true,selectedModelName:previewModel?.name||previewModel?.shortName||'',requestLanguage:/[\u0600-\u06FF]/.test(text)?'ar':'en'});render();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const imageAttachments=(attachments||[]).map(({name,type,size,dataUrl,text})=>({name,type,size,dataUrl,text}));const r=await api('/api/image',{method:'POST',timeoutMs:180000,body:JSON.stringify({conversationId:current,prompt:text,attachments:imageAttachments,modelId,aspectRatio:$('aspectRatio').value,resolution:$('imageResolution').value,requestId:newRequestId(),locale:lang,taskId:overrideTaskId||routedTaskId()})});const actualModelId=r.routedModelId||r.modelId||modelId;history[history.length-1]={role:'assistant',content:lang==='ar'?'تم إنشاء الصورة المطلوبة.':'The requested image has been generated.',generatedImage:r.image,model_id:actualModelId,routedModelId:actualModelId,chargedTokens:Number(r.chargedTokens||0),providerUsd:Number(r.providerUsd||0),selectedModelName:r.selectedModelName||actualModelId,token_usage:{chargedTokens:Number(r.chargedTokens||0),routedModelId:actualModelId,providerUsd:Number(r.providerUsd||0),selectedModelName:r.selectedModelName||actualModelId}};render();persistGeneratedImage(r.image);await Promise.all([refreshMe(),loadChats()]);if(r.lowBalance)showLowBalance(r.remainingTokens)}
 
+function utf8Bytes(value){try{return new TextEncoder().encode(String(value??'')).length}catch{return String(value??'').length*2}}
+function backendLikePendingMessage(text,attachments=[]){
+ const base=text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files');
+ const textFiles=attachments.filter(a=>typeof a?.text==='string');
+ const richFiles=attachments.filter(a=>typeof a?.text!=='string');
+ const textPayload=textFiles.map(a=>`\n\n--- ATTACHED FILE: ${String(a.name||'').slice(0,150)} ---\n${a.text}\n--- END FILE: ${String(a.name||'').slice(0,150)} ---`).join('');
+ const combined=base+textPayload;
+ const content=richFiles.length?[{type:'text',text:combined},...richFiles.map(a=>String(a.type||'').startsWith('image/')?{type:'image_url',image_url:{url:'data:image/placeholder;base64,'}}:{type:'file',file:{filename:String(a.name||'').slice(0,150),file_data:'data:application/octet-stream;base64,'}})]:combined;
+ return {role:'user',content,attachments:attachments.map(({name,type,size})=>({name,type,size}))};
+}
+function packConversationMessages(messages,attachmentPayloadBytes=0){
+ const source=(messages||[]).filter(m=>m&&['user','assistant'].includes(m.role)).map(m=>({role:m.role,content:m.content||''}));
+ const hardBudget=Math.max(220000,4100000-Math.max(0,attachmentPayloadBytes)-70000);
+ let used=2,kept=[];
+ for(let i=source.length-1;i>=0;i--){const candidate=source[i];const bytes=utf8Bytes(JSON.stringify(candidate))+1;if(!kept.length||used+bytes<=hardBudget){kept.unshift(candidate);used+=bytes}else break}
+ return {messages:kept,omitted:Math.max(0,source.length-kept.length)};
+}
 function estimateMessagesForBackend(text,attachments){
- const pending={role:'user',content:text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files')};
- if(attachments?.length)pending.attachments=attachments.map(({name,type,size})=>({name,type,size}));
- return [...history.filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content||''})),pending];
+ const list=attachments||[],base=text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files');
+ const prior=history.filter(m=>m.role==='user'||m.role==='assistant').map(m=>({role:m.role,content:m.content||''}));
+ const transportPending={role:'user',content:base};
+ const packed=packConversationMessages([...prior,transportPending],utf8Bytes(JSON.stringify(list)));
+ const pending=backendLikePendingMessage(text,list);
+ if(packed.messages.length)packed.messages[packed.messages.length-1]=pending;else packed.messages=[pending];
+ return {...packed,pending};
 }
 function formatApproximateCost(estimate){
  const tokens=Math.max(1,Number(estimate?.chargedTokens||0));
@@ -1070,7 +1123,8 @@ async function confirmEstimatedMessageCost(modelId,text,attachments){
  const imageMode=selectedImageModelForTask()?.type==='image';
  const decision=showCostEstimateLoading();
  try{
-  const estimate=await api('/api/models',{method:'POST',body:JSON.stringify({action:'estimate-message',modelId,messages:estimateMessagesForBackend(text,attachments),attachments,taskId:routedTaskId(),webSearch:imageMode?false:webSearch,outputReserve:0,resolution:imageMode?$('imageResolution').value:'',hasReferenceImage:imageMode&&attachments.some(a=>String(a.type||'').startsWith('image/')),aspectRatio:imageMode?$('aspectRatio').value:'',locale:lang})});
+  const estimateContext=estimateMessagesForBackend(text,attachments);
+  const estimate=await api('/api/models',{method:'POST',body:JSON.stringify({action:'estimate-message',modelId,messages:estimateContext.messages,attachments:(attachments||[]).map(({name,type,size,text})=>({name,type,size,text:typeof text==='string'})),clientOmittedContextMessages:estimateContext.omitted,taskId:routedTaskId(),webSearch:imageMode?false:webSearch,outputReserve:0,resolution:imageMode?$('imageResolution').value:'',hasReferenceImage:imageMode&&attachments.some(a=>String(a.type||'').startsWith('image/')),aspectRatio:imageMode?$('aspectRatio').value:'',locale:lang})});
   estimate.attachmentNames=(attachments||[]).map(file=>file?.name).filter(Boolean);
   updateCostEstimateDialog(formatApproximateCost(estimate));
   return await decision;
@@ -1105,31 +1159,33 @@ async function sendMessage(){
     }
     if(isImageRequest(text)&&selectedModel()?.type!=='image'){
       const guidance=imageModelGuidance(text);
-      history.push({role:'user',content:text,attachments:pendingAttachments.map(({name,type,size,dataUrl})=>({name,type,size,dataUrl}))});
+      history.push({role:'user',content:text,attachments:pendingAttachments.map(({name,type,size,dataUrl,text})=>({name,type,size,dataUrl,text}))});
       history.push({role:'assistant',content:guidance});
       render();toast(guidance);openModelMenu();return;
     }
-    const estimateAttachments=pendingAttachments.map(({name,type,size})=>({name,type,size}));
+    const estimateAttachments=pendingAttachments.map(({name,type,size,dataUrl,text})=>({name,type,size,dataUrl,text}));
     if(!await confirmEstimatedMessageCost(taskRoutedModelId(),text,estimateAttachments))return;
     if(!current){
       const firstTitle=(text||(pendingAttachments?.[0]?.name)|| (lang==='ar'?'محادثة جديدة':'New chat')).replace(/\s+/g,' ').trim().slice(0,80);const d=await api('/api/conversations',{method:'POST',body:JSON.stringify({title:firstTitle,modelId,taskId:routedTaskId()})});
       current=d.conversation.id;
     }
-    const sentAttachments=pendingAttachments.map(({name,type,size,dataUrl})=>({name,type,size,dataUrl}));
-    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
+    const sentAttachments=pendingAttachments.map(({name,type,size,dataUrl,text})=>({name,type,size,dataUrl,text}));
+    pendingAttachments=[];renderAttachmentStrip();streamQueue='';if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
     history.push({role:'user',content:text||(lang==='ar'?'حلل الملفات المرفقة':'Analyze the attached files'),attachments:sentAttachments});
     $('prompt').value='';autoSize();render();$('status').textContent='';setSendButtonState('streaming');
     if(selectedModel()?.type==='image'){await generateImageMessage(text,sentAttachments);return}
     const requestLanguage=/[\u0600-\u06FF]/.test(text)?'ar':'en';history.push({role:'assistant',content:'',requestLanguage,usedWebSearch:effectiveWebSearch,streamStage:'analyzing'});render();stageTimer=setTimeout(()=>{const m=history.at(-1);if(streaming&&m?.role==='assistant'&&!m.content){m.streamStage=effectiveWebSearch?'searching':'writing';updateStreamingBubble();syncComposerStreamStatus(m)}},650);
-    let r;try{r=await fetchWithClientTimeout('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history.slice(0,-1),temperature:.7,webSearch:effectiveWebSearch,attachments:sentAttachments,requestId:newRequestId(),locale:lang,taskId:routedTaskId()})},45000)}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
+    const attachmentPayloadBytes=utf8Bytes(JSON.stringify(sentAttachments));
+    const transportContext=packConversationMessages(history.slice(0,-1),attachmentPayloadBytes);
+    let r;try{r=await fetchWithClientTimeout('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:transportContext.messages,clientOmittedContextMessages:transportContext.omitted,temperature:.7,webSearch:effectiveWebSearch,attachments:sentAttachments,requestId:newRequestId(),locale:lang,taskId:routedTaskId()})},45000)}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
     if(!r.body)throw makeUiError(lang==='ar'?'تعذر بدء بث الإجابة في هذا المتصفح. حدّث المتصفح وحاول مرة أخرى.':'Could not start response streaming in this browser. Update the browser and try again.','STREAM_INTERRUPTED');
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null;
-    while(true){const {done,value}=await readStreamWithIdleTimeout(reader,60000);if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta'){const m=history.at(-1);if(m)m.streamStage='writing';enqueueStreamText(d.text)}if(d.type==='done'){completed=true;lowBalanceInfo=d.lowBalance?d:null;const m=history[history.length-1];m.streamComplete=true;m.routedModelId=d.routedModelId;m.requestedModelId=d.requestedModelId;m.fallbackUsed=Boolean(d.fallbackUsed);m.generationId=d.generationId;m.id=d.messageId||m.id;m.chargedTokens=Number(d.chargedTokens||0);m.selectedModelName=d.selectedModelName||'';m.providerUsd=Number(d.providerUsd||0);m.autoSelected=Boolean(d.autoSelected);m.token_usage={...(m.token_usage||{}),...(d.usage||{}),webSearch:Boolean(m.usedWebSearch),chargedTokens:Number(d.chargedTokens||0),remainingTokens:Number(d.remainingTokens||0),fallbackUsed:Boolean(d.fallbackUsed),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId,selectedModelName:d.selectedModelName||'',providerUsd:Number(d.providerUsd||0),autoSelected:Boolean(d.autoSelected)}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
+    while(true){const {done,value}=await readStreamWithIdleTimeout(reader,60000);if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta'){const m=history.at(-1);if(m)m.streamStage='writing';enqueueStreamText(d.text)}if(d.type==='done'){completed=true;lowBalanceInfo=d.lowBalance?d:null;const m=history[history.length-1];m.streamComplete=true;m.routedModelId=d.routedModelId;m.requestedModelId=d.requestedModelId;m.fallbackUsed=Boolean(d.fallbackUsed);m.generationId=d.generationId;m.id=d.messageId||m.id;m.chargedTokens=Number(d.chargedTokens||0);m.selectedModelName=d.selectedModelName||'';m.providerUsd=Number(d.providerUsd||0);m.autoSelected=Boolean(d.autoSelected);m.omittedContextMessages=Number(d.omittedContextMessages||0);m.token_usage={...(m.token_usage||{}),...(d.usage||{}),webSearch:Boolean(m.usedWebSearch),chargedTokens:Number(d.chargedTokens||0),remainingTokens:Number(d.remainingTokens||0),fallbackUsed:Boolean(d.fallbackUsed),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId,selectedModelName:d.selectedModelName||'',providerUsd:Number(d.providerUsd||0),autoSelected:Boolean(d.autoSelected)}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الإجابة. أعد المحاولة؛ لن يُخصم رصيد عن رد غير مكتمل.':'The connection ended before the answer was complete. Try again; an incomplete response will not be charged.','STREAM_INTERRUPTED');
     clearTimeout(stageTimer);await drainStreamQueue();streaming=false;render();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
   }catch(e){
-    if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
+    if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError'){if(!history.at(-1)?.content)history.pop();toast(lang==='ar'?'تم إيقاف الإجابة':'Response stopped')}
     else{if(e?.code==='FREE_DAILY_LIMIT'){const requestLanguage=history.at(-1)?.requestLanguage||lang;history[history.length-1]={role:'assistant',content:'',generatedImage:null,uiCard:'free-daily-limit',requestLanguage};const t=I18N[requestLanguage]||I18N[lang];toast(t.freeLimitTitle)}else{const friendly=friendlyClientError(e,lang==='ar'?'حدث عطل مؤقت. حاول مرة أخرى؛ لم يتم خصم رصيدك.':'A temporary error occurred. Try again; your balance was not charged.');if(history.at(-1)?.role==='assistant'&&!history.at(-1)?.content)history.at(-1).content=friendly.message;toast(friendly.message);handleActionableError(friendly)}}
     render();
@@ -1149,7 +1205,7 @@ async function continueResponse(index){
     if(userProfile&&Number(userProfile.has_purchased?userProfile.ai_tokens:(userProfile.free_trial_tokens??userProfile.trial_messages_remaining??0))<=0)throw makeUiError(lang==='ar'?'رصيدك انتهى. اشحن رصيدًا جديدًا ثم حاول مرة أخرى.':'Your balance has run out. Add more balance, then try again.','INSUFFICIENT_TOKENS',{availableTokens:0});
     if(!current||!target.id){toast(lang==='ar'?'احفظ المحادثة أولًا ثم حاول مرة أخرى':'Save the conversation first, then try again');return}
     const modelId=activeTask&&activeTask!=='all-models'?'aiway/auto':($('model').value||target.model_id||target.routedModelId||target.token_usage?.activeModelId||'openrouter/auto');
-    streamQueue='';if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
+    streamQueue='';if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamDrainResolve=null;firstStreamChunkSeen=false;streaming=true;controller=new AbortController();
     target.requestLanguage=target.requestLanguage||lang;target.streamStage='writing';render();$('status').textContent=I18N[lang].continueResponse;setSendButtonState('streaming');
     let r;try{r=await fetchWithClientTimeout('/api/chat',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-UI-Language':lang,Authorization:`Bearer ${auth.token}`},body:JSON.stringify({conversationId:current,modelId,messages:history,temperature:.7,webSearch:false,attachments:[],requestId:newRequestId(),locale:lang,continueFromMessageId:target.id,taskId:routedTaskId()})},45000)}catch(error){throw friendlyClientError(error,lang==='ar'?'تعذر الاتصال بخدمة المحادثة. تحقق من الإنترنت ثم حاول مرة أخرى.':'Could not connect to the chat service. Check your internet connection and try again.')}
     if(!r.ok){const d=await r.json().catch(()=>({}));throw makeUiError(d.error||statusMessage(r.status),d.code||`HTTP_${r.status}`,{status:r.status,availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}
@@ -1159,7 +1215,7 @@ async function continueResponse(index){
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الاستكمال. لم يتم تثبيت خصم للجزء غير المكتمل.':'The connection ended before continuation completed. No charge was finalized for the incomplete part.','STREAM_INTERRUPTED');
     await drainStreamQueue();streaming=false;render();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);
   }catch(e){
-    if(streamTimer){cancelAnimationFrame(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
+    if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError')toast(lang==='ar'?'تم إيقاف الاستكمال':'Continuation stopped');else{const friendly=friendlyClientError(e,lang==='ar'?'تعذر استكمال الرد. حاول مرة أخرى.':'Could not continue the response. Try again.');toast(friendly.message);handleActionableError(friendly)}render();
   }finally{if(stageTimer)clearTimeout(stageTimer);streaming=false;controller=null;$('status').textContent='';$('status').classList.remove('stream-status');setSendButtonState('idle')}
 }
