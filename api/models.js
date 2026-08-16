@@ -82,10 +82,13 @@ export default async function handler(req, res) {
       if (routingTaskId) model = await chooseTaskModel(routingTaskId, latestText, {webSearch:Boolean(body.webSearch),hasAttachments:estimateAttachments.length>0,attachmentTypes});
       else if (body.modelId === 'aiway/auto') model = await chooseAutoModel(latestText, {webSearch:Boolean(body.webSearch),hasAttachments:estimateAttachments.length>0,attachmentTypes});
       if (!model) { const id = (routingTaskId ? settings[routingTaskId] : '') || body.modelId; model = models.find(item => item.id === id && modelSupportsAttachmentTypes(item,attachmentTypes)) || models.find(item=>modelSupportsAttachmentTypes(item,attachmentTypes)) || models[0]; }
-      const reserveForServer = estimatePurchased ? 32768 : 16384;
-      const fittedEstimateContext = fitMessagesToModelContext(estimateMessages, Number(model.contextLength || model.context_length || 0), reserveForServer, locale);
+      // Reserve context capacity conservatively, but do NOT bill the estimate as if the model
+      // will always emit the whole reserve. estimateChatCharge(..., 0) predicts output size
+      // from the actual prompt/context/attachments instead.
+      const reserveForContext = estimatePurchased ? 32768 : 16384;
+      const fittedEstimateContext = fitMessagesToModelContext(estimateMessages, Number(model.contextLength || model.context_length || 0), reserveForContext, locale);
       if (fittedEstimateContext.tooLarge) return json(res, 413, { error:localize(locale,'المحتوى أكبر من سعة النموذج المختار.','The content exceeds the selected model context capacity.'), code:'CONTEXT_TOO_LONG' });
-      const estimate = estimateChatCharge(model.pricing, fittedEstimateContext.messages, Boolean(body.webSearch), reserveForServer);
+      const estimate = estimateChatCharge(model.pricing, fittedEstimateContext.messages, Boolean(body.webSearch), 0);
       return json(res, 200, {
         type:'chat', modelId:model.id, routedModelId:model.id, modelName:model.name,
         ...(estimatePurchased ? estimate : { ...estimate, providerUsd:0, chargedTokens:1 }),
