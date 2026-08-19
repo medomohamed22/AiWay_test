@@ -263,7 +263,7 @@ function imageUnitCost(m){const values=[m?.pricing?.image,m?.pricing?.image_outp
 function modelCostValue(m){if(m?.isAuto||m?.id==='openrouter/auto')return Number.POSITIVE_INFINITY;return m?.type==='image'?imageUnitCost(m):chatCostPerMillion(m)}
 function isUnsupportedOpenRouterImageModel(m){const id=String(m?.id||'').toLowerCase(),name=String(m?.name||'').trim().toLowerCase();return id==='openrouter/auto'||id==='openrouter/auto:beta'||id==='openrouter/auto-beta'||/(^|\/)openrouter[\s:_-]*(auto)?[\s:_-]*beta$/.test(id)||/^openrouter(?:\s+auto)?(?:\s+beta)?$/.test(name)}
 function compareCostAsc(a,b){const av=modelCostValue(a),bv=modelCostValue(b);return av-bv||String(a.name||a.id).localeCompare(String(b.name||b.id))}
-function compareCostDesc(a,b){const av=modelCostValue(a),bv=modelCostValue(b);return bv-av||String(a.name||a.id).localeCompare(String(b.name||b.id))}
+function compareCostDesc(a,b){const av=modelCostValue(a),bv=modelCostValue(b),af=Number.isFinite(av),bf=Number.isFinite(bv);if(af!==bf)return af?-1:1;return (bf&&af?bv-av:0)||String(a.name||a.id).localeCompare(String(b.name||b.id))}
 function tokenUsageBadge(m){if(isFreeModel(m)||m?.isFree)return {text:lang==='ar'?'استهلاك منخفض للتوكين':'Low token cost',level:'low'};const cost=chatCostPerMillion(m);if(!Number.isFinite(cost))return null;if(cost>15)return {text:lang==='ar'?'استهلاك عالي جدًا للتوكين':'Very high token cost',level:'very-high'};if(cost>5)return {text:lang==='ar'?'استهلاك عالي للتوكين':'High token cost',level:'high'};return {text:lang==='ar'?'استهلاك منخفض للتوكين':'Low token cost',level:'low'}}
 function rankTier(rank){if(!Number.isFinite(Number(rank)))return null;const n=Number(rank);if(n<=10)return 'top10';if(n<=25)return 'top25';if(n<=50)return 'top50';return null}
 function officialModelBadges(m){
@@ -303,8 +303,8 @@ function renderModelMenu(filter='free'){
  if(imageTask&&!['image-cheap','image-expensive'].includes(filter))filter='image-cheap';
  if(filter==='image-cheap')items=paidImages.sort(compareCostAsc);
  if(filter==='image-expensive')items=paidImages.sort(compareCostDesc);
- if(filter==='cheap')items=modelsByBackendOrder(paidChat,orders.cheapest,compareCostAsc).slice(0,15);
- if(filter==='paid')items=[...paidChat].sort(compareCostDesc);
+ if(filter==='cheap')items=[...paidChat].sort(compareCostAsc).slice(0,15);
+ if(filter==='paid')items=[...paidChat].sort(compareCostDesc).slice(0,15);
  if(filter==='free')items=modelsByBackendOrder(all.filter(isFreeModel),orders.free,compareCostAsc);
  const labels={'image-cheap':lang==='ar'?'الأرخص':'Cheapest','image-expensive':lang==='ar'?'الأغلى':'Most expensive',cheap:lang==='ar'?'الأرخص':'Cheapest',paid:lang==='ar'?'الأغلى':'Most expensive',free:I18N[lang].modelsFree};
  const tabKeys=imageTask?['image-cheap','image-expensive']:['free','cheap','paid'];
