@@ -11,7 +11,7 @@
 <link href="/aiway-logo.png" rel="icon" type="image/png"/>
 <link href="/aiway-logo.png" rel="apple-touch-icon"/>
 <link as="image" fetchpriority="high" href="/aiway-logo.png" rel="preload"/>
-<link href="/app.css?v=20260819-2" rel="stylesheet"/>
+<link href="/app.css?v=20260819-3" rel="stylesheet"/>
 <link href="/motion.css" rel="stylesheet"/>
 <script src="/analytics-init.js"></script>
 <script defer="" src="/_vercel/insights/script.js"></script>
@@ -83,8 +83,15 @@
 <div class="task-shell">
 <div class="task-nav"><div class="task-brand"><img alt="AiWay" src="/aiway-logo.png"/><span>AiWay</span></div><button aria-label="Switch language" class="task-lang-btn" id="taskLanguageBtn" type="button">AR</button></div>
 <div class="task-head"><span class="task-kicker" id="taskKicker">✦ AI utility powered by Pi</span><h1 id="taskTitle">What do you want to <span>get done?</span></h1><p id="taskCopy">Choose a task. AiWay automatically uses a suitable, cost-efficient AI model, and you pay with Pi.</p></div>
+<div class="task-discovery" id="taskDiscovery">
+  <label class="task-search-wrap" for="taskSearch"><span aria-hidden="true">⌕</span><input id="taskSearch" type="search" autocomplete="off" placeholder="ابحث عن أداة..." aria-label="ابحث عن أداة"/><kbd>Ctrl K</kbd></label>
+  <div class="task-filters" id="taskFilters" role="group" aria-label="تصنيف الأدوات"></div>
+  <div class="task-result-meta" id="taskResultMeta" aria-live="polite"></div>
+</div>
 <div class="task-grid" id="taskGrid"></div>
+<div class="task-empty" id="taskEmpty" hidden><b>لا توجد أداة مطابقة</b><small>جرّب كلمة بحث أخرى أو اختر تصنيفًا مختلفًا.</small></div>
 <div class="task-footer" id="taskFooter">No model selection needed — just choose your task and start.</div>
+<div class="task-legal"><a href="/privacy-policy.html">الخصوصية</a><span>•</span><a href="/terms-of-service.html">الشروط</a></div>
 </div>
 </div>
 <div aria-live="polite" class="signin-guide" id="signinGuide"><span class="signin-guide-text" id="signinGuideText">Sign in to use AiWay</span></div>
@@ -155,7 +162,7 @@
 </section>
 </div>
 <div class="auth-progress" id="authProgress" aria-live="polite" aria-hidden="true"><span class="auth-progress-spinner"></span><div><b id="authProgressTitle">Signing in</b><small id="authProgressText">Connecting securely to Pi…</small></div></div><div class="toast" id="toast"></div>
-<script src="/app.js?v=20260819-2"></script>
+<script src="/app.js?v=20260819-3"></script>
 <script src="/desktop-ui.js"></script>
 <script src="/dropzone-ui.js"></script>
 <script src="/landing-ui.js"></script>
