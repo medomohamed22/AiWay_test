@@ -147,21 +147,34 @@ export default async function handler(req, res) {
       ...latestFive(model => /^google\/gemini/i.test(model.id) || /\bGemini\b/i.test(model.name)),
       ...latestFive(model => /^anthropic\/claude/i.test(model.id) || /\bClaude\b/i.test(model.name)),
       ...latestFive(model => /^x-ai\/grok/i.test(model.id) || /\bGrok\b/i.test(model.name)),
-      ...latestFive(model => /^deepseek\/deepseek/i.test(model.id) || /\bDeepSeek\b/i.test(model.name))
+      ...latestFive(model => /^deepseek\/deepseek/i.test(model.id) || /\bDeepSeek\b/i.test(model.name)),
+      // Keep the newest five GLM and Kimi chat models directly from OpenRouter's live catalog.
+      // No model IDs are hard-coded, so future releases appear automatically according to `created`.
+      ...latestFive(model => /^z-ai\/glm/i.test(model.id) || /\bGLM[\s-]*[0-9]/i.test(model.name)),
+      ...latestFive(model => /^moonshotai\/(?:kimi|kimi-)/i.test(model.id) || /\bKimi\b/i.test(model.name))
     ];
-    const visibleCatalog = [...new Map([...featuredPaid, ...freeModels].map(model => [model.id, model])).values()];
+    const openRouterAuto = catalog.find(model => model.id === 'openrouter/auto') || {
+      id:'openrouter/auto', name:'OpenRouter Auto', description:'OpenRouter automatic model routing',
+      contextLength:128000, pricing:{prompt:0,completion:0}, provider:'openrouter'
+    };
+    const visibleCatalog = [...new Map([openRouterAuto, ...featuredPaid, ...freeModels].map(model => [model.id, model])).values()];
     const models = visibleCatalog.map(model => {
       const isFree = model.id === 'openrouter/free' || model.id.endsWith(':free') ||
         (Number(model.pricing?.prompt || 0) === 0 && Number(model.pricing?.completion || 0) === 0);
+      const isAuto = model.id === 'openrouter/auto';
       return {
         ...model,
+        name:isAuto?'AiWay Auto':model.name,
+        shortName:isAuto?'AiWay Auto':model.shortName,
+        providerLabel:isAuto?'AiWay × OpenRouter':model.providerLabel,
         type:'chat',
-        isFree,
+        isAuto,
+        isFree:isAuto?false:isFree,
         locked:!unlocked && model.id !== 'openrouter/free',
         trial:model.id === 'openrouter/free',
-        costPerMillion:(Number(model.pricing?.prompt || 0) + Number(model.pricing?.completion || 0)) * 1e6
+        costPerMillion:isAuto?Number.POSITIVE_INFINITY:(Number(model.pricing?.prompt || 0) + Number(model.pricing?.completion || 0)) * 1e6
       };
-    }).sort((a,b)=>a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
+    }).sort((a,b)=>Number(Boolean(b.isAuto))-Number(Boolean(a.isAuto))||a.costPerMillion-b.costPerMillion||a.name.localeCompare(b.name));
     const packageConfig=await getPaymentPackages(); const packages = {};
     for (const id of Object.keys(packageConfig)) {
       try { packages[id] = await packageQuote(id); }
@@ -169,7 +182,12 @@ export default async function handler(req, res) {
     }
     return json(res, 200, {
       name:'AiWay', models,
-      chatModelOrders:{ cheapest:models.map(model => model.id), mostExpensive:[...models].reverse().map(model => model.id), free:models.filter(model=>model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id) },
+      chatModelOrders:{
+        cheapest:models.filter(model=>!model.isAuto&&!model.isFree).sort((a,b)=>a.costPerMillion-b.costPerMillion).map(model=>model.id),
+        paid:models.filter(model=>!model.isAuto&&!model.isFree).sort((a,b)=>a.costPerMillion-b.costPerMillion).map(model=>model.id),
+        mostExpensive:models.filter(model=>!model.isAuto&&!model.isFree).sort((a,b)=>b.costPerMillion-a.costPerMillion).map(model=>model.id),
+        free:models.filter(model=>model.isFree||model.costPerMillion===0||model.id.endsWith(':free')||model.id==='openrouter/free').map(model=>model.id)
+      },
       trialModelId:'openrouter/free', packages,
       imageModels:(await imageModels()).map(model => ({ ...model, locked:!unlocked, isFree:false })),
       tokenUsd:TOKEN_USD, tools:await getAiTools(), featureFlags:await getFeatureFlags(), globalAnnouncement:await getGlobalAnnouncement(), providerRouting:{sort:'throughput',allowFallbacks:true,label:'Fastest available provider'}, rankingsSource:'OpenRouter Models API pricing', refreshedAt:new Date().toISOString()
