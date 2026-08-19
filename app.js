@@ -908,6 +908,27 @@ function renderStreamingMarkdown(text){
 }
 function isNearBottom(threshold=96){const box=$('messages');return box.scrollHeight-box.scrollTop-box.clientHeight<=threshold}
 function scrollToLatest(behavior='smooth'){const box=$('messages');box.scrollTo({top:box.scrollHeight,behavior});userPinnedToBottom=true;updateScrollLatestButton()}
+function renderAfterStreamComplete(){
+  const box=$('messages');
+  const followLatest=userPinnedToBottom||isNearBottom(220);
+  const previousTop=box?.scrollTop||0;
+  render();
+  if(!box)return;
+  if(followLatest){
+    userPinnedToBottom=true;
+    const pin=()=>{box.scrollTop=box.scrollHeight;updateScrollLatestButton()};
+    // Final Markdown rendering can change the message height after the stream ends
+    // (code blocks, fonts and images). Re-pin across the next layout passes so
+    // mobile browsers never jump to the beginning of the assistant message.
+    requestAnimationFrame(()=>{pin();requestAnimationFrame(pin)});
+    setTimeout(pin,120);
+    setTimeout(pin,360);
+  }else{
+    // If the user intentionally scrolled up while the answer was streaming,
+    // preserve their reading position instead of forcing them to the bottom.
+    requestAnimationFrame(()=>{box.scrollTop=previousTop;userPinnedToBottom=false;updateScrollLatestButton()});
+  }
+}
 let scrollLatestHideTimer=null;
 function updateScrollLatestButton(){const btn=$('scrollLatest');if(!btn)return;const show=history.length>0&&!isNearBottom(110);btn.classList.toggle('show',show);btn.setAttribute('aria-label',lang==='ar'?'الانتقال لآخر المحادثة':'Go to latest message');btn.title=btn.getAttribute('aria-label');clearTimeout(scrollLatestHideTimer);if(show)scrollLatestHideTimer=setTimeout(()=>btn.classList.remove('show'),5000)}
 function wakeScrollLatestButton(){clearTimeout(scrollLatestHideTimer);updateScrollLatestButton()}
@@ -1185,7 +1206,7 @@ async function sendMessage(){
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null,autoContinuationNeeded=false;
     while(true){const {done,value}=await readStreamWithIdleTimeout(reader,60000);if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta'){const m=history.at(-1);if(m)m.streamStage='writing';enqueueStreamText(d.text)}if(d.type==='done'||d.type==='incomplete'){completed=true;autoContinuationNeeded=d.type==='incomplete';lowBalanceInfo=d.lowBalance?d:null;const m=history[history.length-1];m.streamComplete=d.type==='done';m.incompleteReason=d.reason||'';m.autoContinuationPending=autoContinuationNeeded;m.routedModelId=d.routedModelId;m.requestedModelId=d.requestedModelId;m.fallbackUsed=Boolean(d.fallbackUsed);m.generationId=d.generationId;m.id=d.messageId||m.id;m.chargedTokens=Number(d.chargedTokens||0);m.selectedModelName=d.selectedModelName||'';m.providerUsd=Number(d.providerUsd||0);m.autoSelected=Boolean(d.autoSelected);m.omittedContextMessages=Number(d.omittedContextMessages||0);m.token_usage={...(m.token_usage||{}),...(d.usage||{}),webSearch:Boolean(m.usedWebSearch),chargedTokens:Number(d.chargedTokens||0),remainingTokens:Number(d.remainingTokens||0),fallbackUsed:Boolean(d.fallbackUsed),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId,selectedModelName:d.selectedModelName||'',providerUsd:Number(d.providerUsd||0),autoSelected:Boolean(d.autoSelected)}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الإجابة. أعد المحاولة؛ لن يُخصم رصيد عن رد غير مكتمل.':'The connection ended before the answer was complete. Try again; an incomplete response will not be charged.','STREAM_INTERRUPTED');
-    clearTimeout(stageTimer);await drainStreamQueue();streaming=false;render();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);if(autoContinuationNeeded){const index=history.length-1;setTimeout(()=>continueResponse(index,true,1),0)}
+    clearTimeout(stageTimer);await drainStreamQueue();streaming=false;renderAfterStreamComplete();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);if(autoContinuationNeeded){const index=history.length-1;setTimeout(()=>continueResponse(index,true,1),0)}
   }catch(e){
     if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError'){if(!history.at(-1)?.content)history.pop();toast(lang==='ar'?'تم إيقاف الإجابة':'Response stopped')}
@@ -1215,7 +1236,7 @@ async function continueResponse(index,automatic=false,autoDepth=0){
     const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',completed=false,lowBalanceInfo=null,autoContinuationNeeded=false;
     while(true){const {done,value}=await readStreamWithIdleTimeout(reader,60000);if(done)break;buffer+=decoder.decode(value,{stream:true});const parts=buffer.split('\n\n');buffer=parts.pop()||'';for(const part of parts){const line=part.split('\n').find(x=>x.startsWith('data:'));if(!line)continue;let d;try{d=JSON.parse(line.slice(5))}catch{continue}if(d.type==='delta')enqueueStreamText(d.text);if(d.type==='done'||d.type==='incomplete'){completed=true;autoContinuationNeeded=d.type==='incomplete';lowBalanceInfo=d.lowBalance?d:null;target.streamComplete=d.type==='done';target.incompleteReason=d.reason||'';target.autoContinuationPending=autoContinuationNeeded;target.routedModelId=d.routedModelId;target.requestedModelId=d.requestedModelId;target.fallbackUsed=Boolean(d.fallbackUsed);target.generationId=d.generationId;target.id=d.messageId||target.id;target.chargedTokens=Number(d.totalChargedTokens??d.chargedTokens??target.chargedTokens??0);target.token_usage={...(target.token_usage||{}),...(d.usage||{}),chargedTokens:target.chargedTokens,remainingTokens:Number(d.remainingTokens||0),continuations:Number(d.continuations||1),routedModelId:d.routedModelId,requestedModelId:d.requestedModelId}}if(d.type==='error')throw makeUiError(d.error||statusMessage(500),d.code||'SERVER_ERROR',{availableTokens:d.availableTokens,requiredTokens:d.requiredTokens,shortfall:d.shortfall})}}
     if(!completed)throw makeUiError(lang==='ar'?'انقطع الاتصال قبل اكتمال الاستكمال. لم يتم تثبيت خصم للجزء غير المكتمل.':'The connection ended before continuation completed. No charge was finalized for the incomplete part.','STREAM_INTERRUPTED');
-    await drainStreamQueue();streaming=false;render();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);if(autoContinuationNeeded&&automatic&&autoDepth<4){setTimeout(()=>continueResponse(index,true,autoDepth+1),0)}else if(autoContinuationNeeded&&automatic&&autoDepth>=4){target.autoContinuationPending=false;toast(lang==='ar'?'الرد ما زال طويلًا جدًا. يمكنك الضغط على «استكمال الرد» لمتابعته.':'The response is still very long. You can press “Continue response” to keep going.')} 
+    await drainStreamQueue();streaming=false;renderAfterStreamComplete();await Promise.all([refreshMe(),loadChats()]);if(lowBalanceInfo)showLowBalance(lowBalanceInfo.remainingTokens);if(autoContinuationNeeded&&automatic&&autoDepth<4){setTimeout(()=>continueResponse(index,true,autoDepth+1),0)}else if(autoContinuationNeeded&&automatic&&autoDepth>=4){target.autoContinuationPending=false;toast(lang==='ar'?'الرد ما زال طويلًا جدًا. يمكنك الضغط على «استكمال الرد» لمتابعته.':'The response is still very long. You can press “Continue response” to keep going.')} 
   }catch(e){
     if(streamTimer){clearTimeout(streamTimer);streamTimer=0}streamQueue='';if(streamDrainResolve){streamDrainResolve();streamDrainResolve=null}streaming=false;
     if(e.name==='AbortError')toast(lang==='ar'?'تم إيقاف الاستكمال':'Continuation stopped');else{const friendly=friendlyClientError(e,lang==='ar'?'تعذر استكمال الرد. حاول مرة أخرى.':'Could not continue the response. Try again.');toast(friendly.message);handleActionableError(friendly)}render();

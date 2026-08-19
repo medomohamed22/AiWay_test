@@ -4,7 +4,7 @@ window.addEventListener('load',()=>{
   const run=async()=>{
     try{
       if('serviceWorker' in navigator){
-        const registration=await navigator.serviceWorker.register('/sw.js?v=8',{updateViaCache:'none'});
+        const registration=await navigator.serviceWorker.register('/sw.js?v=11',{updateViaCache:'none'});
         registration.update().catch(()=>{});
         // Remove the old app-shell caches that could return an empty navigation response in Pi Browser.
         if('caches' in window){
