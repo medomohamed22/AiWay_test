@@ -1,5 +1,7 @@
 # AiWay Admin Control Center Upgrade
 
+> هذا مستند قديم من النسخة الأصلية. ملف `admin-upgrade.sql` المذكور أدناه لم يكن ضمن المصدر. تعليمات هذه النسخة الحالية موجودة في [README.md](README.md)، وملفات الترقية الفعلية داخل `supabase/migrations/`. راجع preflight ونسخة staging أولًا.
+
 ## Required one-time database step
 Open the Supabase project -> SQL Editor, paste the contents of `admin-upgrade.sql`, then run it once.
 

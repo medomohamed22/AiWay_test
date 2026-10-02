@@ -120,5 +120,8 @@
       "source": "/api/app-interactions",
       "destination": "/api/apps?route=interactions"
     }
-  ]
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "installCommand": "npm ci --omit=dev --ignore-scripts"
 }

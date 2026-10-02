@@ -11,6 +11,21 @@
     "jose": "6.1.0"
   },
   "devDependencies": {
-    "eslint": "9.39.5"
+    "embedded-postgres": "18.4.0-beta.17",
+    "eslint": "9.39.5",
+    "pg": "8.16.3",
+    "prettier": "3.6.2",
+    "espree": "10.4.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local scripts/dev.mjs",
+    "predev": "npm run build",
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "lint": "eslint server api scripts tests",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
+    "verify": "npm run check && npm run format:check && npm run lint && npm test && npm run build",
+    "format": "prettier --write server api scripts tests",
+    "format:check": "prettier --check server api scripts tests"
   }
 }
